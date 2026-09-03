@@ -1,0 +1,30 @@
+OpenVizPilot Enterprise Edition License
+
+Copyright (c) 2026 Mathias Werk (WerkWorks). All rights reserved.
+
+This directory ("ee/") contains the Enterprise Edition of OpenVizPilot.
+It is NOT covered by the PolyForm Noncommercial license that applies to the
+rest of this repository.
+
+1. Source availability. The source code in ee/ is provided for review and
+   evaluation. You may read it and run it in a non-production, evaluation
+   environment for up to 30 days.
+
+2. Production use. Any other use of the Enterprise Edition — in particular
+   running it in production or for the benefit of third parties — requires a
+   valid, unexpired license key issued by the copyright holder for the
+   licensee named in that key. The software verifies this key at startup
+   and refuses to activate Enterprise features without it.
+
+3. Restrictions. You may not remove, disable, circumvent or otherwise
+   interfere with the license verification, redistribute the Enterprise
+   Edition, or sublicense it.
+
+4. Warranty and liability. The Enterprise Edition is provided "as is",
+   without warranty of any kind. To the maximum extent permitted by law, the
+   copyright holder is not liable for any damages arising from its use.
+
+5. Everything outside ee/ remains licensed under the PolyForm Noncommercial
+   License 1.0.0 (see /LICENSE) and is unaffected by this license.
+
+Contact for commercial licenses: mathiaswerk@icloud.com

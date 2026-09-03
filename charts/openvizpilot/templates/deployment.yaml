@@ -1,0 +1,164 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openvizpilot.fullname" . }}
+  labels:
+    {{- include "openvizpilot.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "openvizpilot.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "openvizpilot.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: middleware
+          image: "{{ required "image.repository ist Pflicht" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: LITELLM_BASE_URL
+              value: {{ required "litellm.baseUrl ist Pflicht" .Values.litellm.baseUrl | quote }}
+            - name: DEFAULT_MODEL
+              value: {{ required "app.defaultModel ist Pflicht" .Values.app.defaultModel | quote }}
+            {{- with .Values.app.modelAllowlist }}
+            - name: MODEL_ALLOWLIST
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LOG_LEVEL
+              value: {{ .Values.app.logLevel | quote }}
+            {{- if not .Values.app.scopeGuard }}
+            - name: SCOPE_GUARD
+              value: "off"
+            {{- end }}
+            {{- with .Values.app.scopeModel }}
+            - name: SCOPE_MODEL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.app.publicUrl }}
+            - name: PUBLIC_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.auth.mode }}
+            - name: AUTH_MODE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if eq .Values.auth.mode "oidc" }}
+            - name: OIDC_PROVIDER
+              value: {{ .Values.oidc.provider | quote }}
+            - name: OIDC_ISSUER
+              value: {{ required "oidc.issuer ist Pflicht bei auth.mode=oidc" .Values.oidc.issuer | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ required "oidc.clientId ist Pflicht bei auth.mode=oidc" .Values.oidc.clientId | quote }}
+            - name: OIDC_SCOPES
+              value: {{ .Values.oidc.scopes | quote }}
+            {{- with .Values.oidc.clientSecretSecret.existingSecret }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.oidc.clientSecretSecret.key }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.license.existingSecret }}
+            - name: OVP_LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.license.key }}
+            {{- end }}
+            {{- with .Values.license.publicKeyB64url }}
+            - name: OVP_LICENSE_PUBLIC_KEY_B64URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LITELLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.litellm.apiKeySecret.existingSecret }}
+                  name: {{ .Values.litellm.apiKeySecret.existingSecret }}
+                  key: {{ .Values.litellm.apiKeySecret.key }}
+                  {{- else }}
+                  name: {{ include "openvizpilot.envSecretName" . }}
+                  key: LITELLM_API_KEY
+                  {{- end }}
+            {{- if or .Values.app.authTokenSecret.existingSecret .Values.app.authToken }}
+            - name: API_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.app.authTokenSecret.existingSecret }}
+                  name: {{ .Values.app.authTokenSecret.existingSecret }}
+                  key: {{ .Values.app.authTokenSecret.key }}
+                  {{- else }}
+                  name: {{ include "openvizpilot.envSecretName" . }}
+                  key: API_AUTH_TOKEN
+                  {{- end }}
+            {{- end }}
+            {{- if or .Values.app.adminTokenSecret.existingSecret .Values.app.adminToken }}
+            - name: ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.app.adminTokenSecret.existingSecret }}
+                  name: {{ .Values.app.adminTokenSecret.existingSecret }}
+                  key: {{ .Values.app.adminTokenSecret.key }}
+                  {{- else }}
+                  name: {{ include "openvizpilot.envSecretName" . }}
+                  key: ADMIN_TOKEN
+                  {{- end }}
+            {{- end }}
+            {{- if .Values.memory.enabled }}
+            {{- with .Values.memory.model }}
+            - name: MEMORY_MODEL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MEMORY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  {{- if eq .Values.memory.database.mode "cnpg" }}
+                  # Vom CloudNativePG-Operator erzeugtes App-Secret des Clusters
+                  name: {{ include "openvizpilot.dbClusterName" . }}-app
+                  key: uri
+                  {{- else }}
+                  name: {{ required "memory.database.external.existingSecret ist Pflicht bei mode=external" .Values.memory.database.external.existingSecret }}
+                  key: {{ .Values.memory.database.external.key }}
+                  {{- end }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

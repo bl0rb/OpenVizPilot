@@ -1,0 +1,33 @@
+{
+  "name": "openvizpilot",
+  "private": true,
+  "version": "0.1.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "description": "Tableau Dashboard Extension mit LLM-Chat über eine LiteLLM-Middleware",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "ee"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,ext -c blue,magenta \"npm run dev -w @openvizpilot/server\" \"npm run dev -w @openvizpilot/extension\"",
+    "dev:mock": "concurrently -n server,ext -c blue,magenta \"npm run dev -w @openvizpilot/server\" \"npm run dev:mock -w @openvizpilot/extension\"",
+    "dev:demo": "concurrently -n llm,server,ext -c yellow,blue,magenta \"node packages/server/scripts/mock-litellm.mjs\" \"npm run dev -w @openvizpilot/server\" \"npm run dev:mock -w @openvizpilot/extension\"",
+    "dev:demo:sso": "concurrently -n oidc,llm,server,ext -c green,yellow,blue,magenta \"npm run mock-oidc -w @openvizpilot/ee\" \"node packages/server/scripts/mock-litellm.mjs\" \"npm run dev -w @openvizpilot/server\" \"npm run dev:mock -w @openvizpilot/extension\"",
+    "dev:claude": "concurrently -n claude,server,ext -c yellow,blue,magenta \"node packages/server/scripts/claude-code-llm.mjs\" \"npm run dev -w @openvizpilot/server\" \"npm run dev -w @openvizpilot/extension\"",
+    "build": "npm run build -w @openvizpilot/shared && npm run build -w @openvizpilot/server && npm run build -w @openvizpilot/extension",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
+}

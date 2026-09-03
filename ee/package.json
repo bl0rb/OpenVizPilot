@@ -1,0 +1,26 @@
+{
+  "name": "@openvizpilot/ee",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OpenVizPilot Enterprise Edition — SSO (OIDC: Microsoft Entra ID, Keycloak) und Lizenz-Gating",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "exports": {
+    "./server": "./server/src/index.ts",
+    "./extension": "./extension/src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "mock-oidc": "tsx scripts/mock-oidc.ts",
+    "sign-license": "tsx scripts/sign-license.ts"
+  },
+  "dependencies": {
+    "@openvizpilot/shared": "0.1.0",
+    "hono": "^4.6.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "preact": "^10.24.0",
+    "tsx": "^4.19.0"
+  }
+}

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: openvizpilot
+description: >-
+  OpenVizPilot Middleware (Hono/Node) inkl. Extension-Statik.
+  Statuslos, vertikal skaliert (1 Replica); optionales User-Memory über
+  einen CloudNativePG-Postgres-Cluster.
+type: application
+# version/appVersion werden beim Release vom Publish-Workflow aus dem Git-Tag
+# gesetzt (helm package --version/--app-version); die Werte hier werden beim
+# Taggen mitgezogen und dienen nur der Lesbarkeit im Repo.
+version: 0.3.0-rc.1
+appVersion: "0.3.0-rc.1"
+keywords:
+  - tableau
+  - llm
+  - litellm
+sources:
+  - https://github.com/bl0rb/OpenVizPilot

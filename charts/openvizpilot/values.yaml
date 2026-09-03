@@ -1,0 +1,194 @@
+image:
+  # Publiziert vom GitHub-Workflow publish-ghcr-images.yml; alternativ ECR.
+  repository: ghcr.io/bl0rb/openvizpilot
+  # leer = .Chart.appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Die Middleware ist statuslos (Chat-Historie lebt in der Extension, Memory in
+# Postgres mit DB-seitiger Versionsprüfung/Zeilensperre) und skaliert
+# horizontal UND vertikal: replicaCount fest setzen ODER autoscaling (HPA)
+# aktivieren. Kein Sticky-Session-Bedarf — jeder SSE-Stream lebt auf genau
+# einem Pod. Gilt, solange autoscaling.enabled=false.
+replicaCount: 1
+
+# Horizontaler Pod-Autoscaler (ersetzt replicaCount, CPU-basiert).
+# Nicht mit vpa.updateMode "Auto" kombinieren (beide würden an der
+# CPU-Stellschraube drehen).
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Optionaler VerticalPodAutoscaler (benötigt das VPA-Addon/CRD im Cluster).
+vpa:
+  enabled: false
+  # "Auto" passt Requests automatisch an (Pod-Neustart), "Off" liefert nur Empfehlungen.
+  updateMode: "Off"
+  minAllowed: {}
+  #  cpu: 100m
+  #  memory: 128Mi
+  maxAllowed: {}
+  #  cpu: "2"
+  #  memory: 2Gi
+
+litellm:
+  # Pflicht: Basis-URL des OpenAI-kompatiblen LLM-Endpunkts (z. B. LiteLLM),
+  # z. B. http://litellm.llm.svc.cluster.local:4000
+  baseUrl: ""
+  # API-Key: bevorzugt aus einem bestehenden Secret ...
+  apiKeySecret:
+    existingSecret: ""
+    key: LITELLM_API_KEY
+  # ... oder als Klartext (nur Dev/CI; das Chart legt dann selbst ein Secret an).
+  apiKey: ""
+
+app:
+  # Pflicht: Default-Modell (Modellname/Alias, den der Endpunkt kennt)
+  defaultModel: ""
+  # Kommaseparierte Allowlist der wählbaren Modelle (leer = alle vom Proxy gemeldeten)
+  modelAllowlist: ""
+  logLevel: info
+  # Serverseitiger Themen-Filter vor dem Haupt-LLM-Call (SCOPE_GUARD):
+  # Fragen ohne Dashboard-Bezug werden abgelehnt, ohne das Hauptmodell
+  # aufzurufen. false setzt SCOPE_GUARD=off.
+  scopeGuard: true
+  # Günstiges Modell für die Klassifikation (leer = memory.model bzw. defaultModel).
+  scopeModel: ""
+  # Öffentlicher Origin der Middleware (für die OIDC-Redirect-URI); leer = aus dem Request.
+  publicUrl: ""
+
+  # Shared-Token für /api/* (Extension trägt ihn in den Einstellungen ein).
+  # Leer = offen; dann MUSS der Zugriff über NetworkPolicy/Ingress beschränkt werden.
+  authTokenSecret:
+    existingSecret: ""
+    key: API_AUTH_TOKEN
+  authToken: ""
+  # Statisches Bearer-Token für die Admin-UI (/admin) und /api/admin/* —
+  # eigenes Regime, unabhängig von authToken. Leer (beides) + aktives
+  # User-Memory = Passwort-Modus: Der erste Besucher von /admin legt das
+  # Admin-Passwort selbst an (Ersteinrichtung SOFORT nach dem Deploy
+  # durchführen). Leer UND ohne Memory = Admin-UI komplett deaktiviert.
+  adminTokenSecret:
+    existingSecret: ""
+    key: ADMIN_TOKEN
+  # ... oder als Klartext (nur Dev/CI; siehe authToken oben).
+  adminToken: ""
+
+# User-Memory: persönliche Fakten pro Nutzer (Name, Gewohnheiten) in Postgres.
+# Datenbank der Middleware: Admin-Konto, Anmeldung, Befehle, Playbooks und
+# Statistik — mit Enterprise-Lizenz zusätzlich User-Memory und gespeicherte
+# eigene Abfragen (Features "memory"/"savedQueries", s. docs/enterprise.md).
+memory:
+  enabled: true
+  # Günstiges Modell für die Fakten-Extraktion (leer = defaultModel)
+  model: ""
+  database:
+    # "cnpg": das Chart legt einen CloudNativePG-Cluster an (Operator muss
+    #         installiert sein — wie bei PaddleDoc). Verbindungsdaten kommen
+    #         aus dem vom Operator erzeugten Secret <fullname>-db-app.
+    # "external": bestehende Postgres-URI aus einem eigenen Secret.
+    mode: cnpg
+    cnpg:
+      instances: 1
+      storage:
+        size: 2Gi
+        storageClass: ""
+      # leer = Default-Image des Operators
+      imageName: ""
+      resources: {}
+    external:
+      # Secret mit einer Postgres-URI (postgresql://user:pass@host:5432/db)
+      existingSecret: ""
+      key: uri
+
+# Port, auf dem die Middleware im Container lauscht (wird als PORT-Env gesetzt;
+# Service und Probes folgen automatisch über den benannten Port "http").
+containerPort: 3000
+
+service:
+  type: ClusterIP
+  port: 80
+  # Nur bei type: NodePort relevant (leer = von Kubernetes zugewiesen)
+  nodePort: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # z. B. alb.ingress.kubernetes.io/target-type: ip
+  host: ""
+  path: /
+  pathType: Prefix
+  # SSE beachten: bei nginx-Ingress proxy-buffering off für /api/chat
+  tls: []
+  #  - secretName: openvizpilot-tls
+  #    hosts: [chat.example.com]
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# --- Enterprise Edition (ee/): Anmeldung & Lizenz ---
+auth:
+  # none | token | local | oidc. token = app.authToken/authTokenSecret; local =
+  # Benutzerkonten aus der Admin-UI (Open Core); oidc = Single Sign-On
+  # (Enterprise, braucht license.* mit Feature "sso"). Die Admin-UI kann
+  # Modus, OIDC und Lizenz auch zur Laufzeit setzen (Werte hier = Defaults).
+  mode: ""
+oidc:
+  # entra | keycloak | generic
+  provider: generic
+  # Entra: https://login.microsoftonline.com/<tenant-id>/v2.0 · Keycloak: https://<host>/realms/<realm>
+  issuer: ""
+  clientId: ""
+  scopes: "openid profile email"
+  # Nur für confidential clients (Keycloak "Client authentication: On") — public clients (PKCE) brauchen keins.
+  clientSecretSecret:
+    existingSecret: ""
+    key: OIDC_CLIENT_SECRET
+license:
+  # Signierter Lizenzschlüssel (OVP_LICENSE) aus einem Secret …
+  existingSecret: ""
+  key: OVP_LICENSE
+  # … und der Ed25519-Public-Key des Lizenzgenerators (32 Bytes, base64url).
+  publicKeyB64url: ""

@@ -1,0 +1,28 @@
+OpenVizPilot ist installiert.
+
+Service:  {{ include "openvizpilot.fullname" . }}:{{ .Values.service.port }} (Namespace {{ .Release.Namespace }})
+{{- if .Values.ingress.enabled }}
+Ingress:  https://{{ .Values.ingress.host }}
+{{- else }}
+Ingress:  deaktiviert — Erreichbarkeit z. B. per Port-Forward testen:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "openvizpilot.fullname" . }} 8080:{{ .Values.service.port }}
+{{- end }}
+
+Checks:
+  curl https://<host>/healthz
+  curl https://<host>/api/models
+
+{{- if and .Values.memory.enabled (eq .Values.memory.database.mode "cnpg") }}
+
+User-Memory: CloudNativePG-Cluster "{{ include "openvizpilot.dbClusterName" . }}"
+(Secret {{ include "openvizpilot.dbClusterName" . }}-app, Key "uri").
+{{- end }}
+{{- if not (or .Values.app.authTokenSecret.existingSecret .Values.app.authToken) }}
+
+WARNUNG: Kein API_AUTH_TOKEN gesetzt — /api/* ist unauthentifiziert.
+Zugriff per NetworkPolicy/Ingress auf die Tableau-Nutzer beschränken
+(siehe docs/admin-deployment.md im Repo).
+{{- end }}
+
+Nächste Schritte: Prod-.trex mit der Ingress-URL erzeugen und die URL in die
+Safelist der Tableau-Server-Site eintragen (docs/admin-deployment.md).

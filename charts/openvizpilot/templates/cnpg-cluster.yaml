@@ -1,0 +1,30 @@
+{{- if and .Values.memory.enabled (eq .Values.memory.database.mode "cnpg") }}
+# CloudNativePG-Cluster für das User-Memory. Voraussetzung: der
+# CloudNativePG-Operator ist im Cluster installiert (CRD postgresql.cnpg.io).
+# Der Operator erzeugt das App-Secret "<name>-app" mit dem Key "uri",
+# das im Deployment als MEMORY_DATABASE_URL referenziert wird.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "openvizpilot.dbClusterName" . }}
+  labels:
+    {{- include "openvizpilot.labels" . | nindent 4 }}
+spec:
+  instances: {{ .Values.memory.database.cnpg.instances }}
+  {{- with .Values.memory.database.cnpg.imageName }}
+  imageName: {{ . }}
+  {{- end }}
+  storage:
+    size: {{ .Values.memory.database.cnpg.storage.size }}
+    {{- with .Values.memory.database.cnpg.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  bootstrap:
+    initdb:
+      database: openvizpilot
+      owner: openvizpilot
+  {{- with .Values.memory.database.cnpg.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

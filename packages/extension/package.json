@@ -1,0 +1,28 @@
+{
+  "name": "@openvizpilot/extension",
+  "private": true,
+  "version": "0.1.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "vite --mode mock",
+    "build": "vite build",
+    "build:trex": "tsx scripts/make-trex.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openvizpilot/ee": "0.1.0",
+    "@openvizpilot/shared": "*",
+    "dompurify": "^3.2.0",
+    "marked": "^18.0.11",
+    "preact": "^10.24.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.0",
+    "@tableau/extensions-api-types": "^1.12.0",
+    "@types/node": "^24.13.3",
+    "tsx": "^4.19.0",
+    "vite": "^8.2.2"
+  }
+}

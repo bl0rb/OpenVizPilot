@@ -1,0 +1,14 @@
+node_modules
+packages/*/node_modules
+packages/*/dist
+.env
+.env.*
+!.env.example
+.git
+data
+coverage
+deploy
+docs
+*.log
+.DS_Store
+.claude

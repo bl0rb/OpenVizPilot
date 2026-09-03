@@ -1,0 +1,28 @@
+{{- if .Values.vpa.enabled }}
+# Vertikale Skalierung automatisiert: benötigt das VPA-Addon (CRD
+# autoscaling.k8s.io/v1). Alternativ resources.requests/limits manuell pflegen.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ include "openvizpilot.fullname" . }}
+  labels:
+    {{- include "openvizpilot.labels" . | nindent 4 }}
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "openvizpilot.fullname" . }}
+  updatePolicy:
+    updateMode: {{ .Values.vpa.updateMode | quote }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: middleware
+        {{- with .Values.vpa.minAllowed }}
+        minAllowed:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.vpa.maxAllowed }}
+        maxAllowed:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+{{- end }}

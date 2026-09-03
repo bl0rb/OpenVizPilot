@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
+  <dashboard-extension id="com.openvizpilot.extension.dev" extension-version="0.1.0">
+    <default-locale>de_DE</default-locale>
+    <name resource-id="name"/>
+    <description>Chat mit dem geöffneten Tableau-Dashboard (OpenAI-kompatibler LLM-Endpunkt)</description>
+    <author name="OpenVizPilot" email="mathiaswerk@icloud.com" organization="OpenVizPilot" website="https://github.com/bl0rb/OpenVizPilot"/>
+    <min-api-version>1.10</min-api-version>
+    <source-location>
+      <url>http://localhost:5173/</url>
+    </source-location>
+    <icon>iVBORw0KGgoAAAANSUhEUgAAAEYAAABGCAYAAABxLuKEAAAA70lEQVR42u3cyRHCMBAEQOIgQ5IiVYiAQgbZe/VU+Sc93A8f0q5uN9mf++P5ynxBiMDqArIVqCvKXzjdUX7CmYJyCGcayhLOVJSvOGCgrONAAQMGzFkwQD7gwLgIJiJpYTIlBUzmhMFUCJgsMJUCBkxSmIoBA6Y4zOq83eNSw6zO3T0uNczq/N3jwIBpBuMZ463kOwYMGH/XYMBkhbHmC8a+kp1Ie9cJqx2ibqoNzLj6mKoo4TBjK6qqooTBjK/Bq4pyOYzixIMr/ONqfVugnAWjZF4vARgwcPRE6qTVe61b3/kOTgRxjoxTiIYiTMsbyuP71cDKOowAAAAASUVORK5CYII=</icon>
+  </dashboard-extension>
+  <resources>
+    <resource id="name">
+      <text locale="de_DE">OpenVizPilot (Dev)</text>
+      <text locale="en_US">OpenVizPilot (Dev)</text>
+    </resource>
+  </resources>
+</manifest>

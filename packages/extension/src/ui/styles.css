@@ -1,0 +1,596 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f7f7f7;
+  flex: 0 0 auto;
+}
+
+.title {
+  font-weight: 600;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-hint {
+  font-size: 11px;
+  color: #8a6d00;
+  background: #fff6d6;
+  border: 1px solid #e8d590;
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.btn-icon {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 2px 6px;
+  color: #555;
+}
+
+.btn-icon:hover {
+  color: #000;
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.messages {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-hint {
+  color: #888;
+  text-align: center;
+  margin-top: 30px;
+  padding: 0 20px;
+  line-height: 1.5;
+}
+
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 92%;
+}
+
+.chips-center {
+  justify-content: center;
+  align-self: center;
+  margin-top: 12px;
+}
+
+.chip {
+  border: 1px solid #b6c6d2;
+  background: #fff;
+  color: #1a699e;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chip:hover:not(:disabled) {
+  background: #eef4f8;
+  border-color: #1a699e;
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chip-secondary {
+  color: #666;
+}
+
+.chip-secondary:hover:not(:disabled) {
+  background: #f1f3f5;
+  border-color: #999;
+}
+
+.chip-action {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-color: #c9a86a;
+  color: #7a5c1e;
+}
+
+.chip-action:hover:not(:disabled) {
+  background: #fdf6e8;
+  border-color: #a8842e;
+}
+
+.chip-label {
+  font-weight: 600;
+}
+
+.chip-detail {
+  font-size: 10px;
+  color: #8a7440;
+}
+
+.msg {
+  max-width: 92%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+
+.msg-user {
+  align-self: flex-end;
+  background: #1a699e;
+  color: #fff;
+  white-space: pre-wrap;
+}
+
+/* Zeile aus User-Bubble + ☆-Button — die Bubble behält ihre eigentliche
+   92%-Breitenbegrenzung über die Zeile statt über sich selbst (die jetzt
+   Geschwister des Buttons ist). */
+.msg-row-user {
+  display: flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: 4px;
+  max-width: 92%;
+}
+
+.msg-row-user .msg-user {
+  max-width: none;
+}
+
+.btn-star {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+.msg-assistant {
+  align-self: flex-start;
+  background: #f1f3f5;
+  color: #222;
+}
+
+.thinking {
+  color: #999;
+}
+
+.cursor {
+  animation: blink 1s step-start infinite;
+  color: #1a699e;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.markdown p {
+  margin: 0 0 6px;
+}
+
+.markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 12px;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid #d5d9dd;
+  padding: 3px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.markdown th {
+  background: #e9edf1;
+}
+
+.markdown code {
+  background: #e8eaed;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.markdown pre {
+  background: #e8eaed;
+  padding: 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.tool-chip {
+  align-self: flex-start;
+  font-size: 11px;
+  color: #555;
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  padding: 3px 8px;
+  max-width: 92%;
+}
+
+.tool-chip summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tool-args {
+  color: #999;
+}
+
+.tool-chip pre {
+  margin: 6px 0 2px;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 10px;
+}
+
+.tool-running summary {
+  color: #1a699e;
+}
+
+.notice {
+  align-self: center;
+  font-size: 11px;
+  color: #777;
+  font-style: italic;
+}
+
+.error-banner {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fdecea;
+  border: 1px solid #f5c6c0;
+  color: #8f2a20;
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+
+.error-banner button {
+  border: 1px solid #c96659;
+  background: #fff;
+  color: #8f2a20;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #e0e0e0;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.slash-menu {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 10px;
+  right: 10px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.slash-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.slash-item-active {
+  background: #eef4f8;
+}
+
+.slash-name {
+  font-weight: 600;
+  color: #1a699e;
+  white-space: nowrap;
+}
+
+.slash-arg {
+  font-weight: 400;
+  color: #8a9aa6;
+}
+
+.slash-desc {
+  color: #777;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer textarea {
+  flex: 1 1 auto;
+  resize: none;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.composer textarea:focus {
+  outline: 2px solid #1a699e33;
+  border-color: #1a699e;
+}
+
+.composer button {
+  border: none;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn-send {
+  background: #1a699e;
+  color: #fff;
+}
+
+.btn-send:disabled {
+  background: #b6c6d2;
+  cursor: default;
+}
+
+.btn-stop {
+  background: #b03a2e;
+  color: #fff;
+}
+
+.settings-panel {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.settings-panel h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.settings-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.settings-panel input,
+.settings-panel select,
+.settings-panel textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.settings-panel textarea {
+  resize: vertical;
+}
+
+.field-error {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8f2a20;
+}
+
+.field-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #777;
+}
+
+.settings-message {
+  font-size: 12px;
+  color: #555;
+  background: #f1f3f5;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-actions button {
+  border: none;
+  background: #1a699e;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.settings-actions .btn-secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.memory-section {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-section h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.memory-hint {
+  margin: 0;
+  font-size: 11px;
+  color: #777;
+}
+
+.memory-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.btn-danger {
+  align-self: flex-start;
+  border: 1px solid #c96659;
+  background: #fff;
+  color: #8f2a20;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.prefs-section {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prefs-section h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.prefs-question-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prefs-question-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #f7f7f7;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.prefs-question-list li span {
+  overflow-wrap: anywhere;
+}
+
+/* Enterprise: Login-Gate (OIDC) */
+.login-panel {
+  padding: 24px 16px;
+  text-align: center;
+}
+.login-panel h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.login-panel button {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--accent, #1a699e);
+  background: var(--accent, #1a699e);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.login-panel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.login-panel label {
+  display: block;
+  text-align: left;
+  font-size: 12px;
+  color: #5b6470;
+  margin: 10px auto 0;
+  max-width: 320px;
+}
+.login-panel input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 9px;
+  border: 1px solid #dde1e6;
+  border-radius: 6px;
+  font: inherit;
+}

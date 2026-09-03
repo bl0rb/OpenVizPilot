@@ -1,0 +1,41 @@
+# Hält npm-Module, SHA-gepinnte GitHub-Actions und das Digest-gepinnte
+# Docker-Base-Image aktuell — gleiche Triage wie in den anderen Repos.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    groups:
+      # Dev-Tooling gesammelt in einem PR, Runtime-Deps einzeln.
+      dev-tooling:
+        dependency-type: development
+    open-pull-requests-limit: 10
+    ignore:
+      # Muss zur Node-Runtime passen (engines >=24, Image node:24) —
+      # Major-Bump erst bei bewusster Runtime-Migration.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    ignore:
+      # Auf Node 24 LTS bleiben; nur Digest-/Patch-Updates automatisch.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

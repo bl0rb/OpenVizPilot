@@ -1,0 +1,32 @@
+{
+  "name": "@openvizpilot/server",
+  "private": true,
+  "version": "0.1.0",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/zod-validator": "^0.9.1",
+    "@openvizpilot/ee": "0.1.0",
+    "@openvizpilot/shared": "*",
+    "hono": "^4.6.0",
+    "openai": "^7.9.0",
+    "pg": "^8.13.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

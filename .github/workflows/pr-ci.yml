@@ -1,0 +1,120 @@
+name: PR CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # Erlaubt den Publish-Workflows, diese Checks als Release-Gate aufzurufen.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Typecheck + Tests + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # 24 = Laufzeit des Docker-Images; node:sqlite (Memory-Dev-Backend)
+          # braucht mindestens 22.5.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fails the build on a known-vulnerable dependency instead of leaving it
+      # to whoever happens to run `npm audit` by hand.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  build-checks:
+    name: Image + Chart Build Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        run: docker build -t openvizpilot:ci .
+
+      # Bauen reicht nicht: ein Bundling-Fehler (z. B. umgeschriebene
+      # node:-Imports) zeigt sich erst beim Start des Containers.
+      - name: Smoke-run image
+        run: |
+          docker run -d --name tchat \
+            -e LITELLM_BASE_URL=http://localhost:9 -e LITELLM_API_KEY=sk-ci \
+            -e DEFAULT_MODEL=m -e MEMORY_DB_PATH=/tmp/memory.db \
+            -p 3000:3000 openvizpilot:ci
+          ok=""
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3000/healthz > /dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          docker logs tchat
+          [ "$ok" = "1" ]
+          curl -sf -H 'x-tableau-user: ci' http://localhost:3000/api/memory | grep -q '"facts"'
+          docker rm -f tchat
+
+      - name: Install Helm
+        run: |
+          curl -fsSL https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz -o helm.tgz
+          echo "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb  helm.tgz" | sha256sum -c -
+          tar -xzf helm.tgz
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          helm version --short
+
+      - name: Lint Helm chart
+        # Mit gültigen Pflicht-Values, damit lint sauber durchläuft —
+        # die required/fail-Guards prüft der Negativ-Render-Check unten.
+        run: |
+          helm lint charts/openvizpilot \
+            --set litellm.baseUrl=http://litellm:4000 \
+            --set litellm.apiKey=ci-render-check \
+            --set app.defaultModel=test-model
+
+      - name: Render Helm chart (CNPG-Memory, Default)
+        run: |
+          helm template test charts/openvizpilot \
+            --set litellm.baseUrl=http://litellm:4000 \
+            --set litellm.apiKey=ci-render-check \
+            --set app.defaultModel=test-model > /dev/null
+
+      - name: Render Helm chart (externes Postgres + Ingress)
+        run: |
+          helm template test charts/openvizpilot \
+            --set litellm.apiKeySecret.existingSecret=litellm-secret \
+            --set litellm.baseUrl=http://litellm:4000 \
+            --set app.defaultModel=test-model \
+            --set memory.database.mode=external \
+            --set memory.database.external.existingSecret=memory-db \
+            --set ingress.enabled=true \
+            --set ingress.host=chat.example.com > /dev/null
+
+      - name: Render Helm chart fails without LiteLLM key
+        run: |
+          if helm template test charts/openvizpilot \
+               --set litellm.baseUrl=http://litellm:4000 \
+               --set app.defaultModel=test-model > /dev/null 2>&1; then
+            echo "expected render to fail without litellm.apiKey/apiKeySecret"
+            exit 1
+          fi

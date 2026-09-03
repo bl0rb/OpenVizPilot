@@ -69,6 +69,9 @@ function oidcConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authMode: 'oidc',
     publicUrl: 'https://chat.example.com',
     oidc: { provider: 'generic', issuer: idp.issuer, clientId: 'ovp-ee-test', clientSecret: null, scopes: 'openid profile email' },
+    // Tests senden nie nach außen.
+    telemetryEndpoint: '',
+    appVersion: 'test',
     licenseEnv,
     ...overrides,
   };

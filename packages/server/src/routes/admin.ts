@@ -13,7 +13,17 @@ import {
   validateExtensionUrl,
   type AuthSettings,
 } from '@openvizpilot/shared';
-import { describeLicense, EE_FEATURE_LABELS, hasFeature, loadLicenseFromEnv, trustedPublicKeyFromEnv, verifyLicense, type LicenseStatus } from '@openvizpilot/ee/server';
+import {
+  describeLicense,
+  describeTelemetry,
+  EE_FEATURE_LABELS,
+  hasFeature,
+  loadLicenseFromEnv,
+  trustedPublicKeyFromEnv,
+  verifyLicense,
+  type LicenseStatus,
+  type TelemetryStore,
+} from '@openvizpilot/ee/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import type OpenAI from 'openai';
@@ -138,6 +148,8 @@ export function createAdminRoute(
   logger: Logger,
   client: OpenAI,
   authState: AuthStateProvider,
+  /** Zustand des Lizenz-Heartbeats (ee/) — nur für die Anzeige. */
+  telemetryStore: TelemetryStore | null = null,
 ): Hono {
   const app = new Hono();
   const tokenMode = Boolean(config.adminToken);
@@ -452,6 +464,16 @@ export function createAdminRoute(
             publicUrl: stored.publicUrl ?? null,
           }
         : null,
+      // Transparenz: Der Heartbeat ist Teil der Enterprise-Lizenz, aber der
+      // Betreiber muss jederzeit sehen können, was rausgeht und wie es lief.
+      telemetry: await describeTelemetry({
+        endpoint: config.telemetryEndpoint,
+        license: async () => {
+          const current = await authState.get();
+          return { status: current.license, token: current.licenseToken };
+        },
+        store: telemetryStore,
+      }),
       envDefaults: {
         mode: config.authMode,
         oidcProvider: config.oidc?.provider ?? null,

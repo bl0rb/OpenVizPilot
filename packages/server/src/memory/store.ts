@@ -3,8 +3,11 @@ import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
 import {
   createPgPersonalizationStore,
+  createPgTelemetryStore,
   createSqlitePersonalizationStore,
+  createSqliteTelemetryStore,
   type PersonalizationStore,
+  type TelemetryStore,
 } from '@openvizpilot/ee/server';
 import { createPgMemoryStore, openPgPool } from './pg-store';
 import { createSqliteMemoryStore, openSqliteDatabase } from './sqlite-store';
@@ -157,6 +160,8 @@ export interface MemoryBackend {
   store: MemoryStore;
   /** Enterprise-Personalisierung auf DERSELBEN Verbindung (ee/). */
   personalization: PersonalizationStore;
+  /** Zustand des Lizenz-Heartbeats (ee/), ebenfalls auf derselben Verbindung. */
+  telemetry: TelemetryStore;
   /**
    * Schließt die gemeinsame Verbindung — danach sind BEIDE Stores tot. Der
    * einzige richtige Weg, das Backend zu beenden; `store.close()` direkt
@@ -178,6 +183,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     return {
       store,
       personalization: createPgPersonalizationStore(pool, logger),
+      telemetry: createPgTelemetryStore(pool, logger),
       close: () => store.close(),
     };
   }
@@ -187,6 +193,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     return {
       store,
       personalization: createSqlitePersonalizationStore(db),
+      telemetry: createSqliteTelemetryStore(db),
       close: () => store.close(),
     };
   }

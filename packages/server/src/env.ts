@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { HEARTBEAT_ENDPOINT } from '@openvizpilot/ee/server';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -28,6 +29,8 @@ const envSchema = z.object({
   OIDC_CLIENT_SECRET: z.string().optional(),
   OIDC_SCOPES: z.string().default('openid profile email'),
   OVP_LICENSE: z.string().optional(),
+  /** Produktversion für den Heartbeat (Helm setzt sie aus der Chart-AppVersion). */
+  APP_VERSION: z.string().optional(),
   OVP_LICENSE_PATH: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_B64URL: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_PATH: z.string().optional(),
@@ -82,6 +85,14 @@ export interface AppConfig {
     scopes: string;
   } | null;
   /** Rohwerte für die Lizenzprüfung (ee/server/src/license.ts). */
+  /**
+   * Gegenstelle des Lizenz-Heartbeats (ee/). Fest eingebrannt — es gibt bewusst
+   * keinen Umgebungsschalter dafür, der Heartbeat gehört zur Enterprise-Lizenz.
+   * Nur Tests setzen den Wert leer, damit nie ein echter Aufruf hinausgeht.
+   */
+  telemetryEndpoint: string;
+  /** Produktversion, die im Heartbeat gemeldet wird. */
+  appVersion: string;
   licenseEnv: {
     OVP_LICENSE?: string;
     OVP_LICENSE_PATH?: string;
@@ -160,6 +171,8 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
             scopes: e.OIDC_SCOPES.trim() || 'openid profile email',
           }
         : null,
+    telemetryEndpoint: HEARTBEAT_ENDPOINT,
+    appVersion: e.APP_VERSION?.trim() || 'unbekannt',
     licenseEnv: {
       OVP_LICENSE: e.OVP_LICENSE,
       OVP_LICENSE_PATH: e.OVP_LICENSE_PATH,

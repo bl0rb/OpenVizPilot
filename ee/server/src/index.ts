@@ -8,3 +8,5 @@ export * from './auth-routes';
 export * from './personalization';
 export * from './personalization-schema';
 export * from './personalization-store';
+export * from './telemetry';
+export * from './telemetry-store';

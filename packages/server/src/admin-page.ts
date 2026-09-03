@@ -214,6 +214,17 @@ export const adminPageHtml = `<!doctype html>
         <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false"></textarea>
       </label>
       <p id="license-summary" class="hint">Lade …</p>
+      <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
+        <strong>Lizenz-Heartbeat</strong>
+        <p id="telemetry-status" class="hint"></p>
+        <details>
+          <summary style="cursor: pointer;">Was gesendet wird</summary>
+          <div class="row" style="align-items: flex-start; gap: 2rem;">
+            <div><em>Gesendet:</em><ul id="telemetry-sends"></ul></div>
+            <div><em>Nie gesendet:</em><ul id="telemetry-never"></ul></div>
+          </div>
+        </details>
+      </div>
       <div class="row">
         <button class="primary" id="save-auth">Prüfen &amp; speichern</button>
         <button id="remove-license">Lizenz entfernen</button>
@@ -633,10 +644,32 @@ export const adminPageHtml = `<!doctype html>
     oidcClientSecret.value = '';
     oidcClientSecret.placeholder = data.stored && data.stored.hasClientSecret ? 'gespeichert — leer lassen = unverändert' : 'leer = public client (PKCE)';
     licenseToken.value = '';
+    renderTelemetry(data.telemetry);
     authPublicUrl.value = eff.publicUrl || (data.envDefaults && data.envDefaults.publicUrl) || window.location.origin;
     authPublicUrl.placeholder = data.envDefaults && data.envDefaults.publicUrl ? 'Env: ' + data.envDefaults.publicUrl : 'https://chat.example.com';
     updateRedirectPreview();
     updateOidcVisibility();
+  }
+
+  function renderTelemetry(t) {
+    var box = document.getElementById('telemetry-box');
+    if (!t) { box.hidden = true; return; }
+    box.hidden = false;
+    var status = t.active
+      ? 'Aktiv — alle ' + t.intervalHours + ' Stunden an ' + t.endpoint + '. ' + t.reason
+      : 'Inaktiv — ' + t.reason;
+    if (t.lastOkAt) status += ' Zuletzt erfolgreich: ' + new Date(t.lastOkAt).toLocaleString('de-DE') + '.';
+    else if (t.lastAttemptAt) status += ' Letzter Versuch: ' + new Date(t.lastAttemptAt).toLocaleString('de-DE') + ' (' + (t.lastDetail || 'ohne Ergebnis') + ').';
+    document.getElementById('telemetry-status').textContent = status;
+    [['telemetry-sends', t.sends], ['telemetry-never', t.neverSends]].forEach(function (pair) {
+      var list = document.getElementById(pair[0]);
+      list.innerHTML = '';
+      (pair[1] || []).forEach(function (entry) {
+        var li = document.createElement('li');
+        li.textContent = entry;
+        list.appendChild(li);
+      });
+    });
   }
 
   function loadAuth() {

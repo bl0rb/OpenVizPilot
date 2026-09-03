@@ -47,6 +47,9 @@ function localConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     publicUrl: null,
     oidc: null,
     // Die Sitzungsbindung wird über die (lizenzpflichtigen) Präferenzen geprüft.
+    // Tests senden nie nach außen.
+    telemetryEndpoint: '',
+    appVersion: 'test',
     licenseEnv: testLicenseEnv(['savedQueries']),
     ...overrides,
   };

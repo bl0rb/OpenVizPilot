@@ -8,6 +8,7 @@ import {
   hasFeature,
   LICENSE_FORMAT_VERSION,
   loadLicenseFromEnv,
+  readLicenseTokenFromEnv,
   signLicensePayload,
   verifyLicense,
 } from '../server/src/license';
@@ -99,6 +100,26 @@ describe('license verification', () => {
         ).status,
       ).toBe('valid');
       expect(loadLicenseFromEnv({ OVP_LICENSE: t, OVP_LICENSE_PUBLIC_KEY_B64URL: 'kaputt' }).status).toBe('invalid');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('readLicenseTokenFromEnv', () => {
+  it('liefert den Token auch aus der Lizenzdatei — nicht nur aus OVP_LICENSE', () => {
+    const k = keys();
+    const t = token(k.privateKey);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ovp-license-'));
+    const file = path.join(dir, 'license');
+    // Mit Zeilenumbruch, wie ihn ein gemountetes Secret typischerweise hat.
+    fs.writeFileSync(file, `${t}\n`);
+
+    try {
+      expect(readLicenseTokenFromEnv({ OVP_LICENSE: t }).token).toBe(t);
+      expect(readLicenseTokenFromEnv({ OVP_LICENSE_PATH: file }).token).toBe(t);
+      expect(readLicenseTokenFromEnv({}).token).toBeNull();
+      expect(readLicenseTokenFromEnv({ OVP_LICENSE_PATH: path.join(dir, 'fehlt') }).error).toMatch(/nicht lesbar/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

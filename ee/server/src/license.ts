@@ -154,29 +154,45 @@ export interface LicenseEnv {
 }
 
 /**
+ * Der rohe Lizenz-Token aus der Umgebung — aus `OVP_LICENSE` oder der Datei
+ * unter `OVP_LICENSE_PATH`. Beide Wege müssen denselben Token liefern: Wer nur
+ * die Datei mountet, hat sonst zwar eine gültige Lizenz, aber keinen Token für
+ * alles, was ihn braucht.
+ */
+export function readLicenseTokenFromEnv(env: LicenseEnv): { token: string | null; error: string | null } {
+  const inline = env.OVP_LICENSE?.trim();
+  if (inline) return { token: inline, error: null };
+
+  const path = env.OVP_LICENSE_PATH?.trim();
+  if (!path) return { token: null, error: null };
+  try {
+    return { token: fs.readFileSync(path, 'utf8').trim() || null, error: null };
+  } catch (err) {
+    return { token: null, error: `Lizenzdatei nicht lesbar: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+/**
  * Liest Lizenz und Public Key aus der Umgebung. Ohne Token → 'none'
  * (Open Core). Token ohne Public Key ist ein Konfigurationsfehler ('invalid').
  */
 export function loadLicenseFromEnv(env: LicenseEnv, now: Date = new Date()): LicenseStatus {
-  let token = env.OVP_LICENSE?.trim() ?? '';
-  if (!token && env.OVP_LICENSE_PATH?.trim()) {
-    try {
-      token = fs.readFileSync(env.OVP_LICENSE_PATH.trim(), 'utf8').trim();
-    } catch (err) {
-      return { status: 'invalid', reason: `Lizenzdatei nicht lesbar: ${err instanceof Error ? err.message : String(err)}` };
-    }
-  }
+  const { token, error } = readLicenseTokenFromEnv(env);
+  if (error) return { status: 'invalid', reason: error };
   if (!token) return { status: 'none' };
+  return verifyLicenseWithEnvKey(token, env, now);
+}
 
+/**
+ * Prüft einen bereits gelesenen Token gegen den Vertrauensanker aus der
+ * Umgebung. Getrennt von `loadLicenseFromEnv`, damit ein Aufrufer, der den
+ * Token ohnehin in der Hand hat, die Lizenzdatei nicht ein zweites Mal liest —
+ * sonst könnten Status und Token aus zwei verschiedenen Ständen stammen.
+ */
+export function verifyLicenseWithEnvKey(token: string, env: LicenseEnv, now: Date = new Date()): LicenseStatus {
   let publicKey: KeyObject;
   try {
-    if (env.OVP_LICENSE_PUBLIC_KEY_B64URL?.trim()) {
-      publicKey = publicKeyFromB64Url(env.OVP_LICENSE_PUBLIC_KEY_B64URL);
-    } else if (env.OVP_LICENSE_PUBLIC_KEY_PATH?.trim()) {
-      publicKey = publicKeyFromPem(fs.readFileSync(env.OVP_LICENSE_PUBLIC_KEY_PATH.trim(), 'utf8'));
-    } else {
-      publicKey = publicKeyFromB64Url(DEFAULT_LICENSE_PUBLIC_KEY_B64URL);
-    }
+    publicKey = trustedPublicKeyFromEnv(env);
   } catch (err) {
     return { status: 'invalid', reason: `Public Key unlesbar: ${err instanceof Error ? err.message : String(err)}` };
   }

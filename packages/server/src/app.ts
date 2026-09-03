@@ -3,6 +3,8 @@ import {
   createAuthCallbackRoute,
   createPersonalizationRoutes,
   describeLicense,
+  startHeartbeat,
+  USAGE_WINDOW_DAYS,
   EE_FEATURES,
   hasFeature,
   requireOidcUser,
@@ -33,6 +35,8 @@ export function createApp(config: AppConfig): {
   logger: Logger;
   memoryStore: MemoryStore | null;
   authState: AuthStateProvider;
+  /** Beendet den Lizenz-Heartbeat (Tests, Shutdown). */
+  stopHeartbeat: () => void;
 } {
   const logger = createLogger(config.logLevel);
   const client = createLLMClient(config);
@@ -40,6 +44,7 @@ export function createApp(config: AppConfig): {
   const memoryStore = backend?.store ?? null;
   // Speicher der Enterprise-Personalisierung (ee/) auf derselben Verbindung.
   const personalizationStore = backend?.personalization ?? null;
+  const telemetryStore = backend?.telemetry ?? null;
   if (memoryStore) {
     logger.info('User-Memory aktiv', {
       backend: config.memoryDatabaseUrl ? 'postgres' : 'sqlite',
@@ -58,6 +63,33 @@ export function createApp(config: AppConfig): {
     logger[level](msg, data);
   /** Lizenzprüfung pro Request — ein in der Admin-UI eingetragener Schlüssel wirkt sofort. */
   const licensedFeature = async (feature: EeFeature): Promise<boolean> => hasFeature((await authState.get()).license, feature);
+
+  /**
+   * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft.
+   * Nur mit gültiger Lizenz, nur mit Datenbank — Open Core sendet nie, und ein
+   * Fehler der Gegenstelle bleibt folgenlos (siehe ee/server/src/telemetry.ts).
+   */
+  const stopHeartbeat =
+    telemetryStore && memoryStore
+      ? startHeartbeat({
+          endpoint: config.telemetryEndpoint,
+          license: async () => {
+            const state = await authState.get();
+            return { status: state.license, token: state.licenseToken };
+          },
+          version: config.appVersion,
+          store: telemetryStore,
+          usage: async () => {
+            // Nur Zahlen: unterschiedliche Pseudonyme und Anzahl Dashboards.
+            const rows = await memoryStore.getDashboardUsage(USAGE_WINDOW_DAYS);
+            return {
+              activeUsers30d: new Set(rows.map((r) => r.userToken).filter(Boolean)).size,
+              dashboards: new Set(rows.map((r) => r.dashboardKey)).size,
+            };
+          },
+          logger,
+        })
+      : () => undefined;
 
   const app = new Hono<AuthVariables>();
 
@@ -169,7 +201,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/memory', createPersonalizationRoutes({ store: personalizationStore, logger, hasFeature: licensedFeature }));
   app.route('/api/commands', createCommandsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore));
 
   // Admin-UI: erreichbar mit statischem ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert
@@ -182,5 +214,5 @@ export function createApp(config: AppConfig): {
     app.use('*', serveStatic({ root: config.serveStaticDir }));
   }
 
-  return { app, logger, memoryStore, authState };
+  return { app, logger, memoryStore, authState, stopHeartbeat };
 }

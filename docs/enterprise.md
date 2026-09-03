@@ -115,6 +115,12 @@ abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Der Status ist in d
 Für Entwicklung und Tests: `npm run sign-license -w @openvizpilot/ee -- keygen ./keys` erzeugt ein
 Schlüsselpaar, `… -- sign ./keys/private.pem "Firma GmbH" 2027-12-31` einen Token.
 
+## Lizenz-Heartbeat
+
+Eine lizenzierte Installation meldet sich einmal täglich bei WerkWorks — Umfang,
+Verhalten und der Text für Vertrag und Lizenzdokument stehen in
+[ee/telemetry/README.md](../ee/telemetry/README.md).
+
 ## Helm
 
 ```yaml

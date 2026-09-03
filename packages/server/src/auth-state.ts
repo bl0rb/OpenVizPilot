@@ -1,9 +1,8 @@
 import {
   hasFeature,
-  loadLicenseFromEnv,
   OidcClient,
-  trustedPublicKeyFromEnv,
-  verifyLicense,
+  readLicenseTokenFromEnv,
+  verifyLicenseWithEnvKey,
   type LicenseStatus,
 } from '@openvizpilot/ee/server';
 import type { AuthMode, AuthSettings, OidcSettings } from '@openvizpilot/shared';
@@ -34,6 +33,8 @@ export interface AuthState {
   oidc: OidcClient | null;
   oidcSettings: OidcSettings | null;
   license: LicenseStatus;
+  /** Rohtoken zur `license` — der Lizenz-Heartbeat (ee/) sendet ihn unverändert. */
+  licenseToken: string | null;
   /** Öffentlicher Origin für die SSO-Redirect-URI (Admin-UI oder PUBLIC_URL). */
   publicUrl: string | null;
   /**
@@ -100,22 +101,22 @@ export function createAuthStateProvider(config: AppConfig, store: MemoryStore | 
           oidc: null,
           oidcSettings: null,
           license: { status: 'none' },
+          licenseToken: null,
           publicUrl: config.publicUrl,
           blockedReason: 'Anmelde-Einstellungen nicht lesbar (Datenbank nicht erreichbar) — Zugriff vorübergehend gesperrt.',
         };
       }
     }
 
-    let license: LicenseStatus;
-    if (settings?.license) {
-      try {
-        license = verifyLicense(settings.license, trustedPublicKeyFromEnv(config.licenseEnv));
-      } catch (err) {
-        license = { status: 'invalid', reason: err instanceof Error ? err.message : 'Public Key ungültig' };
-      }
-    } else {
-      license = loadLicenseFromEnv(config.licenseEnv);
-    }
+    // Genau ein Lesevorgang: Status und Token gehören immer zusammen, auch
+    // wenn die Lizenzdatei gerade rotiert wird.
+    const fromEnv = settings?.license ? { token: settings.license, error: null } : readLicenseTokenFromEnv(config.licenseEnv);
+    const licenseToken = fromEnv.token;
+    const license: LicenseStatus = fromEnv.error
+      ? { status: 'invalid', reason: fromEnv.error }
+      : licenseToken
+        ? verifyLicenseWithEnvKey(licenseToken, config.licenseEnv)
+        : { status: 'none' };
 
     const mode: AuthMode = settings?.mode ?? config.authMode;
     const oidcSettings = settings?.oidc ?? envOidc();
@@ -137,7 +138,7 @@ export function createAuthStateProvider(config: AppConfig, store: MemoryStore | 
         oidc = oidcClientFor(oidcSettings);
       }
     }
-    return { mode, source: settings ? 'db' : 'env', oidc, oidcSettings, license, publicUrl, blockedReason };
+    return { mode, source: settings ? 'db' : 'env', oidc, oidcSettings, license, licenseToken, publicUrl, blockedReason };
   };
 
   return {

@@ -31,6 +31,9 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authMode: 'none',
     publicUrl: null,
     oidc: null,
+    // Tests senden nie nach außen.
+    telemetryEndpoint: '',
+    appVersion: 'test',
     licenseEnv: {},
     ...overrides,
   };

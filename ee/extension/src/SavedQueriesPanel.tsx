@@ -1,4 +1,5 @@
 import { FOCUS_PRESETS, MAX_STANDARD_QUESTIONS, type DashboardPrefs } from '../../server/src/personalization-schema';
+import { t } from '@openvizpilot/shared';
 import { useState } from 'preact/hooks';
 
 /**
@@ -28,15 +29,15 @@ export function SavedQueriesPanel(props: {
 
   return (
     <div class="prefs-section">
-      <h3>Dieses Dashboard</h3>
+      <h3>{t('savedQueries.title')}</h3>
       <label>
-        Antwortfokus
+        {t('savedQueries.answerFocus')}
         <select
           value={current.focus}
           disabled={props.prefs === 'loading' || busy}
-          onInput={(e) => void save({ ...current, focus: (e.target as HTMLSelectElement).value }, 'Antwortfokus gespeichert.')}
+          onInput={(e) => void save({ ...current, focus: (e.target as HTMLSelectElement).value }, t('savedQueries.saved'))}
         >
-          <option value="">Kein Fokus</option>
+          <option value="">{t('savedQueries.noFocus')}</option>
           {FOCUS_PRESETS.map((preset) => (
             <option key={preset} value={preset}>
               {preset}
@@ -45,10 +46,10 @@ export function SavedQueriesPanel(props: {
         </select>
       </label>
       <p class="memory-hint">
-        Gespeicherte Standardfragen ({current.questions.length}/{MAX_STANDARD_QUESTIONS})
+        {t('savedQueries.savedQuestions', undefined, { count: current.questions.length, max: MAX_STANDARD_QUESTIONS })}
       </p>
       {current.questions.length === 0 ? (
-        <p class="memory-hint">Noch keine Standardfragen gespeichert.</p>
+        <p class="memory-hint">{t('savedQueries.empty')}</p>
       ) : (
         <ul class="prefs-question-list">
           {current.questions.map((q) => (
@@ -57,9 +58,9 @@ export function SavedQueriesPanel(props: {
               <button
                 type="button"
                 class="btn-icon"
-                title="Standardfrage löschen"
+                title={t('savedQueries.deleteTitle')}
                 disabled={busy}
-                onClick={() => void save({ ...current, questions: current.questions.filter((x) => x !== q) }, 'Standardfrage gelöscht.')}
+                onClick={() => void save({ ...current, questions: current.questions.filter((x) => x !== q) }, t('savedQueries.deleted'))}
               >
                 ✕
               </button>

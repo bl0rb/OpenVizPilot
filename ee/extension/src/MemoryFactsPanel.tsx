@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { USER_ID_HEADER } from '@openvizpilot/shared';
+import { t, USER_ID_HEADER } from '@openvizpilot/shared';
 
 /**
  * User-Memory in den Einstellungen (Enterprise): zeigt, was die Middleware
@@ -29,7 +29,7 @@ export function MemoryFactsPanel(props: { backendUrl: string; apiToken: string; 
         if (!cancelled) setFacts(data.facts);
       })
       .catch(() => {
-        if (!cancelled) setStatus('Gespeicherte Infos nicht abrufbar (Memory evtl. deaktiviert).');
+        if (!cancelled) setStatus(t('memory.fetchFailed'));
       });
     return () => {
       cancelled = true;
@@ -42,9 +42,9 @@ export function MemoryFactsPanel(props: { backendUrl: string; apiToken: string; 
       const res = await fetch(`${props.backendUrl}/api/memory`, { method: 'DELETE', headers: headers() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setFacts([]);
-      setStatus('Alle gespeicherten Infos wurden gelöscht.');
+      setStatus(t('memory.deleted'));
     } catch {
-      setStatus('Löschen fehlgeschlagen — bitte später erneut versuchen.');
+      setStatus(t('memory.deleteFailed'));
     }
   };
 
@@ -53,16 +53,14 @@ export function MemoryFactsPanel(props: { backendUrl: string; apiToken: string; 
 
   return (
     <div class="memory-section">
-      <h3>Gespeicherte Infos über mich</h3>
+      <h3>{t('memory.title')}</h3>
       <p class="memory-hint">
-        {props.licensed
-          ? 'Der Assistent merkt sich persönliche Angaben (z. B. Name, bevorzugte Sichten), um Dashboard-Antworten zu personalisieren — nie Dashboard-Daten.'
-          : 'Diese Infos stammen aus einer Zeit mit Enterprise-Lizenz. Es kommen keine neuen hinzu; löschen kannst du sie weiterhin jederzeit.'}
+        {props.licensed ? t('memory.licensedHint') : t('memory.unlicensedHint')}
       </p>
       {facts === null ? (
-        <p class="memory-hint">{status ?? 'Lade…'}</p>
+        <p class="memory-hint">{status ?? t('memory.loading')}</p>
       ) : facts.length === 0 ? (
-        <p class="memory-hint">Noch nichts gespeichert.</p>
+        <p class="memory-hint">{t('memory.empty')}</p>
       ) : (
         <ul class="memory-list">
           {facts.map((f) => (
@@ -72,7 +70,7 @@ export function MemoryFactsPanel(props: { backendUrl: string; apiToken: string; 
       )}
       {facts !== null && facts.length > 0 && (
         <button type="button" class="btn-danger" onClick={() => void deleteAll()}>
-          Alle gespeicherten Infos löschen
+          {t('memory.deleteAll')}
         </button>
       )}
       {facts !== null && status && <p class="memory-hint">{status}</p>}

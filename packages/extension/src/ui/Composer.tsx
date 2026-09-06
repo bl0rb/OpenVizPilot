@@ -1,4 +1,4 @@
-import { MAX_MESSAGE_CHARS, type SlashCommand } from '@openvizpilot/shared';
+import { MAX_MESSAGE_CHARS, t, type SlashCommand } from '@openvizpilot/shared';
 import { useMemo, useState } from 'preact/hooks';
 import { matchSlashCommands } from '../chat/slash-commands';
 
@@ -62,7 +62,7 @@ export function Composer(props: {
       <textarea
         value={text}
         disabled={props.disabled}
-        placeholder='Frage zum Dashboard… („/" für Befehle)'
+        placeholder={t('composer.placeholder')}
         rows={2}
         maxLength={MAX_MESSAGE_CHARS}
         onInput={(e) => updateText((e.target as HTMLTextAreaElement).value)}
@@ -98,11 +98,11 @@ export function Composer(props: {
       />
       {props.busy ? (
         <button type="button" class="btn-stop" onClick={props.onStop}>
-          Stopp
+          {t('composer.stop')}
         </button>
       ) : (
         <button type="button" class="btn-send" disabled={props.disabled || text.trim() === ''} onClick={submit}>
-          Senden
+          {t('composer.send')}
         </button>
       )}
     </div>

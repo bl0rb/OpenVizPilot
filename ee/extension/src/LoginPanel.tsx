@@ -1,3 +1,4 @@
+import { t } from '@openvizpilot/shared';
 import { useState } from 'preact/hooks';
 import { loginWithPopup, type AuthConfig, type OidcSession } from './oidc-login';
 
@@ -25,16 +26,13 @@ export function LoginPanel(props: { baseUrl: string; config: AuthConfig; onLogge
 
   return (
     <div class="login-panel">
-      <h2>Anmeldung erforderlich</h2>
-      <p class="memory-hint">
-        Diese Middleware ist mit Single Sign-On abgesichert. Melde dich mit deinem Firmenkonto an — der Chat
-        nutzt danach deine Tableau-Berechtigungen wie gewohnt.
-      </p>
+      <h2>{t('login.required')}</h2>
+      <p class="memory-hint">{t('login.oidcHint')}</p>
       {props.config.error ? (
         <div class="settings-message">{props.config.error}</div>
       ) : (
         <button type="button" disabled={busy} onClick={() => void start()}>
-          {busy ? 'Anmeldefenster geöffnet …' : `Mit ${label} anmelden`}
+          {busy ? t('login.oidcButtonBusy') : t('login.oidcButton', undefined, { provider: label })}
         </button>
       )}
       {error && <div class="settings-message">{error}</div>}

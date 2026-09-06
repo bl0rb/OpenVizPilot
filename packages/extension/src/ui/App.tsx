@@ -1,6 +1,7 @@
 import {
   DEFAULT_SLASH_COMMANDS,
   MAX_DASHBOARD_KEY_CHARS,
+  t,
   type DashboardAction,
   type SlashCommand,
   type Suggestions,
@@ -168,16 +169,16 @@ export function App(props: { dashboard: Dashboard }) {
   // Starter aus dem Admin-Playbook dieses Dashboards (vor den generischen).
   const [playbookStarters, setPlaybookStarters] = useState<string[]>([]);
   const [playbookKey, setPlaybookKey] = useState<string | null>(null);
-  const [registrationMessage, setRegistrationMessage] = useState('Dashboard-Zuordnung wird geladen …');
+  const [registrationMessage, setRegistrationMessage] = useState(t('app.registration.loading'));
 
   useEffect(() => {
     let cancelled = false;
     void ensureDashboardKey().then((key) => {
       if (cancelled) return;
       setPlaybookKey(key);
-      if (!key) setRegistrationMessage('Für eigene Standardanalysen die Extension einmal im Bearbeitungsmodus öffnen und das Workbook speichern.');
+      if (!key) setRegistrationMessage(t('app.registration.dashboardCopyHint'));
     }).catch(() => {
-      if (!cancelled) setRegistrationMessage('Dashboard-Zuordnung konnte nicht gespeichert werden. Bitte im Bearbeitungsmodus erneut öffnen.');
+      if (!cancelled) setRegistrationMessage(t('app.registration.saveFailed'));
     });
     return () => { cancelled = true; };
   }, [dashboard]);
@@ -343,8 +344,8 @@ export function App(props: { dashboard: Dashboard }) {
         if (playbookKey) {
           const registered = await registerDashboard(baseUrl, apiToken || undefined, playbookKey, dashboard);
           if (!cancelled) setRegistrationMessage(registered
-            ? 'Im Adminportal unter „Standardanalysen pro Dashboard“ verfügbar.'
-            : 'Registrierung nicht erreichbar. Bitte Verbindung und Datenbank der Middleware prüfen.');
+           ? t('app.registration.available')
+           : t('app.registration.unavailable'));
         }
         if (cancelled) return;
         const loaded = await loadSlashCommands(baseUrl, apiToken || undefined, playbookKey || undefined);
@@ -385,7 +386,7 @@ export function App(props: { dashboard: Dashboard }) {
   /** Schreibt Präferenzen optimistisch, macht bei Fehler den State-Update rückgängig. */
   const updatePrefs = useCallback(
     async (next: DashboardPrefs): Promise<string | null> => {
-      if (!userId) return 'Keine Nutzer-ID verfügbar — Präferenzen können nicht gespeichert werden.';
+      if (!userId) return t('app.prefs.noUserId');
       const previous = prefs;
       setPrefs(next);
       try {
@@ -393,7 +394,7 @@ export function App(props: { dashboard: Dashboard }) {
         return null;
       } catch (err) {
         setPrefs(previous);
-        return err instanceof Error ? err.message : 'Präferenzen konnten nicht gespeichert werden.';
+        return err instanceof Error ? err.message : t('app.prefs.saveError');
       }
     },
     [userId, prefs, baseUrl, apiToken, dashboardKey],
@@ -454,7 +455,7 @@ export function App(props: { dashboard: Dashboard }) {
             onDone: (data) => {
               dispatch({ type: 'done' });
               if (data.finishReason === 'length') {
-                dispatch({ type: 'notice', text: 'Antwort wurde wegen Längenlimit abgeschnitten.' });
+                dispatch({ type: 'notice', text: t('app.chat.lengthLimit') });
               }
             },
           },
@@ -485,7 +486,7 @@ export function App(props: { dashboard: Dashboard }) {
   const stop = useCallback(() => {
     session.stop();
     dispatch({ type: 'done' });
-    dispatch({ type: 'notice', text: 'Abgebrochen.' });
+    dispatch({ type: 'notice', text: t('app.chat.cancelled') });
   }, [session]);
 
   // Vom LLM VORGESCHLAGENE Aktion — Ausführung ausschließlich hier,
@@ -503,7 +504,7 @@ export function App(props: { dashboard: Dashboard }) {
         .catch((err: unknown) =>
           dispatch({
             type: 'notice',
-            text: `Aktion fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`,
+            text: t('app.chat.actionFailed', undefined, { error: err instanceof Error ? err.message : String(err) }),
           }),
         );
     },
@@ -517,10 +518,10 @@ export function App(props: { dashboard: Dashboard }) {
   const starters = useMemo(() => {
     const names = dashboard.worksheets.map((w) => w.name);
     const generic = [
-      'Fasse das Dashboard kurz zusammen.',
-      'Was fällt in den Daten auf? Nenne die drei wichtigsten Punkte.',
-      'Welche Filter sind gerade aktiv?',
-      ...names.slice(0, 2).map((n) => `Was zeigt „${n}"?`),
+      t('app.starters.summary'),
+      t('app.starters.anomalies'),
+      t('app.starters.filters'),
+      ...names.slice(0, 2).map((n) => t('app.starters.worksheet', undefined, { name: n })),
     ];
     const savedQuestions = typeof prefs === 'object' && prefs !== null ? prefs.questions : [];
     const seen = new Set(savedQuestions.map((q) => q.trim()));
@@ -573,7 +574,7 @@ export function App(props: { dashboard: Dashboard }) {
     (focus: string) => {
       const questions = typeof prefs === 'object' && prefs !== null ? prefs.questions : [];
       void updatePrefs({ focus, questions }).then((err) =>
-        dispatch({ type: 'notice', text: err ?? 'Antwortfokus für dieses Dashboard gespeichert.' }),
+        dispatch({ type: 'notice', text: err ?? t('app.focus.saved') }),
       );
     },
     [prefs, updatePrefs],
@@ -582,7 +583,7 @@ export function App(props: { dashboard: Dashboard }) {
   const onSkipFocus = useCallback(() => {
     const questions = typeof prefs === 'object' && prefs !== null ? prefs.questions : [];
     void updatePrefs({ focus: '', questions }).then((err) =>
-      dispatch({ type: 'notice', text: err ?? 'Ohne Fokus gestartet.' }),
+      dispatch({ type: 'notice', text: err ?? t('app.focus.started') }),
     );
   }, [prefs, updatePrefs]);
 
@@ -613,9 +614,7 @@ export function App(props: { dashboard: Dashboard }) {
     const report = (ok: boolean) =>
       dispatch({
         type: 'notice',
-        text: ok
-          ? 'Verlauf als Markdown kopiert.'
-          : 'Kopieren fehlgeschlagen — bitte Text manuell markieren.',
+        text: ok ? t('app.transcript.copied') : t('app.transcript.copyFailed'),
       });
     try {
       void navigator.clipboard
@@ -641,15 +640,15 @@ export function App(props: { dashboard: Dashboard }) {
           OpenVizPilot
         </span>
         {contextDirty && (
-          <span class="context-hint" title="Der Dashboard-Kontext wird beim nächsten Senden aktualisiert.">
-            {contextChange ?? 'Dashboard geändert'}
+          <span class="context-hint" title={t('app.context.updated')}>
+            {contextChange ?? t('app.context.changed')}
           </span>
         )}
         {items.length > 0 && (
           <button
             type="button"
             class="btn-icon"
-            title="Verlauf als Markdown kopieren"
+            title={t('app.header.copyTranscriptTitle')}
             disabled={busy}
             onClick={copyTranscript}
           >
@@ -660,7 +659,7 @@ export function App(props: { dashboard: Dashboard }) {
           <button
             type="button"
             class="btn-icon"
-            title={`Abmelden${authSession.user.name || authSession.user.email ? ` (${authSession.user.name ?? authSession.user.email})` : ''}`}
+            title={`${t('app.header.logoutTitle')}${authSession.user.name || authSession.user.email ? ` (${authSession.user.name ?? authSession.user.email})` : ''}`}
             onClick={logout}
           >
             ⎋
@@ -669,7 +668,7 @@ export function App(props: { dashboard: Dashboard }) {
         <button
           type="button"
           class="btn-icon"
-          title="Einstellungen"
+          title={t('app.header.settingsTitle')}
           onClick={() => setSettingsOpen((v) => !v)}
         >
           ⚙
@@ -681,10 +680,10 @@ export function App(props: { dashboard: Dashboard }) {
           registrationMessage={registrationMessage}
           registrationKey={playbookKey}
           onResetRegistration={async () => {
-            if (!window.confirm('Neue Dashboard-Zuordnung erstellen? Bisherige Standardanalysen bleiben bei der alten Zuordnung.')) return;
+            if (!window.confirm(t('app.confirm.resetRegistration'))) return;
             const key = await ensureDashboardKey(true);
             if (key) { setPlaybookKey(key); setPlaybookStarters([]); }
-            else setRegistrationMessage('Neue Zuordnung nur im Bearbeitungsmodus möglich. Bitte anschließend das Workbook speichern.');
+            else setRegistrationMessage(t('app.confirm.resetRegistrationDisabled'));
           }}
           models={models}
           defaultModel={defaultModel}
@@ -729,12 +728,12 @@ export function App(props: { dashboard: Dashboard }) {
                 onClick={() => {
                   const worksheet = selectionIn;
                   setSelectionIn(null);
-                  send(`Was zeigt meine aktuelle Auswahl in „${worksheet}"?`);
+                  send(t('app.selection.evaluate', undefined, { worksheet }));
                 }}
               >
-                Auswahl in „{selectionIn}" auswerten
+                {t('app.selection.evaluate', undefined, { worksheet: selectionIn })}
               </button>
-              <button type="button" class="btn-icon" title="Hinweis ausblenden" onClick={() => setSelectionIn(null)}>
+              <button type="button" class="btn-icon" title={t('app.selection.hideTitle')} onClick={() => setSelectionIn(null)}>
                 ×
               </button>
             </div>

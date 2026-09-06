@@ -80,4 +80,11 @@ jobs:
       - name: Push chart to GHCR OCI
         shell: bash
         run: |
-          helm push "${{ steps.package.outputs.file }}" "oci://${{ env.OCI_REPO }}"
+          # 403 heißt hier fast immer: Das Paket existiert bereits und ist nicht
+          # mit DIESEM Repository verknüpft (typisch nach einem Repo-Umzug) —
+          # das GITHUB_TOKEN darf dann nicht schreiben. Ohne diesen Hinweis
+          # steht in den Logs nur "403 Forbidden".
+          if ! helm push "${{ steps.package.outputs.file }}" "oci://${{ env.OCI_REPO }}"; then
+            echo "::error title=GHCR-Push abgelehnt::Falls 403: Paket ${{ env.OCI_REPO }}/openvizpilot mit diesem Repository verknüpfen — GitHub → Packages → Package settings → Manage Actions access → Repository hinzufügen, Rolle 'Write'. Danach diesen Workflow erneut ausführen (workflow_dispatch, Version ohne 'v')."
+            exit 1
+          fi

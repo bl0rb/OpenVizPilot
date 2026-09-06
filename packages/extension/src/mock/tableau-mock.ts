@@ -1,4 +1,5 @@
 import type {
+  DashboardObject,
   DataTable,
   DataTableReader,
   DataValue,
@@ -31,7 +32,8 @@ export interface MockState {
   /** Protokoll ausgeführter Schreibaktionen (für Tests). */
   actions: string[];
   /** Event manuell auslösen (Demo/Tests). */
-  emit(eventType: string): void;
+  /** Feuert ein Ereignis — ohne `scope` überall, mit `scope` nur in diesem Worksheet. */
+  emit(eventType: string, scope?: string): void;
 }
 
 interface MockWorksheetSpec {
@@ -40,6 +42,8 @@ interface MockWorksheetSpec {
   rows: unknown[][];
   filters: Filter[];
   selectedRows?: number[];
+  /** Marks, die hervorgehoben (nicht selektiert) sind — Highlighter/Legende. */
+  highlightedRows?: number[];
   datasource: { name: string; fields: Array<{ name: string; role: string; aggregation?: string }> };
 }
 
@@ -117,6 +121,9 @@ const WORKSHEETS: MockWorksheetSpec[] = [
   },
   {
     name: 'Auftragsdetails',
+    // Nichts selektiert, aber zwei Zeilen hervorgehoben — so lässt sich der
+    // Unterschied zwischen Selektion und Highlight ohne Tableau durchspielen.
+    highlightedRows: [0, 1],
     columns: [
       { fieldName: 'Region', dataType: 'string' },
       { fieldName: 'Produkt', dataType: 'string' },
@@ -170,7 +177,10 @@ const PARAMETERS: Parameter[] = [
 ];
 
 export function createMockTableau(): { api: TableauApi; state: MockState } {
-  const listeners = new Map<string, Set<() => void>>();
+  // Ein Topf JE BEREICH: Ein Ereignis in „Top Produkte" darf nicht die Handler
+  // von „Umsatz nach Region" auslösen — sonst nennt die Extension im Mock das
+  // falsche Worksheet, und genau das soll der Mock ja aufdecken.
+  const listeners = new Map<string, Map<string, Set<(event: unknown) => void>>>();
   const releases: Record<string, number> = {};
   const openReaders: Record<string, number> = {};
   const readerOptions: Record<string, { ignoreSelection?: boolean } | undefined> = {};
@@ -190,15 +200,32 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
     currentValue: { ...p.currentValue },
   }));
 
-  const addListener = (eventType: string, handler: (event: unknown) => void): Unregister => {
-    let set = listeners.get(eventType);
+  const listenersIn = (scope: string, eventType: string): Set<(event: unknown) => void> => {
+    let byType = listeners.get(scope);
+    if (!byType) {
+      byType = new Map();
+      listeners.set(scope, byType);
+    }
+    let set = byType.get(eventType);
     if (!set) {
       set = new Set();
-      listeners.set(eventType, set);
+      byType.set(eventType, set);
     }
-    const h = () => handler({});
-    set.add(h);
-    return () => set?.delete(h);
+    return set;
+  };
+
+  const addListenerIn =
+    (scope: string) =>
+    (eventType: string, handler: (event: unknown) => void): Unregister => {
+      const set = listenersIn(scope, eventType);
+      set.add(handler);
+      return () => set.delete(handler);
+    };
+
+  const addListener = addListenerIn('dashboard');
+
+  const emitIn = (scope: string, eventType: string, event: unknown) => {
+    for (const h of [...listenersIn(scope, eventType)]) h(event);
   };
 
   const makeTable = (spec: MockWorksheetSpec, rowIndices?: number[]): DataTable => {
@@ -251,15 +278,21 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
     async getSelectedMarksAsync(): Promise<MarksCollection> {
       return { data: [makeTable(spec, spec.selectedRows ?? [])] };
     },
+    async getHighlightedMarksAsync(): Promise<MarksCollection> {
+      return { data: [makeTable(spec, spec.highlightedRows ?? [])] };
+    },
     async getDataSourcesAsync() {
       return [
         {
           name: spec.datasource.name,
           fields: spec.datasource.fields,
+          async getConnectionSummariesAsync() {
+            return [{ name: spec.datasource.name, id: 'mock-connection', type: 'hyper' }];
+          },
         },
       ];
     },
-    addEventListener: addListener,
+    addEventListener: addListenerIn(spec.name),
     async applyFilterAsync(fieldName, values, _updateType, options) {
       const existing = spec.filters.find(
         (f) => f.fieldName === fieldName && f.filterType === 'categorical',
@@ -278,24 +311,36 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
         });
       }
       actions.push(`apply_filter:${spec.name}:${fieldName}=${values.join('|')}`);
-      for (const h of listeners.get(EVENT_TYPES.FilterChanged) ?? []) h();
+      emitIn(spec.name, EVENT_TYPES.FilterChanged, { worksheet: { name: spec.name }, fieldName });
       return fieldName;
     },
     async clearFilterAsync(fieldName) {
       const idx = spec.filters.findIndex((f) => f.fieldName === fieldName);
       if (idx >= 0) spec.filters.splice(idx, 1);
       actions.push(`clear_filter:${spec.name}:${fieldName}`);
-      for (const h of listeners.get(EVENT_TYPES.FilterChanged) ?? []) h();
+      emitIn(spec.name, EVENT_TYPES.FilterChanged, { worksheet: { name: spec.name }, fieldName });
       return fieldName;
     },
     async selectMarksByValueAsync(criteria, updateType) {
       const desc = criteria.map((c) => `${c.fieldName}=${c.value.join('|')}`).join(';');
       actions.push(`select_marks:${spec.name}:${desc}:${updateType}`);
-      for (const h of listeners.get(EVENT_TYPES.MarkSelectionChanged) ?? []) h();
+      emitIn(spec.name, EVENT_TYPES.MarkSelectionChanged, { worksheet: { name: spec.name } });
     },
   });
 
   const settingsStore = new Map<string, string>(loadLocalSettings());
+
+  // Zonen des Mock-Dashboards: zwei Sichten, ein ausgeblendetes Detailblatt
+  // und zwei Bedienelemente — genug, um Sichtbarkeit und „wo stelle ich das
+  // um?" ohne Tableau durchzuspielen.
+  const zones: DashboardObject[] = [
+    { id: 1, name: 'Umsatz nach Region', type: 'worksheet', isVisible: true },
+    { id: 2, name: 'Top Produkte', type: 'worksheet', isVisible: true },
+    { id: 3, name: 'Auftragsdetails', type: 'worksheet', isVisible: false },
+    { id: 4, name: 'Region', type: 'quick-filter', isVisible: true },
+    { id: 5, name: 'Mindestumsatz', type: 'parameter-control', isVisible: true },
+    { id: 6, name: 'OpenVizPilot', type: 'extension', isVisible: true },
+  ];
 
   const api: TableauApi = {
     TableauEventType: { ...EVENT_TYPES },
@@ -317,14 +362,25 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
         dashboard: {
           name: 'Vertriebsübersicht (Mock)',
           worksheets: worksheetSpecs.map(makeWorksheet),
+          objects: zones,
+          addEventListener: addListener,
+          async setZoneVisibilityAsync(map: Record<number, string>) {
+            for (const [id, visibility] of Object.entries(map)) {
+              const zone = zones.find((z) => z.id === Number(id));
+              if (!zone) throw new Error(`Zone ${id} nicht gefunden.`);
+              zone.isVisible = visibility === 'show';
+              actions.push(`set_zone_visibility:${zone.name}=${visibility}`);
+            }
+            emitIn('dashboard', EVENT_TYPES.DashboardLayoutChanged, {});
+          },
           async getParametersAsync() {
             return parameters.map((p) => ({
               ...p,
-              addEventListener: addListener,
+              addEventListener: addListenerIn(`parameter:${p.name}`),
               async changeValueAsync(newValue: string | number | boolean | Date) {
                 p.currentValue = dv(newValue);
                 actions.push(`set_parameter:${p.name}=${String(newValue)}`);
-                for (const h of listeners.get(EVENT_TYPES.ParameterChanged) ?? []) h();
+                emitIn(`parameter:${p.name}`, EVENT_TYPES.ParameterChanged, { parameterName: p.name });
                 return p.currentValue;
               },
             }));
@@ -341,7 +397,20 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
           return undefined;
         },
       },
-      environment: { mode: 'authoring', context: 'mock', apiVersion: 'mock', uniqueUserId: 'mock-user-1' },
+      environment: {
+        mode: 'authoring',
+        context: 'mock',
+        apiVersion: 'mock',
+        uniqueUserId: 'mock-user-1',
+        // Wie ein Workbook mit eigener Hausschrift — zeigt im Mock, dass das
+        // Panel die Formatierung übernimmt.
+        workbookFormatting: {
+          formattingSheets: [
+            { classNameKey: 'tableau-worksheet', cssProperties: { fontFamily: 'Georgia, serif', fontSize: '13px', color: '#2b2b2b' } },
+            { classNameKey: 'tableau-worksheet-title', cssProperties: { fontFamily: 'Georgia, serif', fontWeight: '700' } },
+          ],
+        },
+      },
     },
   };
 
@@ -350,8 +419,14 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
     openReaders,
     readerOptions,
     actions,
-    emit(eventType: string) {
-      for (const h of listeners.get(eventType) ?? []) h();
+    emit(eventType: string, scope?: string) {
+      // Ohne Bereich: alle — wie bisher. Mit Bereich: nur dort, inklusive
+      // Herkunftsangabe, wie sie die echte API im Event mitliefert.
+      for (const [name, byType] of listeners) {
+        if (scope && name !== scope) continue;
+        const event = name === 'dashboard' || name.startsWith('parameter:') ? {} : { worksheet: { name } };
+        for (const h of [...(byType.get(eventType) ?? [])]) h(event);
+      }
     },
   };
 

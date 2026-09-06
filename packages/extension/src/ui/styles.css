@@ -9,10 +9,17 @@ body,
   margin: 0;
 }
 
+/*
+ * Die --ovp-*-Variablen setzt tableau/formatting.ts aus der Workbook-
+ * Formatierung, damit der Chat wie das übrige Dashboard aussieht. Ohne
+ * Tableau (Mock) oder ohne gesetztes Format greifen die Standardwerte hier.
+ */
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
-  font-size: 13px;
-  color: #333;
+  font-family: var(--ovp-font-family, 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif);
+  font-size: var(--ovp-font-size, 13px);
+  font-weight: var(--ovp-font-weight, normal);
+  font-style: var(--ovp-font-style, normal);
+  color: var(--ovp-color, #333);
   background: #fff;
 }
 
@@ -33,7 +40,8 @@ body {
 }
 
 .title {
-  font-weight: 600;
+  font-family: var(--ovp-title-font-family, inherit);
+  font-weight: var(--ovp-title-font-weight, 600);
   flex: 1 1 auto;
   white-space: nowrap;
   overflow: hidden;
@@ -593,4 +601,18 @@ body {
   border: 1px solid #dde1e6;
   border-radius: 6px;
   font: inherit;
+}
+
+/* Hinweis über dem Eingabefeld, wenn im Dashboard etwas markiert wurde. */
+.selection-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 0;
+  flex: 0 0 auto;
+}
+
+.selection-hint .chip {
+  flex: 1 1 auto;
+  text-align: left;
 }

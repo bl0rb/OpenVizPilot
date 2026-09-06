@@ -60,7 +60,13 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       commands TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    CREATE TABLE IF NOT EXISTS admin_playbooks (
+    CREATE TABLE IF NOT EXISTS registered_dashboards (
+    dashboard_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS admin_playbooks (
       dashboard_key TEXT PRIMARY KEY,
       playbook TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -175,6 +181,18 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
          VALUES (1, ?, datetime('now'))
          ON CONFLICT(id) DO UPDATE SET catalog = excluded.catalog, updated_at = excluded.updated_at`,
       ).run(JSON.stringify(catalog));
+    },
+
+    async registerDashboard(dashboard) {
+      const now = new Date().toISOString();
+      db.prepare(`INSERT INTO registered_dashboards (dashboard_key, name, first_seen_at, last_seen_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (dashboard_key) DO UPDATE SET name = excluded.name, last_seen_at = excluded.last_seen_at`).run(dashboard.dashboardKey, dashboard.name, now, now);
+    },
+
+    async listDashboards() {
+      const rows = db.prepare('SELECT * FROM registered_dashboards ORDER BY name, dashboard_key').all() as Array<{ dashboard_key: string; name: string; first_seen_at: string; last_seen_at: string }>;
+      return rows.map((r) => ({ dashboardKey: r.dashboard_key, name: r.name, firstSeenAt: r.first_seen_at, lastSeenAt: r.last_seen_at }));
     },
 
     async getPlaybook(dashboardKey: string): Promise<DashboardPlaybook | null> {

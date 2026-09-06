@@ -261,19 +261,20 @@ export const adminPageHtml = `<!doctype html>
     </section>
 
     <section class="card">
-      <h2>Playbooks pro Dashboard</h2>
+      <h2>Standardanalysen pro Dashboard</h2>
       <p class="hint">
         Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard. Die Extension lädt das Playbook
         für das geöffnete Dashboard: Starter erscheinen vor den generischen Vorschlägen, Dashboard-Befehle
-        überlagern gleichnamige globale. Schlüssel ist der Dashboard-Name, wie er in Tableau heißt.
+        überlagern gleichnamige globale. Eingebundene Dashboards erscheinen nach dem ersten angemeldeten Start automatisch – auch ohne Chatfragen. Die Zuordnung wird im Workbook gespeichert.
       </p>
       <p id="playbooks-banner" class="banner"></p>
       <div class="row" style="margin-bottom: 0.75rem;">
         <label for="playbook-key">Dashboard:</label>
-        <input type="text" id="playbook-key" list="playbook-keys" style="flex: 1 1 260px;" placeholder="Dashboard-Name (exakt wie in Tableau)" autocomplete="off" />
-        <datalist id="playbook-keys"></datalist>
-        <button id="playbook-load">Laden</button>
+        <select id="playbook-key" style="flex: 1 1 260px;"><option value="">Dashboard auswählen …</option></select>
+        <button id="playbook-load">Analysen laden</button>
+        <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
+      <p id="playbook-status" class="hint"></p>
       <div id="playbook-list" class="row" style="margin-bottom: 0.75rem;"></div>
       <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)</label>
       <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?"></textarea>
@@ -834,12 +835,13 @@ export const adminPageHtml = `<!doctype html>
   // ---------- Playbooks pro Dashboard ----------
 
   var playbookKey = document.getElementById('playbook-key');
-  var playbookKeys = document.getElementById('playbook-keys');
+  var playbookStatus = document.getElementById('playbook-status');
   var playbookList = document.getElementById('playbook-list');
   var playbookStarters = document.getElementById('playbook-starters');
   var playbookCommandsBody = document.getElementById('playbook-commands-body');
   var playbooksBanner = document.getElementById('playbooks-banner');
   var knownPlaybooks = [];
+  var registeredDashboards = [];
 
   function commandRowInto(body, cmd) {
     var tr = commandRow(cmd);
@@ -869,53 +871,61 @@ export const adminPageHtml = `<!doctype html>
     (entry ? entry.playbook.commands : []).forEach(function (cmd) { commandRowInto(playbookCommandsBody, cmd); });
   }
 
-  function renderPlaybookList(entries, dashboardKeys) {
+  function dashboardLabel(key) {
+    var registered = registeredDashboards.filter(function (d) { return d.dashboardKey === key; })[0];
+    return registered ? registered.name + ' · ' + key.slice(-8) : key + ' (bisherige Zuordnung nach Name)';
+  }
+
+  function renderPlaybookList(entries) {
     knownPlaybooks = entries;
+    var selected = playbookKey.value;
+    playbookKey.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Dashboard auswählen …';
+    playbookKey.appendChild(placeholder);
     playbookList.innerHTML = '';
-    playbookKeys.innerHTML = '';
-    // Object.create(null): Dashboard-Namen wie "__proto__" dürfen nicht im
-    // Prototyp verschwinden.
     var keys = Object.create(null);
     entries.forEach(function (e) { keys[e.dashboardKey] = true; });
-    (dashboardKeys || []).forEach(function (k) { keys[k] = true; });
-    Object.keys(keys).sort().forEach(function (k) {
+    registeredDashboards.forEach(function (d) { keys[d.dashboardKey] = true; });
+    Object.keys(keys).sort(function (a, b) { return dashboardLabel(a).localeCompare(dashboardLabel(b)); }).forEach(function (key) {
       var opt = document.createElement('option');
-      opt.value = k;
-      playbookKeys.appendChild(opt);
+      opt.value = key;
+      opt.textContent = dashboardLabel(key);
+      playbookKey.appendChild(opt);
     });
-    if (entries.length === 0) {
-      var hint = document.createElement('span');
-      hint.className = 'hint';
-      hint.textContent = 'Noch keine Playbooks gespeichert.';
-      playbookList.appendChild(hint);
-      return;
-    }
-    var label = document.createElement('span');
-    label.className = 'hint';
-    label.textContent = 'Gespeichert:';
-    playbookList.appendChild(label);
-    entries.forEach(function (e) {
+    playbookKey.value = selected;
+    playbookStatus.textContent = registeredDashboards.length
+      ? registeredDashboards.length + ' eingebundene Dashboards. Standardanalysen stehen allen Anwendern der jeweiligen Zuordnung zur Verfügung.'
+      : 'Noch kein Dashboard registriert. Extension im Bearbeitungsmodus öffnen, anmelden und Workbook speichern; danach hier aktualisieren.';
+    entries.forEach(function (entry) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = e.dashboardKey + ' (' + e.playbook.starters.length + ' Starter, ' + e.playbook.commands.length + ' Befehle)';
-      btn.addEventListener('click', function () { showPlaybook(e); });
+      btn.textContent = dashboardLabel(entry.dashboardKey) + ' (' + entry.playbook.starters.length + ' Fragen, ' + entry.playbook.commands.length + ' Befehle)';
+      btn.addEventListener('click', function () { showPlaybook(entry); });
       playbookList.appendChild(btn);
     });
   }
 
   function loadPlaybooks() {
     return adminFetch('/playbooks')
-      .then(function (res) { return res.json(); })
-      .then(function (data) { renderPlaybookList(data.playbooks || [], knownDashboardKeys); })
-      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+      .then(function (res) { if (!res.ok) throw new Error('load'); return res.json(); })
+      .then(function (data) {
+        registeredDashboards = data.dashboards || [];
+        renderPlaybookList(data.playbooks || []);
+      })
+      .catch(function () { showBanner(playbooksBanner, 'Dashboards konnten nicht geladen werden. Bitte erneut versuchen.', 'error'); });
   }
 
-  document.getElementById('playbook-load').addEventListener('click', function () {
-    var key = playbookKey.value.trim();
+  function selectPlaybook() {
+    var key = playbookKey.value;
     var entry = knownPlaybooks.filter(function (e) { return e.dashboardKey === key; })[0];
     showPlaybook(entry || null);
-    showBanner(playbooksBanner, entry ? 'Playbook geladen.' : 'Noch kein Playbook für dieses Dashboard — leeres Formular.', 'ok');
-  });
+    showBanner(playbooksBanner, !key ? '' : entry ? 'Standardanalysen geladen.' : 'Für dieses Dashboard gelten bisher die globalen Standards. Hier eigene Analysen ergänzen.', 'ok');
+  }
+  playbookKey.addEventListener('change', selectPlaybook);
+  document.getElementById('playbook-load').addEventListener('click', selectPlaybook);
+  document.getElementById('playbook-refresh').addEventListener('click', loadPlaybooks);
 
   document.getElementById('playbook-add-command').addEventListener('click', function () {
     commandRowInto(playbookCommandsBody, { name: '', description: '', argHint: '', template: '' });
@@ -925,7 +935,7 @@ export const adminPageHtml = `<!doctype html>
     showBanner(playbooksBanner, '', 'ok');
     var key = playbookKey.value.trim();
     if (!key) {
-      showBanner(playbooksBanner, 'Bitte den Dashboard-Namen eintragen.', 'error');
+      showBanner(playbooksBanner, 'Bitte ein eingebundenes Dashboard auswählen.', 'error');
       return;
     }
     var starters = playbookStarters.value.split('\\n').map(function (l) { return l.trim(); }).filter(Boolean);
@@ -943,7 +953,7 @@ export const adminPageHtml = `<!doctype html>
           showBanner(playbooksBanner, (result.data.error || 'Speichern fehlgeschlagen') + (details ? ' — ' + details : ''), 'error');
           return;
         }
-        showBanner(playbooksBanner, 'Playbook gespeichert — die Extension lädt es beim nächsten Start des Dashboards.', 'ok');
+        showBanner(playbooksBanner, 'Standardanalysen gespeichert — offene Extensions aktualisieren sie innerhalb einer Minute.', 'ok');
         return loadPlaybooks();
       })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
@@ -951,7 +961,7 @@ export const adminPageHtml = `<!doctype html>
 
   document.getElementById('playbook-delete').addEventListener('click', function () {
     var key = playbookKey.value.trim();
-    if (!key || !confirm('Playbook für „' + key + '“ löschen?')) return;
+    if (!key || !confirm('Standardanalysen für „' + dashboardLabel(key) + '“ löschen? Danach gelten wieder die globalen Standards.')) return;
     adminFetch('/playbooks?dashboardKey=' + encodeURIComponent(key), { method: 'DELETE' })
       .then(function (res) {
         if (!res.ok) {
@@ -1182,7 +1192,7 @@ export const adminPageHtml = `<!doctype html>
 
   function renderDashboardStats(dashboards) {
     knownDashboardKeys = dashboards.map(function (d) { return d.dashboardKey; });
-    renderPlaybookList(knownPlaybooks, knownDashboardKeys);
+    // Dashboard registrations are loaded independently of usage statistics.
     dashboardStatsBody.innerHTML = '';
     if (dashboards.length === 0) {
       var tr = document.createElement('tr');

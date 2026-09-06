@@ -4,6 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
+/** Behandelt einen leeren Umgebungswert wie „nicht gesetzt" (Vorlagen liefern leere Schlüssel). */
+function emptyAsUnset<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => (value === '' ? undefined : value), schema);
+}
+
 const envSchema = z.object({
   LITELLM_BASE_URL: z.string().url({ message: 'LITELLM_BASE_URL muss eine gültige URL sein' }),
   LITELLM_API_KEY: z.string().min(1, 'LITELLM_API_KEY fehlt'),
@@ -21,9 +26,12 @@ const envSchema = z.object({
   SCOPE_MODEL: z.string().optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   // --- Enterprise (ee/): Anmeldung & Lizenz ---
-  AUTH_MODE: z.enum(['none', 'token', 'local', 'oidc']).optional(),
+  // Leerer Wert = nicht gesetzt. .env.example liefert die Schlüssel bewusst
+  // ohne Wert aus; ohne diese Umdeutung scheitert der dokumentierte Erststart
+  // („cp .env.example .env") an einem leeren Enum-Wert.
+  AUTH_MODE: emptyAsUnset(z.enum(['none', 'token', 'local', 'oidc']).optional()),
   PUBLIC_URL: z.string().url().optional().or(z.literal('')),
-  OIDC_PROVIDER: z.enum(['entra', 'keycloak', 'generic']).default('generic'),
+  OIDC_PROVIDER: emptyAsUnset(z.enum(['entra', 'keycloak', 'generic']).default('generic')),
   OIDC_ISSUER: z.string().url().optional().or(z.literal('')),
   OIDC_CLIENT_ID: z.string().optional(),
   OIDC_CLIENT_SECRET: z.string().optional(),

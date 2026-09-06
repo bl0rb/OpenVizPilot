@@ -15,6 +15,12 @@ env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/bl0rb/openvizpilot
 
+# Zwei gleichzeitig gepushte Tags würden sonst parallel laufen und sich beim
+# Schreiben von :latest überholen — der ältere Lauf könnte gewinnen.
+concurrency:
+  group: publish-${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   packages: write

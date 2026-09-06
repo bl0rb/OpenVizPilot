@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './dashboards';
 export * from './schemas';
 export * from './sse-protocol';
 export * from './suggestions';

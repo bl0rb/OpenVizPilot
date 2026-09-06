@@ -19,13 +19,14 @@ import {
 } from '@openvizpilot/ee/extension';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ChatSession } from '../chat/agent-loop';
+import { ensureDashboardKey, registerDashboard } from '../tableau/dashboard-registration';
 import { loadSlashCommands, sendUsageEvents } from '../chat/commands-client';
 import { expandSlashCommand } from '../chat/slash-commands';
 import { isAllowedBackendUrl, loadSettings, saveSettings, type ExtensionSettings } from '../settings';
 import { executeDashboardAction } from '../tableau/actions';
 import { getTableau, type Dashboard } from '../tableau/api';
 import { buildContextSnapshot } from '../tableau/context-snapshot';
-import { registerContextInvalidation } from '../tableau/events';
+import { describeContextChange, registerContextInvalidation } from '../tableau/events';
 import { executeToolCall } from '../tools/registry';
 import { Composer } from './Composer';
 import { summarizeToolArgs, type ChatItem } from './items';
@@ -154,12 +155,32 @@ export function App(props: { dashboard: Dashboard }) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [defaultModel, setDefaultModel] = useState('');
   const [contextDirty, setContextDirty] = useState(false);
+  // Klartext der letzten Kontextänderung („Filter ‚Region' geändert") und das
+  // Worksheet, in dem der Anwender zuletzt etwas markiert hat.
+  const [contextChange, setContextChange] = useState<string | null>(null);
+  const [selectionIn, setSelectionIn] = useState<string | null>(null);
+  /** Merkt sich, dass die nächste Markierung von einem eigenen Action-Chip stammt. */
+  const ownSelectionRef = useRef(false);
   // Zentral (Admin-UI) verwaltete Slash-Befehle — Fallback: eingebaute
   // Defaults, solange der Server nicht erreichbar ist oder nichts
   // konfiguriert hat (siehe commands-client.ts).
   const [commands, setCommands] = useState<SlashCommand[]>(DEFAULT_SLASH_COMMANDS);
   // Starter aus dem Admin-Playbook dieses Dashboards (vor den generischen).
   const [playbookStarters, setPlaybookStarters] = useState<string[]>([]);
+  const [playbookKey, setPlaybookKey] = useState<string | null>(null);
+  const [registrationMessage, setRegistrationMessage] = useState('Dashboard-Zuordnung wird geladen …');
+
+  useEffect(() => {
+    let cancelled = false;
+    void ensureDashboardKey().then((key) => {
+      if (cancelled) return;
+      setPlaybookKey(key);
+      if (!key) setRegistrationMessage('Für eigene Standardanalysen die Extension einmal im Bearbeitungsmodus öffnen und das Workbook speichern.');
+    }).catch(() => {
+      if (!cancelled) setRegistrationMessage('Dashboard-Zuordnung konnte nicht gespeichert werden. Bitte im Bearbeitungsmodus erneut öffnen.');
+    });
+    return () => { cancelled = true; };
+  }, [dashboard]);
 
   const session = useMemo(() => new ChatSession(), []);
   const snapshotRef = useRef<{ value: string | null; dirty: boolean }>({ value: null, dirty: true });
@@ -178,9 +199,23 @@ export function App(props: { dashboard: Dashboard }) {
   const [prefs, setPrefs] = useState<PrefsState>(userId ? 'loading' : 'unavailable');
 
   useEffect(() => {
-    const unregister = registerContextInvalidation(dashboard, () => {
-      snapshotRef.current.dirty = true;
-      setContextDirty(true);
+    const unregister = registerContextInvalidation(dashboard, {
+      onDirty: (change) => {
+        snapshotRef.current.dirty = true;
+        setContextDirty(true);
+        setContextChange(describeContextChange(change));
+      },
+      // Eine Markierung verwirft den Kontext nicht — sie bietet nur an, sie
+      // auszuwerten (der Snapshot enthält Markierungen ohnehin nicht). Was der
+      // Assistent selbst markiert hat, muss er dem Nutzer aber nicht als
+      // „deine Auswahl" zum Auswerten anbieten.
+      onSelection: (worksheetName) => {
+        if (ownSelectionRef.current) {
+          ownSelectionRef.current = false;
+          return;
+        }
+        setSelectionIn(worksheetName);
+      },
     });
     return unregister;
   }, [dashboard]);
@@ -293,15 +328,41 @@ export function App(props: { dashboard: Dashboard }) {
   useEffect(() => {
     if (!authReady) return;
     let cancelled = false;
-    void loadSlashCommands(baseUrl, apiToken || undefined, dashboardKey || undefined).then((loaded) => {
-      if (cancelled) return;
-      setCommands(loaded.commands);
-      setPlaybookStarters(loaded.starters);
-    });
+    let loading = false;
+    let loadedOnce = false;
+    const refresh = async () => {
+      // Die regelmäßige Auffrischung pausiert im verborgenen Tab — der ERSTE
+      // Lauf nicht: Tableau lädt Extensions auch in einem Dashboard-Reiter, der
+      // beim Öffnen noch nicht sichtbar ist. Ohne diese Ausnahme blieben
+      // Playbook, Slash-Befehle und die Dashboard-Registrierung dauerhaft aus,
+      // bis der Nutzer den Tab einmal wechselt.
+      if (loading || (loadedOnce && document.visibilityState === 'hidden')) return;
+      loading = true;
+      loadedOnce = true;
+      try {
+        if (playbookKey) {
+          const registered = await registerDashboard(baseUrl, apiToken || undefined, playbookKey, dashboard);
+          if (!cancelled) setRegistrationMessage(registered
+            ? 'Im Adminportal unter „Standardanalysen pro Dashboard“ verfügbar.'
+            : 'Registrierung nicht erreichbar. Bitte Verbindung und Datenbank der Middleware prüfen.');
+        }
+        if (cancelled) return;
+        const loaded = await loadSlashCommands(baseUrl, apiToken || undefined, playbookKey || undefined);
+        if (cancelled) return;
+        setCommands(loaded.commands);
+        setPlaybookStarters(loaded.starters);
+      } finally { loading = false; }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 60_000);
+    const onVisible = () => { void refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [baseUrl, apiToken, dashboardKey, authReady]);
+  }, [baseUrl, apiToken, playbookKey, dashboard, authReady]);
 
   useEffect(() => {
     if (!userId || !authReady) return; // bleibt 'unavailable' — keine Personalisierung ohne User-ID
@@ -343,6 +404,7 @@ export function App(props: { dashboard: Dashboard }) {
       snapshotRef.current.value = await buildContextSnapshot(dashboard);
       snapshotRef.current.dirty = false;
       setContextDirty(false);
+      setContextChange(null);
     }
     return snapshotRef.current.value;
   }, [dashboard]);
@@ -431,6 +493,8 @@ export function App(props: { dashboard: Dashboard }) {
   const runDashboardAction = useCallback(
     (action: DashboardAction) => {
       if (busy) return;
+      // Die gleich folgende Markierung stammt von uns, nicht vom Nutzer.
+      if (action.type === 'select_marks') ownSelectionRef.current = true;
       void executeDashboardAction(action, dashboard)
         .then((message) => {
           dispatch({ type: 'notice', text: message });
@@ -471,7 +535,7 @@ export function App(props: { dashboard: Dashboard }) {
       ...savedQuestions.map((q) => `★ ${q}`),
       ...dedupe(playbookStarters),
       ...dedupe(generic),
-    ].slice(0, 6);
+    ].slice(0, 10);
   }, [dashboard, prefs, playbookStarters]);
 
   // Speichert eine gestellte Frage als Standardfrage für dieses Dashboard
@@ -578,7 +642,7 @@ export function App(props: { dashboard: Dashboard }) {
         </span>
         {contextDirty && (
           <span class="context-hint" title="Der Dashboard-Kontext wird beim nächsten Senden aktualisiert.">
-            Dashboard geändert
+            {contextChange ?? 'Dashboard geändert'}
           </span>
         )}
         {items.length > 0 && (
@@ -614,6 +678,14 @@ export function App(props: { dashboard: Dashboard }) {
       {settingsOpen ? (
         <SettingsPanel
           settings={settings}
+          registrationMessage={registrationMessage}
+          registrationKey={playbookKey}
+          onResetRegistration={async () => {
+            if (!window.confirm('Neue Dashboard-Zuordnung erstellen? Bisherige Standardanalysen bleiben bei der alten Zuordnung.')) return;
+            const key = await ensureDashboardKey(true);
+            if (key) { setPlaybookKey(key); setPlaybookStarters([]); }
+            else setRegistrationMessage('Neue Zuordnung nur im Bearbeitungsmodus möglich. Bitte anschließend das Workbook speichern.');
+          }}
           models={models}
           defaultModel={defaultModel}
           backendUrl={baseUrl}
@@ -646,6 +718,27 @@ export function App(props: { dashboard: Dashboard }) {
             onAction={runDashboardAction}
             onSaveStandard={onSaveStandard}
           />
+          {selectionIn && !busy && (
+            // Der Anwender hat im Dashboard etwas markiert. Statt still
+            // abzuwarten, bietet die Extension an, genau das auszuwerten —
+            // ausgeführt wird es erst auf Klick.
+            <div class="selection-hint">
+              <button
+                type="button"
+                class="chip"
+                onClick={() => {
+                  const worksheet = selectionIn;
+                  setSelectionIn(null);
+                  send(`Was zeigt meine aktuelle Auswahl in „${worksheet}"?`);
+                }}
+              >
+                Auswahl in „{selectionIn}" auswerten
+              </button>
+              <button type="button" class="btn-icon" title="Hinweis ausblenden" onClick={() => setSelectionIn(null)}>
+                ×
+              </button>
+            </div>
+          )}
           <Composer busy={busy} disabled={false} commands={commands} onSend={send} onStop={stop} />
         </>
       )}

@@ -54,12 +54,25 @@ const activateSheetAction = z.object({
   label,
 });
 
+/**
+ * Zone ein-/ausblenden: öffnet oder schließt einen Bereich des Dashboards
+ * (Detailtabelle, Erklärtext, Filterleiste). Angesprochen wird die Zone über
+ * ihren NAMEN aus dem Kontext — Zonen-IDs sind für das Modell nicht sichtbar.
+ */
+const setZoneVisibilityAction = z.object({
+  type: z.literal('set_zone_visibility'),
+  zone: z.string().min(1).max(200),
+  visible: z.boolean(),
+  label,
+});
+
 export const dashboardActionSchema = z.discriminatedUnion('type', [
   applyFilterAction,
   clearFilterAction,
   setParameterAction,
   selectMarksAction,
   activateSheetAction,
+  setZoneVisibilityAction,
 ]);
 
 export type DashboardAction = z.infer<typeof dashboardActionSchema>;
@@ -88,6 +101,8 @@ export function describeAction(action: DashboardAction): string {
       return `Markiere „${action.field}" = ${action.values.join(', ')} · Worksheet „${action.worksheet}"`;
     case 'activate_sheet':
       return `Wechsle zu Sheet „${action.sheet}"`;
+    case 'set_zone_visibility':
+      return `${action.visible ? 'Blende ein' : 'Blende aus'}: Bereich „${action.zone}"`;
   }
 }
 

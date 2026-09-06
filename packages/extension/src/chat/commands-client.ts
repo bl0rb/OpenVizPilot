@@ -34,7 +34,7 @@ export async function loadSlashCommands(
   const fallback: LoadedCommands = { commands: DEFAULT_SLASH_COMMANDS, starters: [] };
   try {
     const query = dashboardKey ? `?dashboardKey=${encodeURIComponent(dashboardKey)}` : '';
-    const res = await fetch(`${baseUrl}/api/commands${query}`, { headers: authHeaders(apiToken) });
+    const res = await fetch(`${baseUrl}/api/commands${query}`, { headers: authHeaders(apiToken), signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return fallback;
     const data = (await res.json()) as { commands: unknown; starters?: unknown };
     const parsed = slashCommandListSchema.safeParse(data.commands);

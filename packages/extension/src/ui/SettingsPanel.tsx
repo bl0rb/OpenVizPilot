@@ -6,6 +6,9 @@ import type { EeFeatures } from '../chat/features-client';
 
 export function SettingsPanel(props: {
   settings: ExtensionSettings;
+  registrationMessage: string;
+  registrationKey: string | null;
+  onResetRegistration: () => Promise<void>;
   models: ModelOption[];
   defaultModel: string;
   backendUrl: string;
@@ -44,6 +47,13 @@ export function SettingsPanel(props: {
   return (
     <div class="settings-panel">
       <h2>Einstellungen</h2>
+      <section class="prefs-section">
+        <h3>Standardanalysen pro Dashboard</h3>
+        <p>{props.registrationMessage}</p>
+        {props.registrationKey && <p class="field-hint">Zuordnung: {props.registrationKey}</p>}
+        <button type="button" onClick={() => void props.onResetRegistration()}>Neue Zuordnung für eine Dashboard-Kopie</button>
+        <p class="field-hint">Kopierte Workbooks teilen zunächst dieselben Standardanalysen. Für getrennte Analysen im Bearbeitungsmodus eine neue Zuordnung erstellen und das Workbook speichern.</p>
+      </section>
       <label>
         Backend-URL
         <input
@@ -118,6 +128,22 @@ export function SettingsPanel(props: {
 
       {props.userId && props.features.savedQueries && (
         <SavedQueriesPanel prefs={props.prefs} onSavePrefs={props.onSavePrefs} />
+      )}
+
+      {/* Ohne Anwenderkennung gibt es keine Personalisierung. Das passiert auf
+          Tableau-Versionen vor 2023.2 (Extensions API 1.11), die das Manifest
+          bewusst weiter zulässt — dann aber mit Ansage statt stillem Nichts:
+          Sonst kauft jemand die Enterprise-Features und sieht nie, warum sie
+          fehlen. */}
+      {!props.userId && (props.features.memory || props.features.savedQueries) && (
+        <section class="prefs-section">
+          <h3>Persönliche Einstellungen</h3>
+          <p class="field-hint">
+            Diese Tableau-Version liefert keine Anwenderkennung — persönliche Fakten und gespeicherte
+            Abfragen sind deshalb nicht verfügbar. Sie brauchen Tableau 2023.2 oder neuer
+            (Extensions API 1.11).
+          </p>
+        </section>
       )}
 
     </div>

@@ -16,6 +16,11 @@ env:
   CHART_PATH: charts/openvizpilot
   OCI_REPO: ghcr.io/bl0rb/charts
 
+# Wie beim Image: parallele Tag-Läufe dürfen sich nicht überholen.
+concurrency:
+  group: publish-${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   packages: write

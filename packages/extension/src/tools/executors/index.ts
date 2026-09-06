@@ -85,17 +85,38 @@ export const executors: ToolExecutors = {
   async get_selected_marks(args, dashboard) {
     const ws = findWorksheet(dashboard, args.worksheet);
     const maxRows = args.maxRows ?? MARKS_DEFAULT_MAX_ROWS;
-    const marks = await ws.getSelectedMarksAsync();
-    const tables = marks.data.filter((t) => t.data.length > 0);
-    if (tables.length === 0) {
-      return `In "${ws.name}" sind aktuell keine Marks selektiert.`;
+    const selected = await ws.getSelectedMarksAsync();
+    let tables = selected.data.filter((t) => t.data.length > 0);
+    let highlighted = false;
+
+    // Tableau kennt zwei Zustände: angeklickt (Selektion) und hervorgehoben
+    // (Highlighter, Legendenklick, Highlight-Aktion zwischen Blättern). Ohne
+    // diesen Rückfall meldet der Assistent „nichts ausgewählt", während der
+    // Anwender sichtbar etwas hervorgehoben hat.
+    if (tables.length === 0 && ws.getHighlightedMarksAsync) {
+      const marks = await ws.getHighlightedMarksAsync().catch(() => null);
+      const found = marks?.data.filter((t) => t.data.length > 0) ?? [];
+      if (found.length > 0) {
+        tables = found;
+        highlighted = true;
+      }
     }
+
+    if (tables.length === 0) {
+      return `In "${ws.name}" sind aktuell keine Marks selektiert oder hervorgehoben.`;
+    }
+
     const parts: string[] = [];
+    if (highlighted) {
+      // Herkunft benennen, damit das Modell in der Antwort nicht „ausgewählt" schreibt.
+      parts.push('_Nichts selektiert — die folgenden Marks sind im Worksheet hervorgehoben._');
+    }
     for (const t of tables) {
       const { headers, rows } = tableToRows(t, maxRows);
       parts.push(rowsToMarkdownTable(headers, rows, { maxRows }));
       if (t.data.length > rows.length) {
-        parts.push(`_Zeige ${rows.length} von ${t.data.length} selektierten Zeilen._`);
+        const what = highlighted ? 'hervorgehobenen' : 'selektierten';
+        parts.push(`_Zeige ${rows.length} von ${t.data.length} ${what} Zeilen._`);
       }
     }
     return parts.join('\n\n');
@@ -108,6 +129,15 @@ export const executors: ToolExecutors = {
     const parts: string[] = [];
     for (const ds of sources) {
       parts.push(`**Datenquelle: ${ds.name}**`);
+      // Verbindungsart beantwortet die häufigste Vertrauensfrage („woher kommt
+      // diese Zahl?"). Bewusst OHNE serverURI: Ein interner Hostname hat im
+      // Prompt nichts verloren, der Connector-Typ genügt für die Antwort.
+      if (ds.getConnectionSummariesAsync) {
+        const connections = await ds.getConnectionSummariesAsync().catch(() => []);
+        if (connections.length > 0) {
+          parts.push(`Verbindungen: ${connections.map((c) => `${c.name} (${c.type})`).join(', ')}`);
+        }
+      }
       const visible = ds.fields.filter((f) => !f.isHidden);
       parts.push(
         rowsToMarkdownTable(

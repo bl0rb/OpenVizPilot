@@ -1,7 +1,17 @@
 import { MAX_CONTEXT_CHARS } from '@openvizpilot/shared';
-import type { Dashboard, DataTableReader, Filter, Parameter, Worksheet } from './api';
+import type { Dashboard, DashboardObject, DataTableReader, Filter, Parameter, Worksheet } from './api';
 
 const MAX_FILTER_VALUES = 10;
+/** So viele Bedienelemente nennt der Kontext höchstens — der Rest ist Rauschen. */
+const MAX_CONTROLS = 15;
+
+/** Zonentypen, die für den Anwender ein Bedienelement sind (keine Sichten, keine Deko). */
+const CONTROL_TYPES: Record<string, string> = {
+  'quick-filter': 'Filter-Steuerelement',
+  'parameter-control': 'Parameter-Steuerelement',
+  'page-filter': 'Seiten-Steuerelement',
+  legend: 'Legende',
+};
 
 /**
  * Baut den kompakten System-Kontext: Dashboard-Struktur, Spalten + Typen,
@@ -12,8 +22,14 @@ export async function buildContextSnapshot(dashboard: Dashboard): Promise<string
   lines.push(`# Dashboard: ${dashboard.name}`);
   lines.push('');
 
+  // Zonen des Dashboards: Sie sagen, was der Anwender GERADE SIEHT. Ohne sie
+  // beschreibt der Assistent auch Sichten, die hinter einem Show/Hide-Container
+  // liegen — im Chat nicht von einer Halluzination zu unterscheiden.
+  const zones = dashboard.objects ?? [];
+  const hidden = hiddenWorksheetNames(zones);
+
   for (const ws of dashboard.worksheets) {
-    lines.push(`## Worksheet: ${ws.name}`);
+    lines.push(`## Worksheet: ${ws.name}${hidden.has(ws.name) ? ' (im Dashboard aktuell ausgeblendet)' : ''}`);
     try {
       lines.push(await describeColumns(ws));
     } catch (err) {
@@ -32,6 +48,13 @@ export async function buildContextSnapshot(dashboard: Dashboard): Promise<string
     } catch (err) {
       lines.push(`(Filter nicht lesbar: ${errMessage(err)})`);
     }
+    lines.push('');
+  }
+
+  const controls = describeControls(zones);
+  if (controls.length > 0) {
+    lines.push('## Bedienelemente im Dashboard');
+    lines.push(...controls);
     lines.push('');
   }
 
@@ -55,6 +78,33 @@ export async function buildContextSnapshot(dashboard: Dashboard): Promise<string
     snapshot = `${snapshot.slice(0, MAX_CONTEXT_CHARS - 60)}\n\n_[Kontext gekürzt — Details per Tool abfragen]_`;
   }
   return snapshot;
+}
+
+/**
+ * Namen der Worksheets, deren Zone ausgeblendet ist. Tableau meldet nur Zonen,
+ * keine Container — ist die Sichtbarkeit nicht ermittelbar, gilt ein Worksheet
+ * als sichtbar. Lieber nichts behaupten als das Falsche.
+ */
+function hiddenWorksheetNames(zones: DashboardObject[]): Set<string> {
+  const names = new Set<string>();
+  for (const z of zones) {
+    if (z.type === 'worksheet' && z.isVisible === false && z.name) {
+      names.add(z.name);
+    }
+  }
+  return names;
+}
+
+/** Sichtbare Bedienelemente — damit der Assistent sagen kann, WO man etwas umstellt. */
+function describeControls(zones: DashboardObject[]): string[] {
+  const all = zones.filter((z) => CONTROL_TYPES[z.type] && z.isVisible !== false && z.name);
+  const lines = all.slice(0, MAX_CONTROLS).map((z) => `- ${z.name} (${CONTROL_TYPES[z.type]})`);
+  // Ohne diesen Hinweis hielte das Modell die gekürzte Liste für vollständig und
+  // würde behaupten, es gebe kein Steuerelement für ein Feld, das es sehr wohl gibt.
+  if (all.length > lines.length) {
+    lines.push(`- … und ${all.length - lines.length} weitere (nicht aufgeführt)`);
+  }
+  return lines;
 }
 
 async function describeColumns(ws: Worksheet): Promise<string> {

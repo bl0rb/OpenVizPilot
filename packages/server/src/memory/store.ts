@@ -1,4 +1,4 @@
-import type { AuthSettings, DashboardPlaybook, ModelOption, SlashCommand } from '@openvizpilot/shared';
+import type { AuthSettings, DashboardRegistration, RegisteredDashboard, DashboardPlaybook, ModelOption, SlashCommand } from '@openvizpilot/shared';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
 import {
@@ -53,6 +53,9 @@ export interface LocalUserAuth extends LocalUser {
 }
 
 export interface MemoryStore {
+  /** Extension registrations, independent of chat usage or Enterprise personalization. */
+  registerDashboard(dashboard: DashboardRegistration): Promise<void>;
+  listDashboards(): Promise<RegisteredDashboard[]>;
   /**
    * Liest die zentral (Admin-UI) konfigurierten Slash-Befehle — null, wenn
    * nie konfiguriert (Aufrufer verwendet dann DEFAULT_SLASH_COMMANDS aus

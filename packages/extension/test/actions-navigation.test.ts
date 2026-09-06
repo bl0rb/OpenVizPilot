@@ -84,11 +84,14 @@ describe('activate_sheet', () => {
     expect(message).toContain('Details');
   });
 
+  // Der Regelfall in Produktion: Die ausgelieferte Extensions-API-Laufzeit hat
+  // kein activateSheetAsync. Der System-Prompt bietet die Aktion deshalb nicht
+  // mehr an — kommt sie doch, muss die Meldung die Ursache richtig benennen.
   it('fails clearly when the runtime has no activateSheetAsync', async () => {
     (globalThis as Record<string, unknown>).tableau = { extensions: {} };
     await expect(
       executeDashboardAction({ type: 'activate_sheet', sheet: 'Details', label: 'x' }, fakeDashboard([])),
-    ).rejects.toThrow(/nicht unterstützt/);
+    ).rejects.toThrow(/kann nicht zu einem anderen Sheet wechseln/);
   });
 
   it('surfaces the runtime error for unknown sheets', async () => {

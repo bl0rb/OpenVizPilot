@@ -83,6 +83,12 @@ export interface TrexOptions {
   dev?: boolean;
 }
 
+/**
+ * Version im Manifest — für Tableau sichtbar im Erweiterungsdialog. Bei einem
+ * Release mitziehen, sonst zeigt der Admin-Dialog eine falsche Version an.
+ */
+export const EXTENSION_VERSION = '1.0.0';
+
 export function buildTrexManifest(options: TrexOptions): string {
   const dev = options.dev === true;
   const id = dev ? 'com.openvizpilot.extension.dev' : 'com.openvizpilot.extension';
@@ -92,11 +98,11 @@ export function buildTrexManifest(options: TrexOptions): string {
   // nur die source-location darf http://localhost verwenden.
   return `<?xml version="1.0" encoding="utf-8"?>
 <manifest manifest-version="0.1" xmlns="http://www.tableau.com/xml/extension_manifest">
-  <dashboard-extension id="${id}" extension-version="0.1.0">
+  <dashboard-extension id="${id}" extension-version="${EXTENSION_VERSION}">
     <default-locale>de_DE</default-locale>
     <name resource-id="name"/>
     <description>Chat mit dem geöffneten Tableau-Dashboard (OpenAI-kompatibler LLM-Endpunkt)</description>
-    <author name="OpenVizPilot" email="mathiaswerk@icloud.com" organization="OpenVizPilot" website="https://github.com/bl0rb/OpenVizPilot"/>
+    <author name="OpenVizPilot" email="info@werkworks.de" organization="OpenVizPilot" website="https://github.com/bl0rb/OpenVizPilot"/>
     <min-api-version>1.10</min-api-version>
     <source-location>
       <url>${url}</url>

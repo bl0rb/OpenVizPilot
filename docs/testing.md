@@ -20,10 +20,10 @@ curl -s http://localhost:3000/api/models
 ```
 
 ```bash
-curl -sN -X POST http://localhost:3000/api/chat -H 'content-type: application/json' -d '{"context":"# Test-Dashboard","messages":[{"role":"user","content":"Sag nur Hallo."}]}'
+curl -sN -X POST http://localhost:3000/api/chat -H 'content-type: application/json' -d '{"context":"# Test-Dashboard\n\n## Worksheet: Umsatz\nSpalten: Region (string)","messages":[{"role":"user","content":"Was zeigt das Dashboard?"}]}'
 ```
 
-Erwartung: SSE-Events `delta` … `done`. Fehlerfall (Proxy gestoppt): ein `error`-Event mit `retryable:true`, kein Absturz.
+Erwartung: SSE-Events `delta` … `done`. Die Frage muss Dashboard-Bezug haben — der Scope-Guard weist Allgemeines („Sag nur Hallo“) ab, das ist kein Fehler, sondern die Absicherung. Fehlerfall (Proxy gestoppt): ein `error`-Event mit `retryable:true`, kein Absturz.
 
 ## 2. Browser ohne Tableau (Mock-Modus)
 
@@ -34,7 +34,8 @@ Erwartung: SSE-Events `delta` … `done`. Fehlerfall (Proxy gestoppt): ein `erro
 - Tool-Chip aufklappen → Rohvorschau des Tool-Ergebnisses.
 - Stopp-Button während einer laufenden Antwort → Stream bricht ab, Notiz „Abgebrochen.“
 - Zahnrad → Einstellungen: Modell-Liste kommt aus `GET /api/models`.
-- DevTools-Konsole: `window.__tableauMockState.emit('filter-changed')` → Hinweis „Dashboard geändert“ erscheint; nächste Frage baut den Kontext neu.
+- DevTools-Konsole: `window.__tableauMockState.emit('filter-changed')` → Hinweis „Filter geändert“ erscheint (der Hinweis nennt die Ursache); nächste Frage baut den Kontext neu.
+- DevTools-Konsole: `window.__tableauMockState.emit('mark-selection-changed', 'Umsatz nach Region')` → Chip „Auswahl in ‚Umsatz nach Region' auswerten“ über dem Eingabefeld, **kein** Kontext-Hinweis. Dasselbe mit `'Top Produkte'` (dort ist nichts selektiert) → der Chip verschwindet wieder.
 - Netzwerk-Tab: Requests gehen nur an `/api/*` — **kein LLM-Endpunkt-Key im Frontend-Traffic**.
 - Scope-Guard: „Schreib mir ein Gedicht über Katzen“ → feste Absage „…außerhalb des Dashboard-Kontexts…“ (der Mock-LLM klassifiziert „gedicht“/„witz“ als Off-Topic), im Server-Log `chat blocked by scope guard`, in der Admin-Statistik zählt `scope_blocked` hoch. Danach „Fasse das Dashboard zusammen“ → normale Antwort (Guard lässt durch).
 
@@ -43,8 +44,12 @@ Erwartung: SSE-Events `delta` … `done`. Fehlerfall (Proxy gestoppt): ein `erro
 1. `npm run dev` (echter LLM-Endpunkt laut `.env`) — **oder ohne API-Key**: `npm run dev:claude` nutzt die lokal angemeldete Claude Code CLI als LLM (`.env`: `LITELLM_BASE_URL=http://localhost:4020`; Latenz einige Sekunden pro Runde, nur für lokales Testen).
 2. Beispiel-Workbook (z. B. Superstore) öffnen, Dashboard → Objekt „Erweiterung“ aufs Dashboard ziehen → `packages/extension/public/openvizpilot.dev.trex` laden → Laufzeit-Prompt bestätigen. **Nicht** das über die Admin-UI heruntergeladene Manifest verwenden — das zeigt auf die Middleware (Port 3000), die im Dev-Betrieb keine Extension ausliefert (404 im Extension-Rahmen); die Extension kommt im Dev vom Vite-Server (5173).
 3. Fragen wie in Schritt 2; zusätzlich:
-   - Marks im Dashboard selektieren → „Was habe ich gerade ausgewählt?“ → `get_selected_marks` liefert die Selektion.
-   - Filter im Dashboard ändern → Hinweis „Dashboard geändert“ → nächste Frage nutzt den neuen Kontext (Filter in der Antwort prüfen).
+   - Marks im Dashboard selektieren → Hinweis „Auswahl in ‚X' auswerten" über dem Eingabefeld; Klick → `get_selected_marks` liefert die Selektion. Der Kontext-Hinweis „Dashboard geändert" darf dabei **nicht** erscheinen.
+   - Nichts selektieren, stattdessen über Highlighter oder Legende etwas hervorheben → „Was ist gerade hervorgehoben?“ → `get_selected_marks` fällt auf die Hervorhebung zurück und sagt das dazu.
+   - Filter im Dashboard ändern → Hinweis nennt das Feld („Filter ‚Region' geändert“) → nächste Frage nutzt den neuen Kontext (Filter in der Antwort prüfen).
+   - Ein Worksheet in einen Show/Hide-Container legen und zuklappen → „Was zeigt ‚X'?“ → der Assistent sagt, dass der Bereich ausgeblendet ist, und bietet das Einblenden als Chip an (Klick prüfen). **Hier zeigt sich, ob Tableau die Zone eines Worksheets im geschlossenen Container als unsichtbar meldet** — ist das nicht der Fall, verhält sich der Assistent wie bisher.
+   - „Wo stelle ich die Region um?“ → der Assistent nennt das Bedienelement aus dem Abschnitt „Bedienelemente im Dashboard“.
+   - Workbook-Schrift in Tableau umstellen (Format → Arbeitsmappe) → das Chat-Panel übernimmt Schrift und Textfarbe ohne Reload.
    - Nicht existentes Worksheet erfragen („Zeig mir Daten aus Blatt XYZ“) → das LLM korrigiert sich über die Fehlermeldung/`list_worksheets`.
 4. Debugging: Desktop mit `--remote-debugging-port=8696` starten, Chrome → `http://localhost:8696`.
 

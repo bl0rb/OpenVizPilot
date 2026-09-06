@@ -6,3 +6,13 @@ dist/
 .DS_Store
 coverage/
 data/
+
+# Signaturschlüssel für Lizenzen (docs/enterprise.md: sign-license keygen).
+# Das Repository ist öffentlich — ein privater Schlüssel darf hier NIE landen.
+keys/
+*.pem
+*.b64url
+# Ausgestellte Lizenz-Token (docs/enterprise.md, `--out …`): wer sie hat,
+# schaltet jede Installation frei.
+*.openvizpilot-license
+*.license

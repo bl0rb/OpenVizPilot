@@ -643,7 +643,8 @@ export function createAdminRoute(
 
   app.get('/playbooks', async (c) => {
     try {
-      return c.json({ playbooks: await memoryStore!.listPlaybooks() });
+      const [playbooks, dashboards] = await Promise.all([memoryStore!.listPlaybooks(), memoryStore!.listDashboards()]);
+      return c.json({ playbooks, dashboards });
     } catch (err) {
       logger.error('admin playbooks read failed', { name: err instanceof Error ? err.name : 'unknown' });
       return c.json({ error: 'Datenbank nicht erreichbar' }, 503);

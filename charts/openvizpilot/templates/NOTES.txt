@@ -17,7 +17,7 @@ Checks:
 User-Memory: CloudNativePG-Cluster "{{ include "openvizpilot.dbClusterName" . }}"
 (Secret {{ include "openvizpilot.dbClusterName" . }}-app, Key "uri").
 {{- end }}
-{{- if not (or .Values.app.authTokenSecret.existingSecret .Values.app.authToken) }}
+{{- if and (not (or .Values.app.authTokenSecret.existingSecret .Values.app.authToken)) (not (has .Values.auth.mode (list "local" "oidc"))) }}
 
 WARNUNG: Kein API_AUTH_TOKEN gesetzt — /api/* ist unauthentifiziert.
 Zugriff per NetworkPolicy/Ingress auf die Tableau-Nutzer beschränken

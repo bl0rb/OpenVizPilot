@@ -65,12 +65,30 @@ export async function executeDashboardAction(
     case 'activate_sheet': {
       const workbook = getTableau().extensions.workbook;
       if (!workbook?.activateSheetAsync) {
-        throw new Error('Sheet-Wechsel wird von dieser Tableau-Version nicht unterstützt.');
+        // Die Extensions API kennt keinen Sheet-Wechsel: `tableau.extensions.workbook`
+        // hat in der ausgelieferten Laufzeit (1.17) nur getAllDataSourcesAsync,
+        // und die Typdefinitionen kennen activateSheetAsync ebenfalls nicht.
+        // Der System-Prompt bietet die Aktion deshalb nicht mehr an; der Pfad
+        // bleibt für den Fall, dass Tableau sie nachliefert.
+        throw new Error('Die Tableau Extensions API kann nicht zu einem anderen Sheet wechseln.');
       }
       // Wechselt die Ansicht — die Extension wird dabei ggf. entladen, deshalb
       // ist die Rückmeldung nur noch für den Mock/Dev-Fall sichtbar.
       await workbook.activateSheetAsync(a.sheet);
       return `Gewechselt zu Sheet „${a.sheet}".`;
+    }
+    case 'set_zone_visibility': {
+      if (!dashboard.setZoneVisibilityAsync) {
+        throw new Error('Bereiche ein-/ausblenden wird von dieser Tableau-Version nicht unterstützt.');
+      }
+      // Auflösung über den Namen: Das Modell sieht im Kontext Namen, keine IDs.
+      const zone = (dashboard.objects ?? []).find((o) => o.name === a.zone);
+      if (!zone) {
+        const available = (dashboard.objects ?? []).map((o) => `"${o.name}"`).join(', ') || '(keine)';
+        throw new Error(`Bereich "${a.zone}" nicht gefunden. Verfügbar: ${available}`);
+      }
+      await dashboard.setZoneVisibilityAsync({ [zone.id]: a.visible ? 'show' : 'hide' });
+      return `Bereich „${zone.name}" ${a.visible ? 'eingeblendet' : 'ausgeblendet'}.`;
     }
   }
 }

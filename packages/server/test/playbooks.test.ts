@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_SLASH_COMMANDS } from '@openvizpilot/shared';
+import { DEFAULT_SLASH_COMMANDS, type RegisteredDashboard } from '@openvizpilot/shared';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
 import { createSqliteMemoryStore, openSqliteDatabase } from '../src/memory/sqlite-store';
@@ -133,5 +133,64 @@ describe('GET /api/commands with dashboardKey', () => {
     const data = (await (await app.request('/api/commands?dashboardKey=X')).json()) as { commands: unknown; starters: string[] };
     expect(data.commands).toEqual(DEFAULT_SLASH_COMMANDS);
     expect(data.starters).toEqual([]);
+  });
+});
+
+const dashboardA = { dashboardKey: 'dashboard:8b1fe8ce-23cb-4a19-9b18-17ed410a0422', name: 'Sales' };
+const dashboardB = { dashboardKey: 'dashboard:93b78769-79f3-436b-91e3-a71c998b998a', name: 'Sales' };
+
+describe('registered dashboards and standard analyses', () => {
+  it('registers before the first question, separates same-name dashboards and preserves playbooks on refresh', async () => {
+    const { app, memoryStore } = createApp(testConfig());
+    const register = (body: unknown) => app.request('/api/dashboards', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await register(dashboardA)).status).toBe(204);
+    expect((await register(dashboardB)).status).toBe(204);
+    const listed = await (await app.request('/api/admin/playbooks', auth)).json() as { dashboards: RegisteredDashboard[] };
+    expect(listed.dashboards).toHaveLength(2);
+    expect(listed.dashboards).toEqual(expect.arrayContaining([expect.objectContaining(dashboardA), expect.objectContaining(dashboardB)]));
+    expect(await memoryStore!.getDashboardUsage(30)).toEqual([]);
+    expect((await app.request('/api/dashboards')).status).toBe(404);
+    expect((await app.request('/api/admin/playbooks')).status).toBe(401);
+
+    await app.request('/api/admin/playbooks', {
+      method: 'PUT', headers: { ...auth.headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ dashboardKey: dashboardA.dashboardKey, playbook: PLAYBOOK }),
+    });
+    expect((await register({ ...dashboardA, name: 'Sales renamed' })).status).toBe(204);
+    const commands = async (key: string) => (await app.request('/api/commands?dashboardKey=' + encodeURIComponent(key))).json() as Promise<{ starters: string[]; commands: unknown[] }>;
+    expect((await commands(dashboardA.dashboardKey)).starters).toEqual(PLAYBOOK.starters);
+    expect((await commands(dashboardB.dashboardKey)).starters).toEqual([]);
+    expect((await commands(dashboardB.dashboardKey)).commands).toEqual(DEFAULT_SLASH_COMMANDS);
+    const registered = await memoryStore!.listDashboards();
+    expect(registered).toHaveLength(2);
+    expect(registered.find((d) => d.dashboardKey === dashboardA.dashboardKey)?.firstSeenAt)
+      .toBe(listed.dashboards.find((d: { dashboardKey: string }) => d.dashboardKey === dashboardA.dashboardKey)?.firstSeenAt);
+    await app.request('/api/admin/playbooks?dashboardKey=' + encodeURIComponent(dashboardA.dashboardKey), { ...auth, method: 'DELETE' });
+    expect((await commands(dashboardA.dashboardKey)).starters).toEqual([]);
+    expect(await memoryStore!.listDashboards()).toHaveLength(2);
+    await memoryStore!.close();
+  });
+
+  it('requires the configured login and validates registrations without permitting admin edits', async () => {
+    const { app, memoryStore } = createApp(testConfig({ authMode: 'token', apiAuthToken: 'viewer-token' }));
+    const post = (body: unknown, token = '') => app.request('/api/dashboards', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token }, body: JSON.stringify(body),
+    });
+    expect((await post(dashboardA)).status).toBe(401);
+    expect((await post(dashboardA, 'viewer-token')).status).toBe(204);
+    for (const body of [{ ...dashboardA, name: '' }, { ...dashboardA, dashboardKey: 'Sales' }, { ...dashboardA, name: 'a'.repeat(201) }, { ...dashboardA, playbook: PLAYBOOK }]) {
+      expect((await post(body, 'viewer-token')).status).toBe(400);
+    }
+    expect((await app.request('/api/admin/playbooks', { headers: { authorization: 'Bearer viewer-token' } })).status).toBe(401);
+    await memoryStore!.close();
+  });
+
+  it('returns an explicit unavailable result without a database while global commands remain usable', async () => {
+    const { app } = createApp(testConfig({ memoryDbPath: null, adminToken: null }));
+    expect((await app.request('/api/dashboards', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(dashboardA) })).status).toBe(503);
+    const result = await (await app.request('/api/commands')).json() as { commands: unknown[] };
+    expect(result.commands).toEqual(DEFAULT_SLASH_COMMANDS);
   });
 });

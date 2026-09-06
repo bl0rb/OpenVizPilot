@@ -159,7 +159,7 @@ export const toolDefinitions: ToolDefinition[] = [
     function: {
       name: 'get_selected_marks',
       description:
-        'Get the data of the marks the user has currently selected (clicked/highlighted) in a worksheet. Returns an explicit note if nothing is selected.',
+        'Get the data of the marks the user has currently selected in a worksheet. If nothing is selected, falls back to the marks that are highlighted (highlighter control, legend click, highlight action) and says so. Returns an explicit note if neither exists.',
       parameters: {
         type: 'object',
         properties: {
@@ -181,7 +181,7 @@ export const toolDefinitions: ToolDefinition[] = [
     function: {
       name: 'get_datasource_info',
       description:
-        'Get metadata about the data sources of a worksheet: data source name and its fields (name, role, aggregation). No row data.',
+        'Get metadata about the data sources of a worksheet: data source name, its connections (name and connector type — use this to answer where a number comes from) and its fields (name, role, aggregation). No row data.',
       parameters: {
         type: 'object',
         properties: { worksheet: worksheetParam },

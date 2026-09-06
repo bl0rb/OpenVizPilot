@@ -82,10 +82,21 @@ export interface DataSourceField {
   isHidden?: boolean;
 }
 
+/** Eine Verbindung der Datenquelle — beantwortet „woher kommt diese Zahl?". */
+export interface ConnectionSummary {
+  name: string;
+  id?: string;
+  /** Connector-Typ, z. B. 'sqlserver', 'excel-direct', 'hyper'. */
+  type: string;
+  serverURI?: string;
+}
+
 export interface DataSource {
   name: string;
   id?: string;
   fields: DataSourceField[];
+  /** Optional: ältere Laufzeiten und der Mock müssen das nicht können. */
+  getConnectionSummariesAsync?(): Promise<ConnectionSummary[]>;
 }
 
 export interface Worksheet {
@@ -96,6 +107,13 @@ export interface Worksheet {
   ): Promise<DataTableReader>;
   getFiltersAsync(): Promise<Filter[]>;
   getSelectedMarksAsync(): Promise<MarksCollection>;
+  /**
+   * Hervorgehobene Marks — ein ANDERER Zustand als die Selektion: Highlighter,
+   * Legendenklick und Highlight-Aktionen zwischen Blättern erzeugen ihn, ohne
+   * dass etwas selektiert wäre. Optional, damit Mock und ältere Laufzeiten
+   * unverändert gültig bleiben.
+   */
+  getHighlightedMarksAsync?(): Promise<MarksCollection>;
   getDataSourcesAsync(): Promise<DataSource[]>;
   addEventListener(eventType: string, handler: (event: unknown) => void): Unregister;
   /** Schreibend — werden NUR nach explizitem User-Klick aufgerufen (Action-Chips). */
@@ -113,10 +131,40 @@ export interface Worksheet {
   ): Promise<void>;
 }
 
+/**
+ * Eine Zone des Dashboards. Deckt beides ab: Sichten (`type: 'worksheet'`) und
+ * Bedienelemente (`quick-filter`, `parameter-control`, `legend`, `text`, …).
+ * Damit weiß der Assistent, was der Anwender gerade wirklich vor sich hat.
+ */
+export interface DashboardObject {
+  id: number;
+  name: string;
+  /** DashboardObjectType: 'worksheet' | 'quick-filter' | 'parameter-control' | 'legend' | … */
+  type: string;
+  isVisible: boolean;
+  isFloating?: boolean;
+}
+
 export interface Dashboard {
   name: string;
   worksheets: Worksheet[];
   getParametersAsync(): Promise<Parameter[]>;
+  /** Zonen des Dashboards (Extensions API >= 1.1); optional wie alles hier. */
+  objects?: DashboardObject[];
+  addEventListener?(eventType: string, handler: (event: unknown) => void): Unregister;
+  /**
+   * Schreibend (blendet eine Zone ein/aus) — NUR nach explizitem User-Klick
+   * (Action-Chips). Laufzeit ab Extensions API 1.5.
+   */
+  setZoneVisibilityAsync?(zoneVisibilityMap: Record<number, string>): Promise<void>;
+}
+
+/** Eine Formatvorlage des Workbooks (Schrift, Textfarbe) — siehe formatting.ts. */
+export interface FormattingSheet {
+  /** ClassNameKey: 'tableau-worksheet' | 'tableau-worksheet-title' | 'tableau-tooltip' | … */
+  classNameKey: string;
+  /** CSS-Eigenschaften in JS-Schreibweise: fontFamily, fontSize, color, … */
+  cssProperties: Record<string, string | number | undefined>;
 }
 
 export interface Settings {
@@ -132,6 +180,8 @@ export interface Environment {
   tableauVersion?: string;
   /** Obfuskierte, stabile ID des eingeloggten Users (Extensions API >= 1.11). */
   uniqueUserId?: string;
+  /** Schrift- und Farbvorgaben des Workbooks (Extensions API >= 1.7). */
+  workbookFormatting?: { formattingSheets: FormattingSheet[] };
 }
 
 export interface Workbook {
@@ -172,6 +222,10 @@ export const EVENT_TYPES = {
   ParameterChanged: 'parameter-changed',
   MarkSelectionChanged: 'mark-selection-changed',
   SummaryDataChanged: 'summary-data-changed',
+  /** Zonen ein-/ausgeblendet oder verschoben (Extensions API >= 1.7). */
+  DashboardLayoutChanged: 'dashboard-layout-changed',
+  /** Autor ändert die Workbook-Formatierung (Extensions API >= 1.7). */
+  WorkbookFormattingChanged: 'workbook-formatting-changed',
 } as const;
 
 export function getTableau(): TableauApi {

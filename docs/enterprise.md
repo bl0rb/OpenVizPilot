@@ -98,6 +98,13 @@ OIDC_SCOPES=openid profile email
 PUBLIC_URL=https://<middleware>
 ```
 
+## Voraussetzung für Personalisierung
+
+`memory` und `savedQueries` identifizieren den Anwender über `uniqueUserId` der Extensions API
+(ab 1.11) und brauchen deshalb **Tableau 2023.2 oder neuer**. Das Manifest lässt bewusst ab 1.10 zu,
+damit der Core-Betrieb auf älteren Servern möglich bleibt; dort erscheinen die persönlichen Bereiche
+mit einem Hinweis statt stillschweigend zu fehlen. Single Sign-On ist davon nicht betroffen.
+
 ## Lizenzschlüssel
 
 Format und Signatur entsprechen dem bestehenden WerkWorks-Lizenzgenerator (Ed25519, siehe
@@ -110,7 +117,7 @@ OVP_LICENSE_PUBLIC_KEY_B64URL=<32 Bytes>  # oder OVP_LICENSE_PUBLIC_KEY_PATH=/et
 
 Ohne gültige Lizenz mit Feature `sso` startet die Middleware im OIDC-Modus **nicht** (klare Fehlermeldung);
 abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Der Status ist in der Admin-UI unter
-„Edition, Lizenz & Anmeldung“ sichtbar.
+„Anmeldung, Single Sign-On & Lizenz“ sichtbar.
 
 Für Entwicklung und Tests: `npm run sign-license -w @openvizpilot/ee -- keygen ./keys` erzeugt ein
 Schlüsselpaar, `… -- sign ./keys/private.pem "Firma GmbH" 2027-12-31` einen Token.
@@ -167,6 +174,7 @@ Personalisierung weiterlaufen soll; `GET /api/features` zeigt, was gerade aktiv 
 
 `npm run dev:demo:sso` startet zusätzlich einen Mock-Identity-Provider (Port 4030, Auto-Login als
 „Anna Beispiel“). Dazu in der `.env`: `AUTH_MODE=oidc`, `OIDC_PROVIDER=generic`,
-`OIDC_ISSUER=http://127.0.0.1:4030`, `OIDC_CLIENT_ID=openvizpilot-dev`, `PUBLIC_URL=http://localhost:5173`
-(Vite-Dev-Origin, der die Extension ausliefert) sowie eine Dev-Lizenz (siehe oben) — alternativ alles
-in der Admin-UI eintragen.
+`OIDC_ISSUER=http://127.0.0.1:4030`, `OIDC_CLIENT_ID=openvizpilot-dev`, `PUBLIC_URL=http://localhost:3000`
+sowie eine Dev-Lizenz (siehe oben) — alternativ alles in der Admin-UI eintragen. `PUBLIC_URL` muss auf
+die **Middleware** zeigen, nicht auf den Vite-Dev-Server: Die Redirect-URI `<PUBLIC_URL>/auth/callback`
+wird von der Middleware ausgeliefert (Port 3000).

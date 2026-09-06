@@ -24,6 +24,7 @@ import { createAdminRoute } from './routes/admin';
 import { createAuthRoutes, requireLocalUser } from './routes/auth';
 import { createChatRoute } from './routes/chat';
 import { createCommandsRoute } from './routes/commands';
+import { createDashboardsRoute } from './routes/dashboards';
 import { createHealthRoute } from './routes/health';
 import { createModelsRoute } from './routes/models';
 import { createStatsRoute } from './routes/stats';
@@ -200,6 +201,7 @@ export function createApp(config: AppConfig): {
   // weiter funktionieren.
   app.route('/api/memory', createPersonalizationRoutes({ store: personalizationStore, logger, hasFeature: licensedFeature }));
   app.route('/api/commands', createCommandsRoute(memoryStore, logger));
+  app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
   app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore));
 

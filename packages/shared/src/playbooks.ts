@@ -3,8 +3,8 @@ import { MAX_DASHBOARD_KEY_CHARS } from './prefs';
 import { slashCommandListSchema, type SlashCommand } from './slash-commands';
 
 /**
- * Playbooks pro Dashboard: Der Admin hinterlegt je Dashboard (Schlüssel =
- * Dashboard-Name, wie bei den Präferenzen) eigene Starter-Fragen und
+ * Playbooks pro Dashboard: Der Admin hinterlegt je registrierter Dashboard-
+ * Zuordnung eigene Starter-Fragen und
  * Slash-Befehle. Die Extension lädt sie beim Start für das geöffnete
  * Dashboard (GET /api/commands?dashboardKey=…) — Starter erscheinen vor den
  * generischen Vorschlägen, Dashboard-Befehle überlagern gleichnamige globale.

@@ -16,10 +16,6 @@
 
 OpenVizPilot is a Tableau dashboard extension with a chat UI that answers questions about the currently open dashboard. A lightweight Node.js middleware connects the extension to any existing OpenAI-compatible LLM endpoint (for example a LiteLLM proxy). The LLM queries dashboard data selectively via tool calling, and every data access happens in the viewer's own Tableau session, so nobody can ask for data they are not allowed to see.
 
-<p align="center">
-  <img src="docs/images/Dashboard-Flow.gif" width="720" alt="Animation: OpenVizPilot inside a Tableau dashboard — the user picks an answer focus, asks a question, the assistant reads the dashboard via tool calls and answers with follow-up chips" />
-</p>
-
 ## What it does
 
 For dashboard users

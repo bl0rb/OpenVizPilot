@@ -1,4 +1,4 @@
-import { MAX_AUTHOR_CONTEXT_CHARS, type ModelOption } from '@openvizpilot/shared';
+import { MAX_AUTHOR_CONTEXT_CHARS, t, type ModelOption } from '@openvizpilot/shared';
 import { MemoryFactsPanel, SavedQueriesPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
 import { useState } from 'preact/hooks';
 import { isAllowedBackendUrl, type ExtensionSettings } from '../settings';
@@ -32,7 +32,7 @@ export function SettingsPanel(props: {
 
   const save = async () => {
     if (!urlValidation.ok) {
-      setMessage(urlValidation.reason ?? 'Ungültige Backend-URL.');
+      setMessage(urlValidation.reason ?? t('settings.invalidBackendUrl'));
       return;
     }
     const result = await props.onSave({
@@ -41,47 +41,45 @@ export function SettingsPanel(props: {
       apiToken: apiToken.trim(),
       dashboardContext: dashboardContext.trim(),
     });
-    setMessage(result ?? 'Gespeichert.');
+    setMessage(result ?? t('settings.saved'));
   };
 
   return (
     <div class="settings-panel">
-      <h2>Einstellungen</h2>
+      <h2>{t('settings.title')}</h2>
       <section class="prefs-section">
-        <h3>Standardanalysen pro Dashboard</h3>
+        <h3>{t('settings.standardAnalysesTitle')}</h3>
         <p>{props.registrationMessage}</p>
-        {props.registrationKey && <p class="field-hint">Zuordnung: {props.registrationKey}</p>}
-        <button type="button" onClick={() => void props.onResetRegistration()}>Neue Zuordnung für eine Dashboard-Kopie</button>
-        <p class="field-hint">Kopierte Workbooks teilen zunächst dieselben Standardanalysen. Für getrennte Analysen im Bearbeitungsmodus eine neue Zuordnung erstellen und das Workbook speichern.</p>
+        {props.registrationKey && <p class="field-hint">{t('settings.registrationKey', undefined, { key: props.registrationKey })}</p>}
+        <button type="button" onClick={() => void props.onResetRegistration()}>{t('settings.resetRegistrationButton')}</button>
+        <p class="field-hint">{t('settings.resetRegistrationHint')}</p>
       </section>
       <label>
-        Backend-URL
+        {t('settings.backendUrl')}
         <input
           type="text"
           value={backendUrl}
-          placeholder="(leer = gleicher Origin, empfohlen)"
+          placeholder={t('settings.backendUrlPlaceholder')}
           onInput={(e) => setBackendUrl((e.target as HTMLInputElement).value)}
         />
         {!urlValidation.ok && <span class="field-error">{urlValidation.reason}</span>}
       </label>
       <label>
-        API-Token (optional)
+        {t('settings.apiToken')}
         <input
           type="password"
           value={apiToken}
-          placeholder="(nur wenn die Middleware einen Token verlangt)"
+          placeholder={t('settings.apiTokenPlaceholder')}
           onInput={(e) => setApiToken((e.target as HTMLInputElement).value)}
         />
       </label>
       <label>
-        Modell
+        {t('settings.model')}
         <select value={model} onInput={(e) => setModel((e.target as HTMLSelectElement).value)}>
           <option value="">
-            Standard (
-            {props.models.find((m) => m.id === props.defaultModel)?.label ||
-              props.defaultModel ||
-              'Server-Default'}
-            )
+            {t('settings.modelDefault', undefined, {
+              label: props.models.find((m) => m.id === props.defaultModel)?.label || props.defaultModel || t('settings.modelServerDefault'),
+            })}
           </option>
           {props.models.map((m) => (
             <option key={m.id} value={m.id} title={m.id}>
@@ -91,26 +89,23 @@ export function SettingsPanel(props: {
         </select>
       </label>
       <label>
-        Dashboard-Kontext / Glossar (für alle Nutzer dieses Workbooks)
+        {t('settings.dashboardContext')}
         <textarea
           value={dashboardContext}
           maxLength={MAX_AUTHOR_CONTEXT_CHARS}
           rows={5}
-          placeholder="z. B. KPI-Definitionen, Abkürzungen, fachliche Hinweise…"
+          placeholder={t('settings.dashboardContextPlaceholder')}
           onInput={(e) => setDashboardContext((e.target as HTMLTextAreaElement).value)}
         />
-        <span class="field-hint">
-          Personalisiert Antworten inhaltlich (Begriffe, Schwerpunkte) — ändert keine Sicherheitsregeln.
-          Speichern ins Workbook ist nur im Bearbeitungsmodus möglich.
-        </span>
+        <span class="field-hint">{t('settings.dashboardContextHint')}</span>
       </label>
       {message && <div class="settings-message">{message}</div>}
       <div class="settings-actions">
         <button type="button" onClick={() => void save()}>
-          Speichern
+          {t('settings.save')}
         </button>
         <button type="button" class="btn-secondary" onClick={props.onClose}>
-          Schließen
+          {t('settings.close')}
         </button>
       </div>
 
@@ -137,12 +132,8 @@ export function SettingsPanel(props: {
           fehlen. */}
       {!props.userId && (props.features.memory || props.features.savedQueries) && (
         <section class="prefs-section">
-          <h3>Persönliche Einstellungen</h3>
-          <p class="field-hint">
-            Diese Tableau-Version liefert keine Anwenderkennung — persönliche Fakten und gespeicherte
-            Abfragen sind deshalb nicht verfügbar. Sie brauchen Tableau 2023.2 oder neuer
-            (Extensions API 1.11).
-          </p>
+          <h3>{t('settings.personalHeader')}</h3>
+          <p class="field-hint">{t('settings.personalHint')}</p>
         </section>
       )}
 

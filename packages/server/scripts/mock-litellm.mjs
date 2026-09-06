@@ -145,7 +145,7 @@ const server = http.createServer((req, res) => {
         );
       } else if (toolsAllowed && question.includes('filter')) {
         await streamToolCall(res, 'get_filters', {});
-      } else if (toolsAllowed && /(vergleich|aggregier|top|pro region|pro produkt)/.test(question)) {
+      } else if (toolsAllowed && /(vergleich|aggregier|compare|summary|anomalies|report|top|pro region|pro produkt)/.test(question)) {
         await streamToolCall(res, 'aggregate_summary_data', {
           worksheet: 'Auftragsdetails',
           groupBy: ['Region'],

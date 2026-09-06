@@ -11,3 +11,4 @@ export * from './prefs';
 export * from './slash-commands';
 export * from './trex';
 export * from './usage';
+export * from './i18n';

@@ -1,4 +1,4 @@
-import { describeAction, type DashboardAction } from '@openvizpilot/shared';
+import { describeAction, t, type DashboardAction } from '@openvizpilot/shared';
 import { useEffect, useRef } from 'preact/hooks';
 import type { ChatItem } from './items';
 import { renderMarkdown } from './markdown';
@@ -38,7 +38,7 @@ export function MessageList(props: {
         <div class="empty-hint">
           {props.onboarding ? (
             <>
-              <p>Welchen Fokus sollen die Antworten für dieses Dashboard haben?</p>
+              <p>{t('message.empty.onboardingPrompt')}</p>
               <div class="chips-row chips-center">
                 {props.onboarding.presets.map((preset) => (
                   <button
@@ -55,13 +55,13 @@ export function MessageList(props: {
                   class="chip chip-secondary"
                   onClick={() => props.onboarding?.onSkip()}
                 >
-                  Ohne Fokus starten
+                 {t('message.empty.skipFocus')}
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p>Stelle eine Frage zum geöffneten Dashboard — oder starte mit einem Vorschlag:</p>
+              <p>{t('message.empty.startPrompt')}</p>
               <div class="chips-row chips-center">
                 {props.starters.map((s) => (
                   <button key={s} type="button" class="chip" disabled={props.busy} onClick={() => props.onSend(s)}>
@@ -80,13 +80,13 @@ export function MessageList(props: {
               <div key={item.id} class="msg-row-user">
                 <div class="msg msg-user">{item.text}</div>
                 {props.onSaveStandard && (
-                  <button
-                    type="button"
-                    class="btn-icon btn-star"
-                    title="Als Standardfrage für dieses Dashboard speichern"
-                    disabled={props.busy}
-                    onClick={() => props.onSaveStandard?.(item.text)}
-                  >
+                   <button
+                  type="button"
+                  class="btn-icon btn-star"
+                  title={t('message.saveStandardTitle')}
+                  disabled={props.busy}
+                  onClick={() => props.onSaveStandard?.(item.text)}
+                   >
                     ☆
                   </button>
                 )}
@@ -97,7 +97,7 @@ export function MessageList(props: {
             return (
               <div key={item.id} class="msg msg-assistant">
                 {item.text === '' ? (
-                  <span class="thinking">…</span>
+                 <span class="thinking">{t('message.thinking')}</span>
                 ) : (
                   <div
                     class="markdown"
@@ -157,9 +157,9 @@ export function MessageList(props: {
               <div key={item.id} class="error-banner">
                 <span>{item.text}</span>
                 {item.retryable && (
-                  <button type="button" disabled={props.busy} onClick={props.onRetry}>
-                    Erneut versuchen
-                  </button>
+                 <button type="button" disabled={props.busy} onClick={props.onRetry}>
+                   {t('message.retry')}
+                 </button>
                 )}
               </div>
             );

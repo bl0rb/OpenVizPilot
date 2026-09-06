@@ -1,4 +1,4 @@
-import type { AuthConfigResponse, AuthSession } from '@openvizpilot/shared';
+import { t, type AuthConfigResponse, type AuthSession } from '@openvizpilot/shared';
 import { LoginPanel as OidcLoginPanel } from '@openvizpilot/ee/extension';
 import { useState } from 'preact/hooks';
 import { loginLocal } from '../chat/auth-session';
@@ -37,18 +37,18 @@ function LocalLogin(props: { baseUrl: string; error?: string; onLoggedIn: (sessi
 
   return (
     <form class="login-panel" onSubmit={(e) => void submit(e)}>
-      <h2>Anmeldung erforderlich</h2>
-      <p class="memory-hint">Bitte mit dem Benutzerkonto anmelden, das dein Administrator für OpenVizPilot angelegt hat.</p>
+      <h2>{t('login.required')}</h2>
+      <p class="memory-hint">{t('login.localHint')}</p>
       <label>
-        Benutzername
+        {t('login.username')}
         <input type="text" value={username} autocomplete="username" onInput={(e) => setUsername((e.target as HTMLInputElement).value)} />
       </label>
       <label>
-        Passwort
+        {t('login.password')}
         <input type="password" value={password} autocomplete="current-password" onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
       </label>
       <button type="submit" disabled={busy}>
-        {busy ? 'Anmelden …' : 'Anmelden'}
+        {busy ? t('login.submitting') : t('login.submit')}
       </button>
       {(error ?? props.error) && <div class="settings-message">{error ?? props.error}</div>}
     </form>

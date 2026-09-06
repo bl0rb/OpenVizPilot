@@ -26,9 +26,17 @@ describe('expandSlashCommand', () => {
     const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, '/vergleich Nord Süd');
     expect(result?.display).toBe('/vergleich Nord Süd');
     expect(result?.name).toBe('vergleich');
-    expect(result?.prompt).toContain('Vergleich von Nord Süd');
+    expect(result?.prompt).toContain('comparison of Nord Süd');
     expect(result?.prompt).toContain('aggregate_summary_data');
     expect(result?.prompt).not.toContain('{{args}}');
+  });
+
+  it('expands an English alias into the playbook prompt', () => {
+    const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, '/compare Nord Süd');
+    expect(result?.display).toBe('/compare Nord Süd');
+    expect(result?.name).toBe('compare');
+    expect(result?.prompt).toContain('comparison of Nord Süd');
+    expect(result?.prompt).toContain('aggregate_summary_data');
   });
 
   it('fills a neutral placeholder when arguments are missing', () => {
@@ -40,7 +48,7 @@ describe('expandSlashCommand', () => {
     const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, '/zusammenfassung');
     expect(result?.display).toBe('/zusammenfassung');
     expect(result?.name).toBe('zusammenfassung');
-    expect(result?.prompt).toContain('Management-Zusammenfassung');
+    expect(result?.prompt).toContain('management summary');
   });
 
   it('returns null for unknown commands and plain text', () => {

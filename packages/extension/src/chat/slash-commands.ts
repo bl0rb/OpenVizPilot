@@ -1,25 +1,24 @@
 import type { SlashCommand } from '@openvizpilot/shared';
 
 /**
- * Slash-Befehle: Matching und Expansion. Die Befehlsliste selbst kommt von
- * AUSSEN (server-geladen via commands-client.ts, Fallback: DEFAULT_SLASH_COMMANDS
- * aus @openvizpilot/shared) — dieses Modul kennt nur noch die Mechanik, keine
- * Presets mehr. Die Expansion passiert rein clientseitig — der Chat zeigt den
- * Befehl, in die LLM-Historie geht der expandierte Prompt. Gespeicherte
- * Standardfragen dürfen Befehle enthalten; beim Senden werden sie erneut
- * expandiert.
+ * Slash commands: matching and expansion. The command list itself comes from
+ * outside (server-loaded via commands-client.ts, fallback: DEFAULT_SLASH_COMMANDS
+ * from @openvizpilot/shared) — this module only knows the mechanics, not the presets.
+ * Expansion happens purely client-side — the chat shows the command, while the
+ * expanded prompt goes into the LLM history. Saved starter questions may contain
+ * commands; when they are sent, they are expanded again.
  */
 
 export interface ExpandedCommand {
-  /** Was im Chat als User-Nachricht angezeigt wird (der Befehl selbst). */
+  /** What is shown in the chat as a user message (the command itself). */
   display: string;
-  /** Was in die LLM-Historie geht (das expandierte Playbook). */
+  /** What goes into the LLM history (the expanded playbook prompt). */
   prompt: string;
-  /** Name des expandierten Befehls (für anonyme Nutzungsstatistik). */
+  /** Name of the expanded command (for anonymous usage stats). */
   name: string;
 }
 
-/** Befehle, deren Name mit der Eingabe nach dem Slash beginnt (für das Menü). */
+/** Commands whose name begins with the text after the slash (for the menu). */
 export function matchSlashCommands(commands: SlashCommand[], input: string): SlashCommand[] {
   if (!input.startsWith('/')) return [];
   const typed = input.slice(1).split(/\s/, 1)[0]?.toLowerCase() ?? '';
@@ -27,8 +26,8 @@ export function matchSlashCommands(commands: SlashCommand[], input: string): Sla
 }
 
 /**
- * Expandiert eine Eingabe wie "/vergleich Nord Süd". Unbekannte Befehle
- * ergeben null — die Eingabe wird dann als normaler Text gesendet.
+ * Expands an input such as "/vergleich Nord Süd". Unknown commands return null,
+ * which means the input is sent as plain text.
  */
 export function expandSlashCommand(commands: SlashCommand[], input: string): ExpandedCommand | null {
   const trimmed = input.trim();
@@ -37,6 +36,7 @@ export function expandSlashCommand(commands: SlashCommand[], input: string): Exp
   const command = commands.find((c) => c.name === rawName?.toLowerCase());
   if (!command) return null;
   const args = rest.join(' ').trim();
-  const prompt = command.template.split('{{args}}').join(args || 'den relevanten Vergleichsgruppen');
+  const fallbackArgs = command.name === 'compare' ? 'the relevant comparison groups' : 'den relevanten Vergleichsgruppen';
+  const prompt = command.template.split('{{args}}').join(args || fallbackArgs);
   return { display: trimmed, prompt, name: command.name };
 }

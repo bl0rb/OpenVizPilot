@@ -1,15 +1,15 @@
 import { z } from 'zod';
 
 /**
- * Slash-Befehle: deutsche Prompt-Presets nach dem Playbook-Muster
- * (Ziel → Vorgehen → Format). Typen, Validierung und die eingebauten
- * Defaults leben hier zentral, weil sowohl der Server (Admin-Verwaltung,
- * server/routes/admin.ts, server/routes/commands.ts) als auch die Extension
- * (Fallback, extension/src/chat/commands-client.ts) sie brauchen.
+ * Slash commands: prompt presets following the playbook pattern
+ * (goal → approach → format). Types, validation and built-in defaults live
+ * here centrally because both the server (admin management, routes/admin.ts,
+ * routes/commands.ts) and the extension (fallback, extension/src/chat/commands-client.ts)
+ * need them.
  *
- * Die Expansion selbst (Platzhalter → fertiger Prompt) bleibt in der
- * Extension (chat/slash-commands.ts) — sie arbeitet rein clientseitig auf
- * einer vom Aufrufer übergebenen Liste (server-geladen oder Defaults).
+ * The expansion itself (placeholder → finished prompt) stays in the
+ * extension (chat/slash-commands.ts) — it works purely client-side on a list
+ * passed in from the caller (server-loaded or defaults).
  */
 
 export const MAX_SLASH_COMMANDS = 20;
@@ -19,19 +19,19 @@ export const MIN_SLASH_COMMAND_TEMPLATE_CHARS = 10;
 export const MAX_SLASH_COMMAND_TEMPLATE_CHARS = 1500;
 
 export const slashCommandSchema = z.object({
-  /** Name ohne führenden Slash — Kleinbuchstaben, Ziffern, Bindestrich. */
-  name: z.string().regex(/^[a-z0-9-]{1,32}$/, 'Nur a-z, 0-9 und "-", max. 32 Zeichen'),
-  /** Kurzbeschreibung fürs Menü. */
+  /** Name without a leading slash — lowercase letters, numbers, dash. */
+  name: z.string().regex(/^[a-z0-9-]{1,32}$/, 'Only a-z, 0-9 and "-", max. 32 characters'),
+  /** Short description for the menu. */
   description: z.string().min(1).max(MAX_SLASH_COMMAND_DESCRIPTION_CHARS),
-  /** Platzhalter-Hinweis für Argumente (nur Anzeige). */
+  /** Placeholder hint for arguments (display only). */
   argHint: z.string().max(MAX_SLASH_COMMAND_ARG_HINT_CHARS).optional(),
-  /** Prompt-Template; {{args}} wird durch die Eingabe nach dem Befehl ersetzt. */
+  /** Prompt template; {{args}} is replaced by the input after the command. */
   template: z.string().min(MIN_SLASH_COMMAND_TEMPLATE_CHARS).max(MAX_SLASH_COMMAND_TEMPLATE_CHARS),
 });
 
 export type SlashCommand = z.infer<typeof slashCommandSchema>;
 
-/** Liste von Slash-Befehlen — höchstens MAX_SLASH_COMMANDS, Namen eindeutig. */
+/** List of slash commands — at most MAX_SLASH_COMMANDS, names unique. */
 export const slashCommandListSchema = z
   .array(slashCommandSchema)
   .max(MAX_SLASH_COMMANDS)
@@ -49,50 +49,87 @@ export const slashCommandListSchema = z
     });
   });
 
-/** Eingebaute Defaults, verwendet solange der Server keine eigenen konfiguriert hat. */
+/** Built-in defaults, used until the server configures its own playbooks. */
 export const DEFAULT_SLASH_COMMANDS: SlashCommand[] = [
   {
     name: 'zusammenfassung',
-    description: 'Management-Summary des Dashboards',
+    description: 'Management summary of the dashboard',
     template:
-      'Ziel: Eine Management-Zusammenfassung dieses Dashboards. Vorgehen: Lies die zentralen Kennzahlen und aktiven Filter; prüfe die wichtigsten Worksheets gezielt per Tool. Format: 3–5 Kernaussagen als Aufzählung, danach eine kompakte Kennzahlen-Tabelle, je Zahl mit Quellen-Worksheet.',
+      'Goal: Create a concise management summary of this dashboard. Approach: Read the key metrics and active filters; inspect the most relevant worksheets with tools. Format: 3–5 key statements as bullet points, followed by a compact metrics table with each figure tied to the source worksheet.',
+  },
+  {
+    name: 'summary',
+    description: 'Management summary of the dashboard',
+    template:
+      'Goal: Create a concise management summary of this dashboard. Approach: Read the key metrics and active filters; inspect the most relevant worksheets with tools. Format: 3–5 key statements as bullet points, followed by a compact metrics table with each figure tied to the source worksheet.',
   },
   {
     name: 'auffaelligkeiten',
-    description: 'Top-3-Auffälligkeiten mit Drilldown',
+    description: 'Top-3 anomalies with drilldown',
     template:
-      'Ziel: Die drei größten Auffälligkeiten in den Daten finden (Ausreißer, ungewöhnliche Verhältnisse, Top-/Flop-Performer). Vorgehen: Verschaffe dir per Tools einen Überblick und drille mit aggregate_summary_data gezielt nach (Gruppierung nach den relevanten Dimensionen). Format: Pro Auffälligkeit eine Überschrift, die Belegzahlen mit Quelle und eine Einschätzung, ob Handlungsbedarf besteht.',
+      'Goal: Find the three biggest anomalies in the data (outliers, unusual ratios, top/bottom performers). Approach: Get an overview with tools and drill down with aggregate_summary_data for the relevant dimensions. Format: One heading per anomaly, the supporting figures with their source and an assessment of whether action is needed.',
+  },
+  {
+    name: 'anomalies',
+    description: 'Top-3 anomalies with drilldown',
+    template:
+      'Goal: Find the three biggest anomalies in the data (outliers, unusual ratios, top/bottom performers). Approach: Get an overview with tools and drill down with aggregate_summary_data for the relevant dimensions. Format: One heading per anomaly, the supporting figures with their source and an assessment of whether action is needed.',
   },
   {
     name: 'vergleich',
-    description: 'Zwei Segmente/Regionen/Zeiträume vergleichen',
+    description: 'Compare two segments/regions/time ranges',
     argHint: '<A> <B>',
     template:
-      'Ziel: Einen belastbaren Vergleich von {{args}} erstellen. Vorgehen: Ermittle mit aggregate_summary_data die relevanten Kennzahlen je Vergleichsgruppe; achte auf aktive Filter. Format: Vergleichstabelle (Kennzahl · A · B · Differenz absolut/%), danach 2–3 Sätze Einordnung, was den Unterschied treibt.',
+      'Goal: Create a robust comparison of {{args}}. Approach: Use aggregate_summary_data to derive the relevant metrics for each comparison group and keep active filters in mind. Format: A comparison table (metric · A · B · difference absolute/%) followed by 2–3 sentences explaining what drives the gap.',
+  },
+  {
+    name: 'compare',
+    description: 'Compare two segments/regions/time ranges',
+    argHint: '<A> <B>',
+    template:
+      'Goal: Create a robust comparison of {{args}}. Approach: Use aggregate_summary_data to derive the relevant metrics for each comparison group and keep active filters in mind. Format: A comparison table (metric · A · B · difference absolute/%) followed by 2–3 sentences explaining what drives the gap.',
   },
   {
     name: 'top',
-    description: 'Top-N-Analyse einer Dimension',
+    description: 'Top-N analysis of a dimension',
     argHint: '<N> <Dimension>',
     template:
-      'Ziel: Eine Top-Analyse: {{args}}. Vorgehen: Nutze aggregate_summary_data mit passender Gruppierung und sortiere nach der wichtigsten Kennzahl. Format: Rangliste als Tabelle mit Anteil am Gesamtwert, darunter eine Aussage zur Konzentration (z. B. wie viel die Top-Einträge ausmachen).',
+      'Goal: Create a top-N analysis for {{args}}. Approach: Use aggregate_summary_data with a suitable grouping and rank by the most relevant metric. Format: A ranked table with each item’s share of the total and a sentence about concentration (for example, how much the top entries account for).',
   },
   {
     name: 'massnahmen',
-    description: 'Priorisierte Handlungsempfehlungen',
+    description: 'Prioritized action recommendations',
     template:
-      'Ziel: Konkrete nächste Schritte aus den Daten ableiten. Vorgehen: Identifiziere per Tools die größten Chancen und Problemfelder (schwache Segmente, auffällige Entwicklungen). Format: Maximal 3 Empfehlungen, priorisiert, jede mit der Datengrundlage (Zahl + Quelle) und dem erwarteten Effekt. Keine Empfehlung ohne Beleg aus diesem Dashboard.',
+      'Goal: Derive concrete next steps from the data. Approach: Identify the biggest opportunities and problem areas with tools (weak segments, unusual shifts). Format: Up to 3 prioritized recommendations, each with the underlying evidence (figure + source) and the expected effect. No recommendation without evidence from this dashboard.',
+  },
+  {
+    name: 'actions',
+    description: 'Prioritized action recommendations',
+    template:
+      'Goal: Derive concrete next steps from the data. Approach: Identify the biggest opportunities and problem areas with tools (weak segments, unusual shifts). Format: Up to 3 prioritized recommendations, each with the underlying evidence (figure + source) and the expected effect. No recommendation without evidence from this dashboard.',
   },
   {
     name: 'bericht',
-    description: 'Formatierter Bericht zum Kopieren',
+    description: 'Formatted report ready to copy',
     template:
-      'Ziel: Ein versandfertiger Kurzbericht zu diesem Dashboard. Vorgehen: Kennzahlen und Besonderheiten per Tools erheben. Format: Überschrift, Absatz Gesamtlage, Kennzahlen-Tabelle, Abschnitt „Auffälligkeiten", Abschnitt „Empfehlung" — sachlicher Berichtston, alle Zahlen mit Quellen-Worksheet. Nenne am Ende die aktiven Filter als Datenstand.',
+      'Goal: Produce a polished short report for this dashboard. Approach: Gather key figures and noteworthy findings with tools. Format: Heading, overview paragraph, metrics table, section “Findings”, section “Recommendation” — factual tone, all figures tied to the source worksheet. End by naming the active filters as the data snapshot.',
+  },
+  {
+    name: 'report',
+    description: 'Formatted report ready to copy',
+    template:
+      'Goal: Produce a polished short report for this dashboard. Approach: Gather key figures and noteworthy findings with tools. Format: Heading, overview paragraph, metrics table, section “Findings”, section “Recommendation” — factual tone, all figures tied to the source worksheet. End by naming the active filters as the data snapshot.',
   },
   {
     name: 'datenqualitaet',
-    description: 'Lücken und Filter-Effekte erklären',
+    description: 'Explain gaps and filter effects',
     template:
-      'Ziel: Die Datenqualität dieses Dashboards einschätzen. Vorgehen: Prüfe per Tools auffällige Lücken (leere Werte, fehlende Gruppen) und ob aktive Filter oder Parameter Daten ausblenden. Format: Liste der Befunde mit wahrscheinlicher Ursache und dem Hinweis, was der Betrachter beim Interpretieren beachten sollte.',
+      'Goal: Assess the data quality of this dashboard. Approach: Check for obvious gaps (empty values, missing groups) and whether active filters or parameters hide part of the data. Format: List of findings with likely causes and a note on what viewers should keep in mind when interpreting the results.',
+  },
+  {
+    name: 'data-quality',
+    description: 'Explain gaps and filter effects',
+    template:
+      'Goal: Assess the data quality of this dashboard. Approach: Check for obvious gaps (empty values, missing groups) and whether active filters or parameters hide part of the data. Format: List of findings with likely causes and a note on what viewers should keep in mind when interpreting the results.',
   },
 ];

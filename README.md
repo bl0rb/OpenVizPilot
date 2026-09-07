@@ -155,7 +155,7 @@ Details (safelist, HTTPS, access protection, admin modes, memory and usage priva
 
 ## Editions
 
-OpenVizPilot is open core. Everything outside `ee/` is the core edition under the PolyForm Noncommercial license and runs without a license key. The Enterprise Edition in [`ee/`](ee/) (proprietary license, see [ee/LICENSE](ee/LICENSE)) adds Single Sign-On via OIDC — Microsoft Entra ID and Keycloak — so every dashboard user signs in with their company account and the middleware verifies each request against the identity provider instead of a shared API token. Alongside SSO, the Enterprise Edition covers user memory (`memory`) and saved queries (`savedQueries`) — a license may unlock all of them or any subset. The core edition already ships a login for the extension: admins create user accounts in the admin UI and dashboard users sign in with them. Enterprise features activate only with a valid, signed license key entered in the admin UI together with the Entra/Keycloak client settings; setup for Entra, Keycloak, the license and Helm is described in [docs/enterprise.md](docs/enterprise.md).
+OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the PolyForm Noncommercial license: read it, run it, modify it — free for any noncommercial purpose, but **commercial use requires an agreement**, and that includes running it inside a company. The Enterprise Edition in [`ee/`](ee/) (proprietary license, see [ee/LICENSE](ee/LICENSE)) adds Single Sign-On via OIDC — Microsoft Entra ID and Keycloak — so every dashboard user signs in with their company account and the middleware verifies each request against the identity provider instead of a shared API token. Alongside SSO, the Enterprise Edition covers user memory (`memory`) and saved queries (`savedQueries`) — a license may unlock all of them or any subset. The core edition already ships a login for the extension: admins create user accounts in the admin UI and dashboard users sign in with them. Enterprise features activate only with a valid, signed license key entered in the admin UI together with the Entra/Keycloak client settings; setup for Entra, Keycloak, the license and Helm is described in [docs/enterprise.md](docs/enterprise.md).
 
 ## Manual test script
 
@@ -163,4 +163,8 @@ See [docs/testing.md](docs/testing.md).
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE) — the source is open and free to use for any noncommercial purpose. Commercial use requires a separate agreement.
+Core (everything outside `ee/`): [PolyForm Noncommercial 1.0.0](LICENSE) — the full source is public and free for any **noncommercial** purpose. Any commercial use, including internal use in a company and any form of resale or hosting for others, requires an agreement with WerkWorks (info@werkworks.de).
+
+Enterprise Edition (`ee/`): proprietary, see [ee/LICENSE](ee/LICENSE) — usable in production only with a valid license key.
+
+This is deliberately **source-available**, not open source: the code is there to be read, audited and evaluated, not to be taken commercially without a contract.

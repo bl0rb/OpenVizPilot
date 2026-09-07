@@ -1,7 +1,8 @@
 # Enterprise Edition: Single Sign-On, Personalisierung & Lizenz
 
-OpenVizPilot ist **Open Core**: Der Kern (alles außerhalb von `ee/`) steht unter PolyForm Noncommercial
-und läuft ohne Lizenzschlüssel. Die **Enterprise Edition** (`ee/`, proprietäre Lizenz) wird über einen
+OpenVizPilot ist **source-available**, nicht Open Source: Der Kern (alles außerhalb von `ee/`) steht
+unter PolyForm Noncommercial — frei für nicht-kommerzielle Zwecke, jede kommerzielle Nutzung braucht
+eine Vereinbarung. Er läuft ohne Lizenzschlüssel. Die **Enterprise Edition** (`ee/`, proprietäre Lizenz) wird über einen
 signierten Lizenzschlüssel freigeschaltet und umfasst:
 
 | Feature-Schlüssel | Was er freischaltet |
@@ -48,8 +49,8 @@ gültige SSO-Lizenz ab; gespeicherte Werte gelten sofort für alle Replicas und 
 Env-Defaults (`AUTH_MODE`, `OIDC_*`, `OVP_LICENSE`). Secrets und Token werden nie zurückgegeben,
 nur als „vorhanden“ angezeigt.
 
-Für die Open-Core-Edition gibt es daneben den Modus **„Benutzerkonten“**: Der Admin legt im Abschnitt
-**„Benutzerkonten (Open Core)“** Konten mit Passwort an, die Anwender melden sich damit in der
+Für die Core-Edition gibt es daneben den Modus **„Benutzerkonten“**: Der Admin legt im Abschnitt
+**„Benutzerkonten (Core-Edition)“** Konten mit Passwort an, die Anwender melden sich damit in der
 Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der Weg ohne Lizenz.
 
 ## Voraussetzungen

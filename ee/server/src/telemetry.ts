@@ -220,7 +220,7 @@ export async function describeTelemetry(deps: {
         ? 'Keine Datenbank konfiguriert.'
         : licensed
           ? 'Teil der Enterprise-Lizenz.'
-          : 'Open-Core-Edition sendet nicht.',
+          : 'Core-Edition sendet nicht.',
     endpoint: deps.endpoint || null,
     intervalHours: HEARTBEAT_INTERVAL_MS / 3_600_000,
     sends: [

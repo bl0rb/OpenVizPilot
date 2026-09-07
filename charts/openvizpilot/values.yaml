@@ -171,7 +171,7 @@ affinity: {}
 # --- Enterprise Edition (ee/): Anmeldung & Lizenz ---
 auth:
   # none | token | local | oidc. token = app.authToken/authTokenSecret; local =
-  # Benutzerkonten aus der Admin-UI (Open Core); oidc = Single Sign-On
+  # Benutzerkonten aus der Admin-UI (Core-Edition); oidc = Single Sign-On
   # (Enterprise, braucht license.* mit Feature "sso"). Die Admin-UI kann
   # Modus, OIDC und Lizenz auch zur Laufzeit setzen (Werte hier = Defaults).
   mode: ""

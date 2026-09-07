@@ -229,7 +229,7 @@ describe('describeTelemetry (Admin-UI)', () => {
     });
 
     expect(described.active).toBe(false);
-    expect(described.reason).toMatch(/Open-Core/);
+    expect(described.reason).toMatch(/Core-Edition/);
     expect(described.sends.length).toBeGreaterThan(0);
     expect(described.neverSends.join(' ')).toMatch(/Fragen/);
   });

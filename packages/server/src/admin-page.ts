@@ -176,7 +176,7 @@ export const adminPageHtml = `<!doctype html>
         <label>Anmeldemodus
           <select id="auth-mode">
             <option value="none">Offen (nur Netzwerkschutz)</option>
-            <option value="local">Benutzerkonten (Open Core)</option>
+            <option value="local">Benutzerkonten (Core-Edition)</option>
             <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
           </select>
         </label>
@@ -233,7 +233,7 @@ export const adminPageHtml = `<!doctype html>
     </section>
 
     <section class="card">
-      <h2>Benutzerkonten (Open Core)</h2>
+      <h2>Benutzerkonten (Core-Edition)</h2>
       <p class="hint">
         Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“. Passwörter werden nur als
         Hash gespeichert; Sperren beendet laufende Sitzungen sofort.
@@ -617,7 +617,7 @@ export const adminPageHtml = `<!doctype html>
     }
     if (lic.status === 'expired') return 'Enterprise-Lizenz für „' + lic.licensee + '“ ist am ' + String(lic.validUntil).slice(0, 10) + ' abgelaufen — Enterprise-Funktionen deaktiviert.';
     if (lic.status === 'invalid') return 'Lizenz ungültig: ' + lic.reason;
-    return 'Open-Core-Edition (keine Enterprise-Lizenz hinterlegt).';
+    return 'Core-Edition (keine Enterprise-Lizenz hinterlegt).';
   }
 
   function updateOidcVisibility() {

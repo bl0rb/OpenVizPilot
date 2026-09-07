@@ -77,6 +77,7 @@ jobs:
             type=raw,value=latest,enable=${{ !contains(steps.tag.outputs.value, '-') }}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -85,3 +86,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # "denied: permission_denied: write_package" heißt hier fast immer: Das
+      # Package existiert bereits und ist nicht mit DIESEM Repository
+      # verknüpft (z. B. weil es zuerst manuell gepusht wurde) — das
+      # GITHUB_TOKEN darf dann nicht schreiben. Ohne diesen Hinweis steht in
+      # den Logs nur die rohe Buildx-Fehlermeldung.
+      - name: Explain permission_denied on push
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          echo "::error title=GHCR-Push abgelehnt::Falls 'permission_denied: write_package': Package ${{ env.IMAGE }} mit diesem Repository verknüpfen — GitHub → Packages → Package settings → Manage Actions access → Repository hinzufügen, Rolle 'Write'. Danach diesen Workflow erneut ausführen (workflow_dispatch, Tag ohne 'v')."

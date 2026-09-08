@@ -456,6 +456,7 @@ describe('POST /api/chat', () => {
         sso: false,
         memory: false,
         savedQueries: false,
+        mcp: false,
       });
 
       const licensed = createApp(testConfig({ licenseEnv: testLicenseEnv(['memory']) }));
@@ -463,6 +464,7 @@ describe('POST /api/chat', () => {
         sso: false,
         memory: true,
         savedQueries: false,
+        mcp: false,
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
@@ -471,6 +473,7 @@ describe('POST /api/chat', () => {
         sso: true,
         memory: true,
         savedQueries: true,
+        mcp: true,
       });
     });
 

@@ -10,6 +10,7 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `sso` | Single Sign-On per OIDC (Microsoft Entra ID, Keycloak) |
 | `memory` | User-Memory: persönliche Fakten personalisieren die Antworten (`GET`/`DELETE /api/memory`) |
 | `savedQueries` | Eigene Abfragen speichern: Antwortfokus und Standardfragen je Dashboard (`/api/memory/prefs`) |
+| `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Site-Freigaben |
 
 Eine Lizenz kann alle oder einzelne davon enthalten (Feld `features`; fehlt es, gilt der volle
 Umfang des Tiers). Ohne passende Lizenz läuft der Kern unverändert weiter — die Extension blendet
@@ -21,6 +22,10 @@ läuft eine Lizenz aus, bleiben bereits gespeicherte Fakten im Panel sichtbar un
 nur keine neuen hinzu. Welche Features gerade aktiv sind, sagt `GET /api/features`.
 
 ## Warum SSO?
+
+MCP wird unter **MCP & Sites (Enterprise)** in der Admin-UI eingerichtet. Es benötigt
+persönliche Anmeldung, explizite Site-Mitgliedschaften und eine eigene `mcp`-Freigabe.
+Einrichtung, Secret-Referenzen und Grenzen der Site-Zuordnung: [MCP-Dokumentation](mcp.md).
 
 Ohne Anmeldung kann jeder, der die Middleware im Netz erreicht, `/api/chat` aufrufen — mit
 `API_AUTH_TOKEN` schützt nur ein geteiltes Geheimnis, das im Workbook liegt. Im OIDC-Modus meldet

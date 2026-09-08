@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { copyFile } from 'node:fs/promises';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -10,6 +11,9 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   sourcemap: true,
+  onSuccess: async () => {
+    await copyFile(new URL('./scripts/INTER-LICENSE.txt', import.meta.url), new URL('./dist/INTER-LICENSE.txt', import.meta.url));
+  },
   // Alles mitbündeln → das Docker-Runtime-Image braucht keine node_modules.
   noExternal: [/.*/],
   // pg-native: optionale native Erweiterung von pg — wird nie geladen.

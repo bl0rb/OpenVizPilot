@@ -10,3 +10,7 @@ export * from './personalization-schema';
 export * from './personalization-store';
 export * from './telemetry';
 export * from './telemetry-store';
+export * from './mcp/service';
+export * from './mcp/routes';
+export * from './mcp/store';
+export * from './mcp/admin-ui';

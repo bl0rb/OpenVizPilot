@@ -29,6 +29,7 @@ import { getTableau, type Dashboard } from '../tableau/api';
 import { buildContextSnapshot } from '../tableau/context-snapshot';
 import { describeContextChange, registerContextInvalidation } from '../tableau/events';
 import { executeToolCall } from '../tools/registry';
+import { executeMcpTool } from '@openvizpilot/ee/extension';
 import { Composer } from './Composer';
 import { summarizeToolArgs, type ChatItem } from './items';
 import { MessageList } from './MessageList';
@@ -430,7 +431,9 @@ export function App(props: { dashboard: Dashboard }) {
             answerFocus,
             dashboardKey: dashboardKey || undefined,
             getContext,
-            executeTool: (call: ToolCall) => executeToolCall(call, dashboard),
+            executeTool: (call, approval, signal) => call.function.name.startsWith('mcp__')
+              ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
+              : executeToolCall(call, dashboard),
           },
           {
             onRoundStart: () => dispatch({ type: 'round-start' }),

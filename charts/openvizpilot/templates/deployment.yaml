@@ -146,6 +146,16 @@ spec:
                   key: {{ .Values.memory.database.external.key }}
                   {{- end }}
             {{- end }}
+            {{- range .Values.mcp.secretRefs }}
+            {{- if not (regexMatch "^OVP_MCP_[A-Z0-9_]+$" .env) }}
+            {{- fail "MCP secretRefs.env muss mit OVP_MCP_ beginnen und nur A-Z, 0-9, _ enthalten" }}
+            {{- end }}
+            - name: {{ .env | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "MCP secretRefs.secretName fehlt" .secretName | quote }}
+                  key: {{ required "MCP secretRefs.key fehlt" .key | quote }}
+            {{- end }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:

@@ -17,6 +17,7 @@ export { LoginPanel } from './LoginPanel';
 export { MemoryFactsPanel } from './MemoryFactsPanel';
 export { SavedQueriesPanel } from './SavedQueriesPanel';
 export { loadPrefs, savePrefs } from './prefs-client';
+export { executeMcpTool } from './mcp-client';
 export {
   addStandardQuestion,
   dashboardPrefsSchema,

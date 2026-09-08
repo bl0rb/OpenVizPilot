@@ -31,6 +31,7 @@ For administrators (`/admin` — the first visitor sets the admin password on fi
 
 - Extension manifest download: enter the public HTTPS URL, get the ready-made `openvizpilot.trex`; the extension then talks to the origin it was loaded from, and nothing else has to be configured.
 - Model catalog: look up the models your endpoint offers and map them to friendly display names shown in the extension; the catalog is enforced on the chat endpoint.
+- Enterprise MCP: connect approved read-only sources and web-search services in the admin UI, assign them to managed sites, dashboards and authenticated members, and require consent before external queries. See [MCP setup and permission boundaries](docs/mcp.md).
 - Slash-command management: edit, add or reset the global playbooks centrally.
 - Standard analyses per dashboard: embedded extensions register automatically after sign-in. Select a dashboard in the admin portal to configure up to five starter questions and its own slash commands. Global commands remain available; open extensions refresh within a minute. See [setup and workbook copies](docs/admin-deployment.md#standardanalysen-pro-dashboard).
 - Anonymous usage: counters per model, tool, command and error, plus a per-dashboard view (questions, number of users, average and maximum questions per user) — users are counted only as non-reversible pseudonyms, never names, IDs or content.

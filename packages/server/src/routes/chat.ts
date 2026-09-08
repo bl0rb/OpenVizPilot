@@ -14,6 +14,8 @@ import {
   personalizationPromptSection,
   type EeFeature,
   type PersonalizationStore,
+  type McpService,
+  MCP_PROMPT_SECTION,
 } from '@openvizpilot/ee/server';
 import type { MemoryStore } from '../memory/store';
 import { buildSystemPrompt } from '../system-prompt';
@@ -89,6 +91,7 @@ export function createChatRoute(
   personalizationStore: PersonalizationStore | null,
   /** Lizenzprüfung: das User-Memory ist eine Enterprise-Funktion (ee/personalization.ts). */
   hasEeFeature: (feature: EeFeature) => Promise<boolean>,
+  mcp: McpService | null = null,
 ): Hono<AuthVariables> {
   const app = new Hono<AuthVariables>();
 
@@ -249,6 +252,7 @@ export function createChatRoute(
             }
           }
 
+          const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
           const completion = await client.chat.completions.create(
             {
               model,
@@ -261,7 +265,7 @@ export function createChatRoute(
                     // beide Eingaben leer und der Abschnitt entfällt komplett.
                     personalizationPromptSection({ facts: memoryFacts, answerFocus }),
                     req.authorContext,
-                  ),
+                  ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : ''),
                 },
                 ...req.messages,
               ],
@@ -270,7 +274,7 @@ export function createChatRoute(
               // Tools werden IMMER mitgesendet (auch bei toolChoice "none"):
               // die Historie kann tool-Messages enthalten, die manche Provider
               // ohne Tool-Definitionen ablehnen. "none" verbietet nur neue Calls.
-              tools: toolDefinitions,
+              tools: [...toolDefinitions, ...externalTools],
               tool_choice: req.toolChoice === 'none' ? 'none' : 'auto',
             },
             { signal: abortSignal },
@@ -278,13 +282,14 @@ export function createChatRoute(
 
           await pipeChatStream(completion, {
             onDelta: (content) => stream.writeSSE({ event: 'delta', data: JSON.stringify({ content }) }),
-            onToolCalls: (toolCalls) => {
+            onToolCalls: async (toolCalls) => {
               if (memoryStore) {
                 memoryStore
                   .recordUsage(toolCalls.map((call) => ({ metric: 'tool_call', key: call.function.name })))
                   .catch(() => undefined);
               }
-              return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls }) });
+              const external = mcp ? await mcp.approvals(authUser, req.dashboardKey, toolCalls, externalTools) : {};
+              return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls, ...(Object.keys(external).length > 0 ? { external } : {}) }) });
             },
             onDone: async (data) => {
               logger.info('chat done', {

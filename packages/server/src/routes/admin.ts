@@ -23,6 +23,8 @@ import {
   verifyLicense,
   type LicenseStatus,
   type TelemetryStore,
+  createMcpAdminRoute,
+  type McpStore,
 } from '@openvizpilot/ee/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
@@ -150,6 +152,7 @@ export function createAdminRoute(
   authState: AuthStateProvider,
   /** Zustand des Lizenz-Heartbeats (ee/) — nur für die Anzeige. */
   telemetryStore: TelemetryStore | null = null,
+  mcpStore: McpStore | null = null,
 ): Hono {
   const app = new Hono();
   const tokenMode = Boolean(config.adminToken);
@@ -313,6 +316,10 @@ export function createAdminRoute(
   app.use('/models', storeGuard);
   app.use('/playbooks', storeGuard);
   app.use('/stats', storeGuard);
+  app.route('/mcp', createMcpAdminRoute(mcpStore, {
+    listDashboards: () => memoryStore!.listDashboards(),
+    listUsers: () => memoryStore!.listUsers(),
+  }, logger, async (feature) => hasFeature((await authState.get()).license, feature)));
 
   /**
    * Manifest-Download für Tableau: liefert das .trex mit der angegebenen

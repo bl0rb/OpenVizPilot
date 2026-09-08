@@ -33,6 +33,7 @@ Entscheide für die NEUESTE Nutzernachricht: Hat sie Dashboard-Bezug?
 Dashboard-Bezug haben:
 - Fragen zu Daten, Kennzahlen, Filtern, Parametern, Worksheets oder Auffälligkeiten des Dashboards (auch ohne dass Begriffe aus dem Kontext wörtlich vorkommen),
 - Analyse-Aufträge wie Zusammenfassungen, Vergleiche, Top-/Flop-Listen, Trends, Berichte,
+- Recherche nach externen Informationen zur konkreten Dashboard-Analyse, etwa öffentliche Entwicklungen in den betrachteten Regionen oder Fachinformationen zu angezeigten Kennzahlen,
 - kurze Folgefragen einer laufenden Analyse (z. B. "und im Vorjahr?", "warum?", "als Tabelle bitte"),
 - Fragen zur Bedienung des Dashboards oder dieses Assistenten (z. B. "was kannst du?").
 

@@ -6,6 +6,8 @@ image:
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
+mcp:
+  secretRefs: []
 nameOverride: ""
 fullnameOverride: ""
 

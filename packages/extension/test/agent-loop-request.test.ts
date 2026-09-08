@@ -11,6 +11,10 @@ import { describe, expect, it, vi } from 'vitest';
 const captured: Array<{ backendUrl: string; request: Record<string, unknown>; apiToken?: string }> = [];
 /** true = der nächste gemockte Stream bricht mit einem retryable error ab. */
 let failNext = false;
+let mixedToolsNext = false;
+const localCall = { id: 'local-call', type: 'function', function: { name: 'get_selected_marks', arguments: '{"worksheet":"Map"}' } };
+const externalCall = { id: 'external-call', type: 'function', function: { name: 'mcp__web__search', arguments: '{"query":"Berlin"}' } };
+const approval = { ticket: 'signed-ticket', destination: 'https://search.example/mcp' };
 
 vi.mock('../src/chat/sse-client', () => ({
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -21,6 +25,12 @@ vi.mock('../src/chat/sse-client', () => ({
       yield { event: 'error', data: { message: 'kaputt', source: 'upstream', retryable: true } };
       return;
     }
+    if (mixedToolsNext) {
+      mixedToolsNext = false;
+      yield { event: 'tool_calls', data: { toolCalls: [localCall, externalCall], external: { 'external-call': approval } } };
+      yield { event: 'done', data: { finishReason: 'tool_calls' } };
+      return;
+    }
     yield { event: 'delta', data: { content: 'ok' } };
     yield { event: 'done', data: { finishReason: 'stop' } };
   },
@@ -29,6 +39,26 @@ vi.mock('../src/chat/sse-client', () => ({
 const { ChatSession } = await import('../src/chat/agent-loop');
 
 describe('ChatSession request contract', () => {
+  it('routes mixed Tableau and external calls with matching grants and completes every tool pair', async () => {
+    captured.length = 0;
+    mixedToolsNext = true;
+    const session = new ChatSession();
+    const executeTool = vi.fn().mockResolvedValueOnce('Selected: Berlin').mockResolvedValueOnce('External source result');
+    const callbacks = { onRoundStart: vi.fn(), onAssistantDelta: vi.fn(), onAssistantFinal: vi.fn(), onSuggestions: vi.fn(), onToolRun: vi.fn(), onNotice: vi.fn(), onError: vi.fn(), onDone: vi.fn() };
+    await session.runTurn('Zusatzinformationen zur Region', { backendUrl: '', dashboardKey: 'dashboard:11111111-1111-4111-8111-111111111111', getContext: async () => '# Map', executeTool }, callbacks);
+    expect(executeTool).toHaveBeenNthCalledWith(1, localCall, undefined, expect.any(AbortSignal));
+    expect(executeTool).toHaveBeenNthCalledWith(2, externalCall, approval, expect.any(AbortSignal));
+    expect(captured).toHaveLength(2);
+    expect(captured[1]!.request.messages).toEqual([
+      { role: 'user', content: 'Zusatzinformationen zur Region' },
+      { role: 'assistant', content: '', tool_calls: [localCall, externalCall] },
+      { role: 'tool', tool_call_id: localCall.id, content: 'Selected: Berlin' },
+      { role: 'tool', tool_call_id: externalCall.id, content: 'External source result' },
+    ]);
+    expect(JSON.stringify(captured[1]!.request)).not.toContain('signed-ticket');
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
   it('sends the user turn together with all context fields', async () => {
     captured.length = 0;
     const session = new ChatSession();

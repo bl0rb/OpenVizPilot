@@ -16,11 +16,13 @@
     "@openvizpilot/ee": "0.1.0",
     "@openvizpilot/shared": "*",
     "hono": "^4.6.0",
+    "lucide": "^1.42.0",
     "openai": "^7.9.0",
     "pg": "^8.13.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.11.0",
     "tsup": "^8.3.0",

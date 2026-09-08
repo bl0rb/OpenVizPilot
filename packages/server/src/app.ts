@@ -10,6 +10,8 @@ import {
   requireOidcUser,
   type AuthVariables,
   type EeFeature,
+  McpService,
+  createMcpRoute,
 } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -64,6 +66,14 @@ export function createApp(config: AppConfig): {
     logger[level](msg, data);
   /** Lizenzprüfung pro Request — ein in der Admin-UI eingetragener Schlüssel wirkt sofort. */
   const licensedFeature = async (feature: EeFeature): Promise<boolean> => hasFeature((await authState.get()).license, feature);
+  const mcp = backend ? new McpService(backend.mcp, {
+    hasFeature: licensedFeature,
+    salt: () => backend.store.getUsageSalt(),
+    principal: async (user) => {
+      const state = await authState.get();
+      return !state.blockedReason && (state.mode === 'local' || state.mode === 'oidc') ? `${state.mode}:${user}` : null;
+    },
+  }, logger) : null;
 
   /**
    * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft.
@@ -115,7 +125,7 @@ export function createApp(config: AppConfig): {
       // dafür braucht es 'unsafe-inline'.
       c.res.headers.set(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" + (c.req.path === '/admin' ? "; font-src 'self' data:" : ''),
       );
       c.res.headers.set('X-Frame-Options', 'DENY');
     } else {
@@ -195,7 +205,8 @@ export function createApp(config: AppConfig): {
 
   app.route('/healthz', createHealthRoute());
   app.route('/api/models', createModelsRoute(config, logger, client, memoryStore));
-  app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature));
+  app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature, mcp));
+  app.route('/api/mcp', createMcpRoute(mcp, logger, licensedFeature));
   // Personalisierung (User-Memory, eigene Abfragen) liegt in ee/ und ist
   // lizenzpflichtig — der Pfad bleibt /api/memory, damit ältere Extensions
   // weiter funktionieren.
@@ -203,7 +214,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/commands', createCommandsRoute(memoryStore, logger));
   app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null));
 
   // Admin-UI: erreichbar mit statischem ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert

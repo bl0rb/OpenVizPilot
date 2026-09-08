@@ -19,6 +19,7 @@ export interface DeltaEventData {
 
 export interface ToolCallsEventData {
   toolCalls: ToolCall[];
+  external?: Record<string, { ticket: string; destination: string }>;
 }
 
 export type FinishReason = 'stop' | 'tool_calls' | 'length' | 'content_filter' | 'unknown';

@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/extension/package.json packages/extension/
+COPY ee/package.json ee/
 RUN npm ci
 COPY . .
 RUN npm run build

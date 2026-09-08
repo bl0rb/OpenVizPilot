@@ -6,6 +6,7 @@ import {
   type DoneEventData,
   type Suggestions,
   type ToolCall,
+  type ToolCallsEventData,
 } from '@openvizpilot/shared';
 import { streamChat } from './sse-client';
 
@@ -51,7 +52,7 @@ export interface AgentDeps {
   /** Dashboard-Name — nur für die anonyme Nutzungsstatistik pro Dashboard. */
   dashboardKey?: string;
   getContext(): Promise<string>;
-  executeTool(call: ToolCall): Promise<string>;
+  executeTool(call: ToolCall, approval?: NonNullable<ToolCallsEventData['external']>[string], signal?: AbortSignal): Promise<string>;
 }
 
 /**
@@ -99,6 +100,7 @@ export class ChatSession {
         cb.onRoundStart();
         let assistantText = '';
         let toolCalls: ToolCall[] | null = null;
+        let external: ToolCallsEventData['external'];
         let doneData: DoneEventData | null = null;
 
         try {
@@ -123,6 +125,7 @@ export class ChatSession {
                 break;
               case 'tool_calls':
                 toolCalls = ev.data.toolCalls;
+                external = ev.data.external;
                 break;
               case 'done':
                 doneData = ev.data;
@@ -172,7 +175,7 @@ export class ChatSession {
                 argsJson: call.function.arguments,
                 status: 'running',
               });
-              content = await deps.executeTool(call);
+              content = await deps.executeTool(call, external?.[call.id], abort.signal);
               cb.onToolRun({
                 id: call.id,
                 name: call.function.name,

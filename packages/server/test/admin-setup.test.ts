@@ -116,6 +116,23 @@ describe('sqlite admin account/session store', () => {
 });
 
 describe('first-run admin setup (password mode)', () => {
+  it('does not create an account on page access and accepts only one concurrent setup', async () => {
+    const instance = createApp(passwordModeConfig());
+    try {
+      await instance.app.request('/admin');
+      expect(await instance.memoryStore!.getAdminAccount()).toBeNull();
+      const responses = await Promise.all([
+        instance.app.request('/api/admin/setup', json({ password: GOOD_PASSWORD })),
+        instance.app.request('/api/admin/setup', json({ password: GOOD_PASSWORD })),
+      ]);
+      expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+      expect(await (await instance.app.request('/api/admin/auth-status')).json()).toMatchObject({ mode: 'login' });
+    } finally {
+      instance.stopHeartbeat();
+      await instance.memoryStore?.close();
+    }
+  });
+
   it('serves /admin without an ADMIN_TOKEN when a store exists', async () => {
     const { app } = createApp(passwordModeConfig());
     const res = await app.request('/admin');

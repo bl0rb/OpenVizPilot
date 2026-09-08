@@ -8,6 +8,30 @@
  * jedem Request als "Authorization: Bearer <token>" an /api/admin/* gesendet
  * — nie in der URL (siehe Datenschutz-Regel: keine Secrets in URLs/Logs).
  */
+import { mcpAdminScript, mcpAdminSection, mcpAdminStyles } from '@openvizpilot/ee/server';
+import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
+import { adminFont } from './admin-font';
+
+const adminLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tdabg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1e40af"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#tdabg)"/>
+  <path d="M14 18 a6 6 0 0 1 6 -6 h24 a6 6 0 0 1 6 6 v20 a6 6 0 0 1 -6 6 H28 l-8 8 v-8 a6 6 0 0 1 -6 -6 Z" fill="#ffffff"/>
+  <rect x="20.5" y="30" width="5.5" height="8" rx="1.6" fill="#60a5fa"/>
+  <rect x="29.25" y="25" width="5.5" height="13" rx="1.6" fill="#2563eb"/>
+  <rect x="38" y="20" width="5.5" height="18" rx="1.6" fill="#1e40af"/>
+  <path d="M51 43 L53 49 L59 51 L53 53 L51 59 L49 53 L43 51 L49 49 Z" fill="#ffffff"/>
+  <path d="M58 38 L59 40.6 L61.6 41.6 L59 42.6 L58 45.2 L57 42.6 L54.4 41.6 L57 40.6 Z" fill="#bfdbfe"/>
+</svg>`;
+
+function adminIcon(nodes: IconNode): string {
+  return `<svg class="ui-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${nodes.map(([tag, attributes]) => `<${tag} ${Object.entries(attributes).map(([name, value]) => `${name}="${value}"`).join(' ')} />`).join('')}</svg>`;
+}
+
 export const adminPageHtml = `<!doctype html>
 <html lang="de">
 <head>
@@ -15,13 +39,16 @@ export const adminPageHtml = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>OpenVizPilot — Admin</title>
 <style>
+  @font-face { font-family: 'Inter Variable'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('${adminFont}') format('woff2'); }
   :root {
-    --accent: #1a699e;
-    --bg: #f7f8fa;
+    --accent: #635bff;
+    --accent-hover: #4a35d6;
+    --bg: #f6f8fb;
     --surface: #ffffff;
-    --border: #dde1e6;
-    --text: #1b1f24;
+    --border: #e3e8ef;
+    --text: #1a1f36;
     --text-muted: #5b6470;
+    --graphite: #0d0f16;
     --danger: #b3261e;
     --danger-bg: #fdecea;
     --ok-bg: #eaf3ec;
@@ -29,24 +56,25 @@ export const adminPageHtml = `<!doctype html>
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: 2rem 1.25rem 4rem;
+    padding: 0;
     background: var(--bg);
     color: var(--text);
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font: 14px/1.6 'Inter Variable', Inter, sans-serif;
+    letter-spacing: 0;
   }
-  main { max-width: 960px; margin: 0 auto; }
+  main { margin: 0 auto; }
   h1 { font-size: 1.3rem; margin: 0 0 0.25rem; }
   .subtitle { color: var(--text-muted); margin: 0 0 2rem; }
   h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
   section.card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.5rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 1.5rem 0;
+    margin-bottom: 1rem;
   }
   .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-  input[type="text"], input[type="password"], textarea, select {
+  input[type="text"], input[type="password"], input[type="url"], input[type="search"], textarea, select {
     font: inherit;
     color: inherit;
     background: var(--surface);
@@ -55,6 +83,15 @@ export const adminPageHtml = `<!doctype html>
     padding: 0.4rem 0.55rem;
   }
   textarea { width: 100%; resize: vertical; min-height: 3.5rem; }
+  select { max-width: 100%; padding-right: 2rem; cursor: pointer; }
+  input:read-only { background: var(--bg); color: var(--text-muted); }
+  input:disabled, textarea:disabled, select:disabled { background: var(--bg); color: var(--text-muted); cursor: not-allowed; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1rem 1.25rem; margin-bottom: 1.25rem; align-items: end; }
+  .form-field, .form-grid > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
+  .form-field > input, .form-grid > label > input, .form-grid > label > select { width: 100%; min-width: 0; }
+  .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 1.25rem; margin-top: 1.25rem; border-top: 1px solid var(--border); }
+  .form-section { border: 0; border-top: 1px solid var(--border); min-width: 0; margin: 1.5rem 0 0; padding: 1.25rem 0 0; }
+  .form-section legend { padding: 0 0.75rem 0 0; font-weight: 600; }
   button {
     font: inherit;
     cursor: pointer;
@@ -65,17 +102,30 @@ export const adminPageHtml = `<!doctype html>
   }
   button:hover { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.primary:hover { opacity: 0.9; }
+  button.primary:hover { background: var(--accent-hover); opacity: 1; }
+  :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  input[type="checkbox"] { accent-color: var(--accent); }
   button.danger { color: var(--danger); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; }
   th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  th { color: var(--text-muted); background: #eef1f6; font-weight: 600; font-size: 0.8rem; letter-spacing: 0; }
   td input[type="text"] { width: 100%; }
   .col-name { width: 12%; }
   .col-desc { width: 20%; }
   .col-hint { width: 12%; }
   .col-del { width: 2.5rem; text-align: center; }
+  #commands-table, #playbook-commands-table { min-width: 820px; table-layout: fixed; }
+  #commands-table .col-name, #playbook-commands-table .col-name { width: 17%; }
+  #commands-table .col-hint, #playbook-commands-table .col-hint { width: 16%; }
+  #models-table { min-width: 520px; }
+  #users-table { min-width: 520px; }
+  #users-table .col-del { width: 144px; white-space: nowrap; }
+  .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; flex-shrink: 0; }
+  #users-table .icon-button + .icon-button { margin-left: 4px; }
+  dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
+  dialog::backdrop { background: rgb(13 15 22 / 45%); }
+  dialog input { min-height: 44px; }
   .hint { color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
   .banner { border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 1rem; font-size: 0.9rem; display: none; }
   .banner.error { display: block; background: var(--danger-bg); color: var(--danger); }
@@ -83,60 +133,155 @@ export const adminPageHtml = `<!doctype html>
   .hint.error { color: var(--danger); font-weight: 600; }
   .stats-grid { display: flex; flex-wrap: wrap; gap: 1.25rem; }
   .stats-block { min-width: 220px; flex: 1 1 220px; }
-  .stats-block h3 { font-size: 0.85rem; margin: 0 0 0.4rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .stats-block h3 { font-size: 0.85rem; margin: 0 0 0.4rem; color: var(--text-muted); letter-spacing: 0; }
   .stats-block table td:last-child, .stats-block table th:last-child { text-align: right; }
   .total-turns { font-size: 1.6rem; font-weight: 600; color: var(--accent); }
-  .stats-heading { font-size: 0.85rem; margin: 1rem 0 0.25rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+  .stats-heading { font-size: 0.85rem; margin: 1rem 0 0.25rem; color: var(--text-muted); letter-spacing: 0; }
   th.num, td.num { text-align: right; }
-  #gate { max-width: 360px; margin: 4rem auto; text-align: center; }
+  #gate { max-width: 420px; margin: 5rem auto; padding: 2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
   #gate .row { justify-content: center; margin-top: 0.75rem; }
   #app { display: none; }
+  ${mcpAdminStyles}
+  [hidden] { display: none !important; }
+  .ui-icon { flex: 0 0 18px; vertical-align: middle; }
+  .masthead { height: 72px; padding: 0 2rem; background: var(--graphite); color: #e7e9f2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .brand { display: flex; align-items: center; gap: 0.75rem; font-size: 18px; font-weight: 700; }
+  .brand img { width: 34px; height: 34px; }
+  .brand-origin { font-size: 12px; font-weight: 400; color: #a1a8c0; border-left: 1px solid #343847; padding-left: 1rem; }
+  .masthead-label { font-size: 12px; color: #a1a8c0; }
+  .admin-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 72px); }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 2rem 1rem 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .sidebar nav { position: sticky; top: 1.5rem; }
+  .nav-group { margin: 1.5rem 0 0.5rem; padding: 0 0.75rem; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .nav-group:first-child { margin-top: 0; }
+  .sidebar a { min-height: 42px; display: flex; align-items: center; gap: 0.7rem; margin: 0.2rem 0; padding: 0.6rem 0.75rem; color: var(--text-muted); border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500; }
+  .sidebar a:hover { background: var(--bg); color: var(--text); }
+  .sidebar a[aria-current="page"] { background: #eeedff; color: #4a35d6; box-shadow: inset 3px 0 var(--accent); }
+  .nav-ee { margin-left: auto; font-size: 10px; font-weight: 700; }
+  #logout { display: flex; align-items: center; gap: 0.7rem; margin-top: auto; color: var(--text-muted); background: transparent; border: 0; text-align: left; min-height: 42px; }
+  .workspace { min-width: 0; width: 100%; max-width: 1280px; padding: 2rem 3rem 4rem; }
+  .workspace-heading { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 0.25rem; }
+  .workspace-heading p { margin: 0 0 0.5rem; color: var(--text-muted); font-size: 12px; }
+  .workspace-heading h1 { font-size: 28px; line-height: 1.3; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
+  .workspace h2 { font-size: 18px; line-height: 1.4; font-weight: 600; }
+  .workspace h2 small { font-size: 11px; font-weight: 600; color: #4a35d6; background: #eeedff; border-radius: 4px; padding: 4px 7px; margin-left: 6px; vertical-align: middle; }
+  .workspace section { min-width: 0; }
+  .workspace .hint { max-width: 85ch; line-height: 1.7; }
+  .workspace button { min-height: 38px; font-size: 13px; font-weight: 500; }
+  .workspace input:not([type="checkbox"]), .workspace select { min-height: 38px; }
+  .workspace th, .workspace td { padding: 0.7rem 0.6rem; }
+  .workspace table { font-size: 13px; }
+  .workspace tbody tr:hover { background: #f0f2f7; }
+  .row > input, .row > select { max-width: 100%; min-width: 0; }
+  .banner, td, .hint { overflow-wrap: anywhere; }
+  #mcp-admin { border: 0; padding-top: 1.5rem; }
+  #mcp-admin .mcp-entry { padding: 1.1rem 1.25rem; margin: 0.75rem 0 1rem; border-radius: 8px; }
+  #mcp-admin summary { font-size: 14px; }
+  #mcp-admin .mcp-fields { gap: 1rem 1.25rem; }
+  #mcp-admin .mcp-fields label { font-size: 12px; font-weight: 500; gap: 0.35rem; }
+  #mcp-admin h3 { margin-top: 1.75rem; font-size: 13px; }
+  .mobile-navigation { display: none; }
+  #gate h1 { margin-bottom: 0.75rem; font-size: 23px; }
+  #gate .subtitle { margin-bottom: 1.5rem; }
+  #gate input, #gate .primary { width: 100%; min-height: 44px; }
+  #gate input { max-width: 100%; }
+  #gate label { display: block; margin: 1rem 0 0.4rem; font-size: 13px; font-weight: 500; }
+  #gate form .primary { margin-top: 1.5rem; }
+  #gate .gate-caption { color: var(--text-muted); font-size: 12px; margin: 0 0 0.5rem; }
+  @media (max-width: 900px) {
+    .admin-shell { grid-template-columns: 210px minmax(0, 1fr); }
+    .workspace { padding: 1.75rem 1.5rem 3rem; }
+    .brand-origin { display: none; }
+  }
+  @media (max-width: 680px) {
+    .masthead { height: 64px; padding: 0 1.1rem; }
+    .brand { font-size: 16px; }
+    .masthead-label { font-size: 11px; }
+    .admin-shell { display: block; min-height: calc(100vh - 64px); }
+    .sidebar { padding: 0.75rem 1rem; border-right: 0; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; gap: 0.5rem; }
+    .sidebar nav { display: none; }
+    .mobile-navigation { display: block; flex: 1; min-width: 0; min-height: 42px; }
+    #logout { margin: 0; padding: 0.5rem; }
+    #logout span { display: none; }
+    .workspace { padding: 1.5rem 1rem 3rem; }
+    .workspace input:not([type="checkbox"]), .workspace textarea, .workspace select, #gate input, dialog input { font-size: 16px; }
+    .workspace-heading h1 { font-size: 24px; }
+    .workspace-heading { padding-bottom: 1.25rem; }
+    #mcp-admin .mcp-entry { padding: 1rem; }
+    #gate { margin: 2rem 1rem; padding: 1.5rem; }
+    #commands-table, #playbook-commands-table { min-width: 680px; }
+  }
 </style>
 </head>
 <body>
+<header class="masthead">
+  <div class="brand"><img src="data:image/svg+xml,${encodeURIComponent(adminLogo)}" width="34" height="34" alt="" /><span>OpenVizPilot</span><span class="brand-origin">WerkWorks</span></div>
+  <span class="masthead-label">Administration</span>
+</header>
 <main>
   <div id="gate">
-    <h1>OpenVizPilot — Admin</h1>
+    <p class="gate-caption">OpenVizPilot Administration</p>
+    <h1 id="gate-title">Admin-Anmeldung</h1>
 
     <div id="gate-token" hidden>
       <p class="subtitle">Bitte den Admin-Token eingeben.</p>
       <div class="row">
+        <label for="token-input">Admin-Token</label>
         <input type="password" id="token-input" placeholder="Admin-Token" autocomplete="off" />
         <button class="primary" id="token-submit">Anmelden</button>
       </div>
     </div>
 
-    <div id="gate-setup" hidden>
-      <p class="subtitle">Ersteinrichtung: Lege jetzt das Admin-Passwort fest (mindestens 12 Zeichen).</p>
-      <div class="row">
-        <input type="password" id="setup-password" placeholder="Neues Admin-Passwort" autocomplete="new-password" />
-      </div>
-      <div class="row">
-        <input type="password" id="setup-confirm" placeholder="Passwort wiederholen" autocomplete="new-password" />
-        <button class="primary" id="setup-submit">Admin anlegen</button>
-      </div>
-    </div>
+    <form id="gate-setup" hidden>
+      <p class="subtitle">Noch kein Admin vorhanden. Lege das Passwort für das erste Administratorkonto fest.</p>
+      <label for="setup-password">Admin-Passwort</label>
+      <input type="password" id="setup-password" autocomplete="new-password" required minlength="12" maxlength="200" aria-describedby="setup-password-hint" />
+      <p class="hint" id="setup-password-hint">Mindestens 12 Zeichen.</p>
+      <label for="setup-confirm">Passwort bestätigen</label>
+      <input type="password" id="setup-confirm" autocomplete="new-password" required minlength="12" maxlength="200" />
+      <button class="primary" id="setup-submit" type="submit">Administratorkonto anlegen</button>
+    </form>
 
-    <div id="gate-login" hidden>
-      <p class="subtitle">Bitte mit dem Admin-Passwort anmelden.</p>
-      <div class="row">
-        <input type="password" id="login-password" placeholder="Admin-Passwort" autocomplete="current-password" />
-        <button class="primary" id="login-submit">Anmelden</button>
-      </div>
-    </div>
+    <form id="gate-login" hidden>
+      <p class="subtitle">Mit deinem Administratorkonto anmelden.</p>
+      <label for="login-password">Admin-Passwort</label>
+      <input type="password" id="login-password" autocomplete="current-password" required maxlength="200" />
+      <button class="primary" id="login-submit" type="submit">Anmelden</button>
+    </form>
 
-    <p id="gate-error" class="banner error"></p>
+    <p id="gate-error" class="banner error" role="alert"></p>
     <div class="row"><button id="gate-retry" hidden>Erneut versuchen</button></div>
   </div>
 
   <div id="app">
-    <div class="row" style="justify-content: space-between; align-items: baseline;">
-      <h1>OpenVizPilot — Admin</h1>
-      <button id="logout">Abmelden</button>
-    </div>
-    <p class="subtitle">Slash-Befehle zentral verwalten und anonyme Nutzung einsehen.</p>
+    <div class="admin-shell">
+    <aside class="sidebar">
+      <nav aria-label="Administration">
+        <p class="nav-group">Arbeitsbereich</p>
+        <a href="#mcp-admin" aria-current="page">${adminIcon(Network)}MCP &amp; Sites <span class="nav-ee">EE</span></a>
+        <a href="#commands-admin">${adminIcon(Terminal)}Slash-Befehle</a>
+        <a href="#playbooks-admin">${adminIcon(LayoutDashboard)}Dashboard-Analysen</a>
+        <a href="#models-admin">${adminIcon(Settings)}Modelle</a>
+        <p class="nav-group">Zugriff</p>
+        <a href="#auth-admin">${adminIcon(ShieldCheck)}Anmeldung &amp; Lizenz</a>
+        <a href="#users-admin">${adminIcon(Users)}Benutzerkonten</a>
+        <p class="nav-group">Betrieb</p>
+        <a href="#extension-admin">${adminIcon(Download)}Tableau-Extension</a>
+        <a href="#usage-admin">${adminIcon(ChartNoAxesCombined)}Nutzung</a>
+      </nav>
+      <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
+        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="models-admin">Modelle</option></optgroup>
+        <optgroup label="Zugriff"><option value="auth-admin">Anmeldung &amp; Lizenz</option><option value="users-admin">Benutzerkonten</option></optgroup>
+        <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option></optgroup>
+      </select>
+      <button id="logout" title="Abmelden" aria-label="Abmelden">${adminIcon(LogOut)}<span>Abmelden</span></button>
+    </aside>
+    <div class="workspace">
+      <header class="workspace-heading"><p id="view-group">Arbeitsbereich</p><h1 id="view-title" tabindex="-1">MCP &amp; Sites</h1></header>
 
-    <section class="card">
+    ${mcpAdminSection}
+
+    <section class="card" id="commands-admin" hidden>
       <h2>Slash-Befehle</h2>
       <p id="commands-source" class="hint"></p>
       <p id="commands-banner" class="banner"></p>
@@ -161,18 +306,18 @@ export const adminPageHtml = `<!doctype html>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="auth-admin" hidden>
       <h2>Anmeldung, Single Sign-On &amp; Lizenz</h2>
       <p class="hint">
         Wer die Extension (und damit die Middleware) nutzen darf. <strong>Benutzerkonten</strong> (Open Core):
-        Anwender melden sich in der Extension mit Konten aus dem Abschnitt unten an.
+        Anwender melden sich in der Extension mit Konten aus dem Bereich „Benutzerkonten“ an.
         <strong>Single Sign-On</strong> (Enterprise): Anmeldung mit dem Firmenkonto über Microsoft Entra ID oder
         Keycloak — braucht einen gültigen Lizenzschlüssel. Einstellungen hier überschreiben die Env-Defaults
         (AUTH_MODE, OIDC_*, OVP_LICENSE) sofort für alle Replicas.
       </p>
       <p id="auth-source" class="hint"></p>
       <p id="auth-banner" class="banner"></p>
-      <div class="row">
+      <div class="form-grid">
         <label>Anmeldemodus
           <select id="auth-mode">
             <option value="none">Offen (nur Netzwerkschutz)</option>
@@ -185,7 +330,7 @@ export const adminPageHtml = `<!doctype html>
         </label>
       </div>
       <div id="oidc-fields">
-        <div class="row">
+        <div class="form-grid">
           <label>Identity-Provider
             <select id="oidc-provider">
               <option value="entra">Microsoft Entra ID</option>
@@ -197,7 +342,7 @@ export const adminPageHtml = `<!doctype html>
             <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" />
           </label>
         </div>
-        <div class="row">
+        <div class="form-grid">
           <label style="flex: 1 1 240px;">Client-ID
             <input type="text" id="oidc-client-id" autocomplete="off" />
           </label>
@@ -210,7 +355,8 @@ export const adminPageHtml = `<!doctype html>
         </div>
         <p class="hint">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL) — siehe docs/enterprise.md für die Einrichtung in Entra bzw. Keycloak.</p>
       </div>
-      <label>Enterprise-Lizenzschlüssel
+      <fieldset class="form-section"><legend>Enterprise-Lizenz</legend>
+      <label class="form-field">Lizenzschlüssel
         <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false"></textarea>
       </label>
       <p id="license-summary" class="hint">Lade …</p>
@@ -225,14 +371,15 @@ export const adminPageHtml = `<!doctype html>
           </div>
         </details>
       </div>
-      <div class="row">
+      </fieldset>
+      <div class="form-actions">
         <button class="primary" id="save-auth">Prüfen &amp; speichern</button>
         <button id="remove-license">Lizenz entfernen</button>
         <button class="danger" id="reset-auth">Auf Env-Defaults zurücksetzen</button>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="users-admin" hidden>
       <h2>Benutzerkonten (Core-Edition)</h2>
       <p class="hint">
         Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“. Passwörter werden nur als
@@ -252,15 +399,21 @@ export const adminPageHtml = `<!doctype html>
           <tbody id="users-body"></tbody>
         </table>
       </div>
-      <div class="row">
-        <input type="text" id="new-username" placeholder="Benutzername" autocomplete="off" />
-        <input type="text" id="new-display-name" placeholder="Anzeigename (optional)" autocomplete="off" />
-        <input type="password" id="new-password" placeholder="Passwort (min. 10 Zeichen)" autocomplete="new-password" />
-        <button class="primary" id="create-user">Benutzer anlegen</button>
+      <form id="create-user-form">
+      <fieldset class="form-section"><legend>Benutzer anlegen</legend>
+      <div class="form-grid">
+        <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
+        <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
+        <label for="new-password">Passwort (mindestens 10 Zeichen)<input type="password" id="new-password" autocomplete="new-password" minlength="10" required /></label>
       </div>
+      <div class="form-actions">
+        <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
+      </div>
+      </fieldset>
+      </form>
     </section>
 
-    <section class="card">
+    <section class="card" id="playbooks-admin" hidden>
       <h2>Standardanalysen pro Dashboard</h2>
       <p class="hint">
         Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard. Die Extension lädt das Playbook
@@ -271,11 +424,10 @@ export const adminPageHtml = `<!doctype html>
       <div class="row" style="margin-bottom: 0.75rem;">
         <label for="playbook-key">Dashboard:</label>
         <select id="playbook-key" style="flex: 1 1 260px;"><option value="">Dashboard auswählen …</option></select>
-        <button id="playbook-load">Analysen laden</button>
         <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
       <p id="playbook-status" class="hint"></p>
-      <div id="playbook-list" class="row" style="margin-bottom: 0.75rem;"></div>
+      <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten</legend>
       <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)</label>
       <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?"></textarea>
       <p class="hint" style="margin-top: 0.75rem;">Slash-Befehle nur für dieses Dashboard</p>
@@ -295,12 +447,13 @@ export const adminPageHtml = `<!doctype html>
       </div>
       <div class="row">
         <button id="playbook-add-command">+ Befehl hinzufügen</button>
-        <button class="primary" id="playbook-save">Playbook speichern</button>
-        <button class="danger" id="playbook-delete">Playbook löschen</button>
+        <button class="primary" id="playbook-save">Analysen speichern</button>
+        <button class="danger" id="playbook-delete">Analysen löschen</button>
       </div>
+      </fieldset>
     </section>
 
-    <section class="card">
+    <section class="card" id="models-admin" hidden>
       <h2>Modelle in der Extension</h2>
       <p class="hint">
         Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt
@@ -330,7 +483,7 @@ export const adminPageHtml = `<!doctype html>
       <div id="lookup-results" class="row" style="margin-top: 0.75rem;"></div>
     </section>
 
-    <section class="card">
+    <section class="card" id="extension-admin" hidden>
       <h2>Extension für Tableau</h2>
       <p class="hint">
         Lädt das Manifest (.trex) mit der eingetragenen Extension-URL herunter — die Adresse, unter der
@@ -339,13 +492,15 @@ export const adminPageHtml = `<!doctype html>
         Server-Safelist eintragen und das Manifest im Dashboard auswählen.
       </p>
       <p id="trex-banner" class="banner"></p>
-      <div class="row">
-        <input type="text" id="trex-url" style="flex: 1 1 320px;" placeholder="https://chat.example.com/" autocomplete="off" />
+      <label class="form-field" for="trex-url">Öffentliche Extension-URL
+        <input type="url" id="trex-url" placeholder="https://chat.example.com/" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="form-actions">
         <button class="primary" id="trex-download">Manifest (.trex) herunterladen</button>
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="usage-admin" hidden>
       <h2>Nutzung (anonym)</h2>
       <p class="hint">Aggregierte Zähler ohne Nutzerbezug und ohne Inhalte.</p>
       <div class="row" style="margin-bottom: 1rem;">
@@ -382,8 +537,25 @@ export const adminPageHtml = `<!doctype html>
       <h3 class="stats-heading">Zähler</h3>
       <div class="stats-grid" id="stats-grid"></div>
     </section>
+    </div>
+    </div>
   </div>
 </main>
+<dialog id="user-password-dialog" aria-labelledby="user-password-title">
+  <form id="user-password-form">
+    <h2 id="user-password-title">Passwort ändern</h2>
+    <p id="user-password-account" class="hint"></p>
+    <label class="form-field" for="user-password-value">Neues Passwort (mindestens 10 Zeichen)
+      <input type="password" id="user-password-value" autocomplete="new-password" minlength="10" required />
+    </label>
+    <p class="hint">Laufende Sitzungen dieses Benutzers werden beendet.</p>
+    <p id="user-password-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" id="user-password-cancel">Abbrechen</button>
+      <button type="submit" id="user-password-save" class="primary">Passwort speichern</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 (function () {
@@ -393,6 +565,14 @@ export const adminPageHtml = `<!doctype html>
   var gate = document.getElementById('gate');
   var app = document.getElementById('app');
   var gateError = document.getElementById('gate-error');
+  var actionIcons = { remove: ${JSON.stringify(adminIcon(Trash2))}, password: ${JSON.stringify(adminIcon(KeyRound))}, lock: ${JSON.stringify(adminIcon(LockKeyhole))}, unlock: ${JSON.stringify(adminIcon(LockKeyholeOpen))} };
+
+  function setActionIcon(button, icon, label) {
+    button.innerHTML = actionIcons[icon];
+    button.classList.add('icon-button');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+  }
 
   function getToken() {
     try {
@@ -415,9 +595,12 @@ export const adminPageHtml = `<!doctype html>
   function showBanner(el, text, kind) {
     el.textContent = text;
     el.className = 'banner' + (text ? ' ' + kind : '');
+    el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    el.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   }
 
   function showGate(message) {
+    if (passwordDialog && passwordDialog.open) passwordDialog.close();
     app.style.display = 'none';
     gate.style.display = 'block';
     showBanner(gateError, message || '', 'error');
@@ -441,6 +624,7 @@ export const adminPageHtml = `<!doctype html>
         var id =
           result.data.mode === 'token' ? 'gate-token' :
           result.data.mode === 'setup' ? 'gate-setup' : 'gate-login';
+        document.getElementById('gate-title').textContent = result.data.mode === 'setup' ? 'Admin-Konto einrichten' : 'Admin-Anmeldung';
         document.getElementById(id).hidden = false;
       })
       .catch(function () {
@@ -452,7 +636,30 @@ export const adminPageHtml = `<!doctype html>
   function showApp() {
     gate.style.display = 'none';
     app.style.display = 'block';
+    selectAdminView(false);
+    loadMcp();
   }
+
+  function selectAdminView(focus) {
+    var selector = document.getElementById('admin-navigation');
+    var selected = location.hash.slice(1);
+    var option = Array.from(selector.options).find(function (entry) { return entry.value === selected; }) || selector.options[0];
+    selected = option.value;
+    selector.value = selected;
+    document.querySelectorAll('.workspace > section').forEach(function (section) { section.hidden = section.id !== selected; });
+    document.querySelectorAll('.sidebar nav a').forEach(function (link) {
+      if (link.hash === '#' + selected) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    document.getElementById('view-title').textContent = option.textContent;
+    document.getElementById('view-group').textContent = option.parentElement.label;
+    if (focus && app.style.display !== 'none') {
+      window.scrollTo(0, 0);
+      document.getElementById('view-title').focus({ preventScroll: true });
+    }
+  }
+  window.addEventListener('hashchange', function () { selectAdminView(true); });
+  document.getElementById('admin-navigation').addEventListener('change', function (event) { location.hash = event.target.value; });
 
   /** fetch gegen /api/admin/* mit Bearer-Token; wirft bei 401 zurück ins Token-Gate. */
   function adminFetch(path, options) {
@@ -467,6 +674,8 @@ export const adminPageHtml = `<!doctype html>
       return res;
     });
   }
+
+  ${mcpAdminScript}
 
   // ---------- Slash-Befehle ----------
 
@@ -485,6 +694,7 @@ export const adminPageHtml = `<!doctype html>
       field.placeholder = placeholder || '';
       field.value = cmd[valueKey] || '';
       field.dataset.field = valueKey;
+      field.setAttribute('aria-label', { name: 'Befehlsname', description: 'Beschreibung', argHint: 'Argument-Hinweis', template: 'Prompt-Template' }[valueKey]);
       td.appendChild(field);
       return td;
     }
@@ -498,8 +708,7 @@ export const adminPageHtml = `<!doctype html>
     delTd.className = 'col-del';
     var delBtn = document.createElement('button');
     delBtn.type = 'button';
-    delBtn.title = 'Zeile löschen';
-    delBtn.textContent = '✕';
+    setActionIcon(delBtn, 'remove', 'Befehl entfernen');
     delBtn.addEventListener('click', function () {
       tr.remove();
     });
@@ -777,22 +986,25 @@ export const adminPageHtml = `<!doctype html>
       actions.className = 'col-del';
       var pw = document.createElement('button');
       pw.type = 'button';
-      pw.textContent = 'Passwort';
+      setActionIcon(pw, 'password', 'Passwort ändern: ' + u.username);
       pw.addEventListener('click', function () {
-        var next = window.prompt('Neues Passwort für ' + u.username + ' (min. 10 Zeichen):');
-        if (!next) return;
-        userAction('/users/' + encodeURIComponent(u.username) + '/password', jsonRequest('PUT', { password: next }), 'Passwort gesetzt — laufende Sitzungen beendet.');
+        passwordUsername = u.username;
+        document.getElementById('user-password-account').textContent = u.displayName ? u.displayName + ' (' + u.username + ')' : u.username;
+        passwordForm.reset();
+        showBanner(passwordBanner, '', 'error');
+        passwordDialog.showModal();
+        document.getElementById('user-password-value').focus();
       });
       var toggle = document.createElement('button');
       toggle.type = 'button';
-      toggle.textContent = u.disabled ? 'Entsperren' : 'Sperren';
+      setActionIcon(toggle, u.disabled ? 'unlock' : 'lock', (u.disabled ? 'Entsperren: ' : 'Sperren: ') + u.username);
       toggle.addEventListener('click', function () {
         userAction('/users/' + encodeURIComponent(u.username) + '/disabled', jsonRequest('PUT', { disabled: !u.disabled }), u.disabled ? 'Entsperrt.' : 'Gesperrt.');
       });
       var del = document.createElement('button');
       del.type = 'button';
       del.className = 'danger';
-      del.textContent = 'Löschen';
+      setActionIcon(del, 'remove', 'Benutzer löschen: ' + u.username);
       del.addEventListener('click', function () {
         if (!window.confirm('Benutzer ' + u.username + ' löschen?')) return;
         userAction('/users/' + encodeURIComponent(u.username), { method: 'DELETE' }, 'Gelöscht.');
@@ -815,7 +1027,42 @@ export const adminPageHtml = `<!doctype html>
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
 
-  document.getElementById('create-user').addEventListener('click', function () {
+  var passwordDialog = document.getElementById('user-password-dialog');
+  var passwordForm = document.getElementById('user-password-form');
+  var passwordBanner = document.getElementById('user-password-banner');
+  var passwordUsername = '';
+  passwordDialog.addEventListener('close', function () { passwordForm.reset(); });
+  passwordDialog.addEventListener('cancel', function (event) {
+    if (document.getElementById('user-password-save').disabled) event.preventDefault();
+  });
+  document.getElementById('user-password-cancel').addEventListener('click', function () { passwordDialog.close(); });
+  passwordForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = document.getElementById('user-password-save');
+    if (button.disabled) return;
+    button.disabled = true;
+    document.getElementById('user-password-cancel').disabled = true;
+    document.getElementById('user-password-value').readOnly = true;
+    button.textContent = 'Wird gespeichert …';
+    adminFetch('/users/' + encodeURIComponent(passwordUsername) + '/password', jsonRequest('PUT', { password: document.getElementById('user-password-value').value }))
+      .then(function (response) {
+        if (!response.ok) return response.json().then(function (data) { throw new Error(data.error || 'Passwort konnte nicht gespeichert werden.'); });
+        passwordDialog.close();
+        showBanner(usersBanner, 'Passwort gesetzt. Laufende Sitzungen beendet.', 'ok');
+      })
+      .catch(function (error) { showBanner(passwordBanner, error.message || 'Server nicht erreichbar.', 'error'); })
+      .finally(function () {
+        button.disabled = false;
+        button.textContent = 'Passwort speichern';
+        document.getElementById('user-password-cancel').disabled = false;
+        document.getElementById('user-password-value').readOnly = false;
+      });
+  });
+
+  document.getElementById('create-user-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = document.getElementById('create-user');
+    if (button.disabled) return;
     var username = document.getElementById('new-username').value.trim();
     var displayName = document.getElementById('new-display-name').value.trim();
     var password = document.getElementById('new-password').value;
@@ -823,20 +1070,24 @@ export const adminPageHtml = `<!doctype html>
       showBanner(usersBanner, 'Benutzername und Passwort angeben.', 'error');
       return;
     }
+    button.disabled = true;
     userAction('/users', jsonRequest('POST', { username: username, displayName: displayName, password: password }), 'Benutzer angelegt.')
       .then(function (ok) {
         if (!ok) return;
         document.getElementById('new-username').value = '';
         document.getElementById('new-display-name').value = '';
         document.getElementById('new-password').value = '';
-      });
+      }).finally(function () { button.disabled = false; });
   });
 
   // ---------- Playbooks pro Dashboard ----------
 
   var playbookKey = document.getElementById('playbook-key');
   var playbookStatus = document.getElementById('playbook-status');
-  var playbookList = document.getElementById('playbook-list');
+  var playbookEditor = document.getElementById('playbook-editor');
+  var selectedPlaybookKey = '';
+  var playbookBaseline = '';
+  var playbookPending = false;
   var playbookStarters = document.getElementById('playbook-starters');
   var playbookCommandsBody = document.getElementById('playbook-commands-body');
   var playbooksBanner = document.getElementById('playbooks-banner');
@@ -866,10 +1117,32 @@ export const adminPageHtml = `<!doctype html>
 
   function showPlaybook(entry) {
     playbookKey.value = entry ? entry.dashboardKey : playbookKey.value;
+    selectedPlaybookKey = playbookKey.value;
+    playbookEditor.disabled = playbookPending || !selectedPlaybookKey;
     playbookStarters.value = entry ? entry.playbook.starters.join('\\n') : '';
     playbookCommandsBody.innerHTML = '';
     (entry ? entry.playbook.commands : []).forEach(function (cmd) { commandRowInto(playbookCommandsBody, cmd); });
+    playbookBaseline = playbookDraft();
   }
+
+  function playbookDraft() {
+    return JSON.stringify({ starters: playbookStarters.value, commands: readCommandsFrom(playbookCommandsBody) });
+  }
+
+  function playbookIsDirty() {
+    return Boolean(selectedPlaybookKey) && playbookDraft() !== playbookBaseline;
+  }
+
+  function setPlaybookPending(pending) {
+    playbookPending = pending;
+    playbookEditor.disabled = pending || !selectedPlaybookKey;
+    playbookKey.disabled = pending;
+    document.getElementById('playbook-refresh').disabled = pending;
+  }
+
+  window.addEventListener('beforeunload', function (event) {
+    if (mcpDirty || playbookIsDirty()) { event.preventDefault(); event.returnValue = ''; }
+  });
 
   function dashboardLabel(key) {
     var registered = registeredDashboards.filter(function (d) { return d.dashboardKey === key; })[0];
@@ -884,27 +1157,20 @@ export const adminPageHtml = `<!doctype html>
     placeholder.value = '';
     placeholder.textContent = 'Dashboard auswählen …';
     playbookKey.appendChild(placeholder);
-    playbookList.innerHTML = '';
     var keys = Object.create(null);
     entries.forEach(function (e) { keys[e.dashboardKey] = true; });
     registeredDashboards.forEach(function (d) { keys[d.dashboardKey] = true; });
     Object.keys(keys).sort(function (a, b) { return dashboardLabel(a).localeCompare(dashboardLabel(b)); }).forEach(function (key) {
       var opt = document.createElement('option');
       opt.value = key;
-      opt.textContent = dashboardLabel(key);
+      var saved = entries.find(function (entry) { return entry.dashboardKey === key; });
+      opt.textContent = dashboardLabel(key) + (saved ? ' (' + saved.playbook.starters.length + ' Fragen, ' + saved.playbook.commands.length + ' Befehle)' : ' (Standard)');
       playbookKey.appendChild(opt);
     });
     playbookKey.value = selected;
     playbookStatus.textContent = registeredDashboards.length
       ? registeredDashboards.length + ' eingebundene Dashboards. Standardanalysen stehen allen Anwendern der jeweiligen Zuordnung zur Verfügung.'
       : 'Noch kein Dashboard registriert. Extension im Bearbeitungsmodus öffnen, anmelden und Workbook speichern; danach hier aktualisieren.';
-    entries.forEach(function (entry) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = dashboardLabel(entry.dashboardKey) + ' (' + entry.playbook.starters.length + ' Fragen, ' + entry.playbook.commands.length + ' Befehle)';
-      btn.addEventListener('click', function () { showPlaybook(entry); });
-      playbookList.appendChild(btn);
-    });
   }
 
   function loadPlaybooks() {
@@ -919,12 +1185,15 @@ export const adminPageHtml = `<!doctype html>
 
   function selectPlaybook() {
     var key = playbookKey.value;
+    if (playbookIsDirty() && !confirm('Ungespeicherte Dashboard-Analysen verwerfen?')) {
+      playbookKey.value = selectedPlaybookKey;
+      return;
+    }
     var entry = knownPlaybooks.filter(function (e) { return e.dashboardKey === key; })[0];
     showPlaybook(entry || null);
     showBanner(playbooksBanner, !key ? '' : entry ? 'Standardanalysen geladen.' : 'Für dieses Dashboard gelten bisher die globalen Standards. Hier eigene Analysen ergänzen.', 'ok');
   }
   playbookKey.addEventListener('change', selectPlaybook);
-  document.getElementById('playbook-load').addEventListener('click', selectPlaybook);
   document.getElementById('playbook-refresh').addEventListener('click', loadPlaybooks);
 
   document.getElementById('playbook-add-command').addEventListener('click', function () {
@@ -932,6 +1201,7 @@ export const adminPageHtml = `<!doctype html>
   });
 
   document.getElementById('playbook-save').addEventListener('click', function () {
+    if (playbookPending) return;
     showBanner(playbooksBanner, '', 'ok');
     var key = playbookKey.value.trim();
     if (!key) {
@@ -939,6 +1209,8 @@ export const adminPageHtml = `<!doctype html>
       return;
     }
     var starters = playbookStarters.value.split('\\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var submittedDraft = playbookDraft();
+    setPlaybookPending(true);
     adminFetch('/playbooks', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
@@ -953,15 +1225,19 @@ export const adminPageHtml = `<!doctype html>
           showBanner(playbooksBanner, (result.data.error || 'Speichern fehlgeschlagen') + (details ? ' — ' + details : ''), 'error');
           return;
         }
+        playbookBaseline = submittedDraft;
         showBanner(playbooksBanner, 'Standardanalysen gespeichert — offene Extensions aktualisieren sie innerhalb einer Minute.', 'ok');
         return loadPlaybooks();
       })
-      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+      .catch(function () { showBanner(playbooksBanner, 'Speichern fehlgeschlagen. Bitte erneut versuchen.', 'error'); })
+      .finally(function () { setPlaybookPending(false); });
   });
 
   document.getElementById('playbook-delete').addEventListener('click', function () {
+    if (playbookPending) return;
     var key = playbookKey.value.trim();
     if (!key || !confirm('Standardanalysen für „' + dashboardLabel(key) + '“ löschen? Danach gelten wieder die globalen Standards.')) return;
+    setPlaybookPending(true);
     adminFetch('/playbooks?dashboardKey=' + encodeURIComponent(key), { method: 'DELETE' })
       .then(function (res) {
         if (!res.ok) {
@@ -972,7 +1248,8 @@ export const adminPageHtml = `<!doctype html>
         showBanner(playbooksBanner, 'Playbook gelöscht.', 'ok');
         return loadPlaybooks();
       })
-      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+        .catch(function () { showBanner(playbooksBanner, 'Löschen fehlgeschlagen. Bitte erneut versuchen.', 'error'); })
+        .finally(function () { setPlaybookPending(false); });
   });
 
   // ---------- Modell-Katalog ----------
@@ -991,6 +1268,7 @@ export const adminPageHtml = `<!doctype html>
       field.placeholder = key === 'id' ? 'z. B. claude-sonnet-5' : 'z. B. Standard (empfohlen)';
       field.value = model[key] || '';
       field.dataset.field = key;
+      field.setAttribute('aria-label', key === 'id' ? 'Modell-ID' : 'Anzeigename');
       td.appendChild(field);
       tr.appendChild(td);
     });
@@ -998,8 +1276,7 @@ export const adminPageHtml = `<!doctype html>
     delTd.className = 'col-del';
     var delBtn = document.createElement('button');
     delBtn.type = 'button';
-    delBtn.title = 'Zeile löschen';
-    delBtn.textContent = '✕';
+    setActionIcon(delBtn, 'remove', 'Modell entfernen');
     delBtn.addEventListener('click', function () { tr.remove(); });
     delTd.appendChild(delBtn);
     tr.appendChild(delTd);
@@ -1266,6 +1543,7 @@ export const adminPageHtml = `<!doctype html>
 
   function enterApp(token) {
     setToken(token);
+    ['setup-password', 'setup-confirm', 'login-password', 'token-input'].forEach(function (id) { document.getElementById(id).value = ''; });
     showBanner(gateError, '', 'error');
     showApp();
     loadAuth();
@@ -1296,7 +1574,10 @@ export const adminPageHtml = `<!doctype html>
     });
   }
 
-  document.getElementById('setup-submit').addEventListener('click', function () {
+  document.getElementById('gate-setup').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = document.getElementById('setup-submit');
+    if (button.disabled) return;
     var password = document.getElementById('setup-password').value;
     var confirm = document.getElementById('setup-confirm').value;
     if (!password) return;
@@ -1304,6 +1585,8 @@ export const adminPageHtml = `<!doctype html>
       showBanner(gateError, 'Die Passwörter stimmen nicht überein.', 'error');
       return;
     }
+    button.disabled = true;
+    button.textContent = 'Konto wird angelegt …';
     authPost('/setup', password)
       .then(function (result) {
         if (!result.res.ok) {
@@ -1317,15 +1600,18 @@ export const adminPageHtml = `<!doctype html>
         }
         enterApp(result.data.token);
       })
-      .catch(function () { showBanner(gateError, 'Server nicht erreichbar.', 'error'); });
-  });
-  document.getElementById('setup-confirm').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') document.getElementById('setup-submit').click();
+      .catch(function () { showBanner(gateError, 'Server nicht erreichbar.', 'error'); })
+      .finally(function () { button.disabled = false; button.textContent = 'Administratorkonto anlegen'; });
   });
 
-  document.getElementById('login-submit').addEventListener('click', function () {
+  document.getElementById('gate-login').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = document.getElementById('login-submit');
+    if (button.disabled) return;
     var password = document.getElementById('login-password').value;
     if (!password) return;
+    button.disabled = true;
+    button.textContent = 'Anmeldung läuft …';
     authPost('/login', password)
       .then(function (result) {
         if (!result.res.ok) {
@@ -1334,10 +1620,8 @@ export const adminPageHtml = `<!doctype html>
         }
         enterApp(result.data.token);
       })
-      .catch(function () { showBanner(gateError, 'Server nicht erreichbar.', 'error'); });
-  });
-  document.getElementById('login-password').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') document.getElementById('login-submit').click();
+      .catch(function () { showBanner(gateError, 'Server nicht erreichbar.', 'error'); })
+      .finally(function () { button.disabled = false; button.textContent = 'Anmelden'; });
   });
 
   document.getElementById('logout').addEventListener('click', function () {

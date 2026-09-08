@@ -4,10 +4,13 @@ import type { Logger } from '../logger';
 import {
   createPgPersonalizationStore,
   createPgTelemetryStore,
+  createPgMcpStore,
+  createSqliteMcpStore,
   createSqlitePersonalizationStore,
   createSqliteTelemetryStore,
   type PersonalizationStore,
   type TelemetryStore,
+  type McpStore,
 } from '@openvizpilot/ee/server';
 import { createPgMemoryStore, openPgPool } from './pg-store';
 import { createSqliteMemoryStore, openSqliteDatabase } from './sqlite-store';
@@ -159,6 +162,7 @@ export interface MemoryStore {
 }
 
 export interface MemoryBackend {
+  mcp: McpStore;
   /** Kern-Store: Admin, Anmeldung, Befehle, Playbooks, Modelle, Statistik. */
   store: MemoryStore;
   /** Enterprise-Personalisierung auf DERSELBEN Verbindung (ee/). */
@@ -185,6 +189,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     const store = createPgMemoryStore(pool, logger);
     return {
       store,
+      mcp: createPgMcpStore(pool),
       personalization: createPgPersonalizationStore(pool, logger),
       telemetry: createPgTelemetryStore(pool, logger),
       close: () => store.close(),
@@ -195,6 +200,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     const store = createSqliteMemoryStore(db, logger);
     return {
       store,
+      mcp: createSqliteMcpStore(db),
       personalization: createSqlitePersonalizationStore(db),
       telemetry: createSqliteTelemetryStore(db),
       close: () => store.close(),

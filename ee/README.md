@@ -15,6 +15,7 @@ PolyForm-Noncommercial-Lizenz des restlichen Repos, sondern unter der proprietä
 | `server/src/personalization-store.ts` | Eigene Tabellen (`user_facts`, `user_memory_state`, `user_dashboard_prefs`) samt Nebenläufigkeits-Garantie gegen Wiederauferstehung gelöschter Fakten — auf der Verbindung, die der Kern ohnehin hält |
 | `server/src/personalization-schema.ts` | Datenvertrag der Präferenzen, Fokus-Vorschläge und die Regeln fürs Speichern eigener Fragen |
 | `server/src/mcp/` | MCP-Client, Admin-Verwaltung, Site-Freigaben, eigene Tabellen und serverseitige Lizenzprüfung über `mcp` |
+| `server/src/system-prompt.ts` (Kern, lizenzabhängiger Abschnitt) | Dashboard-Aktionen (Filter, Parameter, Markieren, Bereich) im System-Prompt — lizenzpflichtig über `actions` |
 | `extension/src/mcp-client.ts` | Bestätigung externer Datenübertragungen und authentifizierte MCP-Aufrufe |
 | `extension/src/oidc-login.ts` | Popup-Login mit PKCE aus der Tableau-Extension heraus, Sitzung im `sessionStorage` |
 | `extension/src/LoginPanel.tsx` | Login-Ansicht der Extension |
@@ -40,7 +41,7 @@ Identisch zum bestehenden WerkWorks-Lizenzgenerator (`certpulse-license-generato
 ```json
 { "formatVersion": "openvizpilot-license-v1", "licenseId": "…", "tier": "enterprise",
   "licensee": "Firma GmbH", "issuedAt": "2026-09-02T…", "validUntil": "2027-09-02T…",
-    "features": ["sso", "memory", "savedQueries", "mcp"] }
+    "features": ["sso", "memory", "savedQueries", "mcp", "actions"] }
 ```
 
 Lizenzen stellt der WerkWorks-Lizenzgenerator direkt aus:
@@ -50,12 +51,15 @@ Lizenzen stellt der WerkWorks-Lizenzgenerator direkt aus:
 JSON-Bytes, base64url); `scripts/sign-license.ts` bleibt als Notnagel, wenn der Generator nicht zur
 Hand ist.
 
-**Upgrade-Hinweis:** Lizenzen, die vor Einführung von `memory`/`savedQueries` mit ausdrücklicher
-`features`-Liste ausgestellt wurden (typisch `["sso"]`), schalten die Personalisierung NICHT frei —
-sie war vorher lizenzfreie Kernfunktion. Solche Lizenzen neu ausstellen; `GET /api/features` zeigt
-den aktuellen Stand.
+**Upgrade-Hinweis:** Lizenzen, die vor Einführung von `memory`/`savedQueries`/`actions` mit
+ausdrücklicher `features`-Liste ausgestellt wurden (typisch `["sso"]`), schalten diese Funktionen
+NICHT frei — sie waren vorher lizenzfreie Kernfunktionen. Solche Lizenzen neu ausstellen;
+`GET /api/features` zeigt den aktuellen Stand.
 
 Für MCP muss eine explizite Feature-Liste zusätzlich `mcp` enthalten. Die MCP-Prüfung
-erfolgt vor Tool-Discovery, Admin-Verbindungstests und jeder Ausführung. Ein externer
-Lizenzgenerator mit festem Produktkatalog muss diesen neuen Schlüssel ebenfalls
+erfolgt vor Tool-Discovery, Admin-Verbindungstests und jeder Ausführung. Für Dashboard-Aktionen aus
+dem Chat (Filter, Parameter, Markieren, Bereich) muss sie zusätzlich `actions` enthalten — ohne
+Lizenz kennt das Modell die Aktionssyntax gar nicht, und die Extension verwirft eine dennoch
+auftauchende Aktionsliste zusätzlich clientseitig. Ein externer
+Lizenzgenerator mit festem Produktkatalog muss diese neuen Schlüssel ebenfalls
 kennen; dieser Katalog liegt nicht in diesem Repository.

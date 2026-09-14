@@ -11,12 +11,15 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `memory` | User-Memory: persönliche Fakten personalisieren die Antworten (`GET`/`DELETE /api/memory`) |
 | `savedQueries` | Eigene Abfragen speichern: Antwortfokus und Standardfragen je Dashboard (`/api/memory/prefs`) |
 | `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Site-Freigaben |
+| `actions` | Dashboard-Aktionen aus dem Chat: Filter setzen/zurücksetzen, Parameter ändern, Marks markieren, Bereiche ein-/ausblenden |
 
 Eine Lizenz kann alle oder einzelne davon enthalten (Feld `features`; fehlt es, gilt der volle
 Umfang des Tiers). Ohne passende Lizenz läuft der Kern unverändert weiter — die Extension blendet
 aus, was sie nicht speichern kann, `/api/memory/prefs` antwortet mit `402 license_required`, und der
 Antwortfokus wird serverseitig ignoriert (die Prüfung sitzt im Chat-Endpunkt, nicht in der
-Extension). Lizenzpflichtig ist das **Erzeugen** von Fakten: `GET` und `DELETE /api/memory` bleiben
+Extension). Ohne `actions` weiß das Modell nichts von der Aktionssyntax (System-Prompt-Abschnitt
+entfällt) und die Extension verwirft eine dennoch auftauchende Aktionsliste zusätzlich clientseitig —
+es entstehen weder Vorschlags-Chips noch eine Ausführung. Lizenzpflichtig ist das **Erzeugen** von Fakten: `GET` und `DELETE /api/memory` bleiben
 immer offen, damit Auskunft und Löschung (DSGVO Art. 15/17) nie an einem Lizenzschlüssel hängen —
 läuft eine Lizenz aus, bleiben bereits gespeicherte Fakten im Panel sichtbar und löschbar, es kommen
 nur keine neuen hinzu. Welche Features gerade aktiv sind, sagt `GET /api/features`.

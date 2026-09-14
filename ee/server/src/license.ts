@@ -34,7 +34,7 @@ export const LICENSE_FORMAT_VERSION = 'openvizpilot-license-v1';
 export const DEFAULT_LICENSE_PUBLIC_KEY_B64URL = 'NFitkQQZAptFWMB-YAdHzrMzkO9p76ljOdWrQROUFF4';
 
 /** Enterprise-Feature-Schlüssel — müssen im Lizenzgenerator identisch heißen. */
-export const EE_FEATURES = ['sso', 'memory', 'savedQueries', 'mcp'] as const;
+export const EE_FEATURES = ['sso', 'memory', 'savedQueries', 'mcp', 'actions'] as const;
 export type EeFeature = (typeof EE_FEATURES)[number];
 
 export const EE_FEATURE_LABELS: Record<EeFeature, string> = {
@@ -42,6 +42,7 @@ export const EE_FEATURE_LABELS: Record<EeFeature, string> = {
   memory: 'User-Memory (persönliche Fakten personalisieren die Antworten)',
   savedQueries: 'Eigene Abfragen speichern (Standardfragen und Antwortfokus je Dashboard)',
   mcp: 'MCP-Quellen und Websuche (Site-Freigaben und zentrale Verwaltung)',
+  actions: 'Dashboard-Aktionen aus dem Chat (Filter setzen, Parameter, Markieren, Bereich ein-/ausblenden)',
 };
 
 const isoDate = z.string().refine((s) => !Number.isNaN(Date.parse(s)), 'ISO-8601-Zeitstempel erwartet');

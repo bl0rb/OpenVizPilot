@@ -40,7 +40,7 @@ describe('license verification', () => {
     expect(status.status).toBe('valid');
     expect(hasFeature(status, 'sso')).toBe(true);
     expect(hasFeature(status, 'mcp')).toBe(true);
-    if (status.status === 'valid') expect(status.license.effectiveFeatures).toEqual(['sso', 'memory', 'savedQueries', 'mcp']);
+    if (status.status === 'valid') expect(status.license.effectiveFeatures).toEqual(['sso', 'memory', 'savedQueries', 'mcp', 'actions']);
   });
 
   it('honours an explicit (narrower) feature list', () => {

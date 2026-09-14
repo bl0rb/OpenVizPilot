@@ -21,7 +21,7 @@ OpenVizPilot is a Tableau dashboard extension with a chat UI that answers questi
 For dashboard users
 
 - Ask in plain language: the LLM reads worksheet data, filters, parameters and selections through 8 read-only tools (up to 5 tool rounds per question), including aggregation drilldowns (`aggregate_summary_data`: group by/sum/avg/min/max/count over summary data — no full-data permission required).
-- Action chips: the LLM proposes follow-up questions and dashboard actions — apply or clear filters, change parameters, highlight marks (for example “show me the top 3 regions”) and show or hide a dashboard zone. Actions run only on click, with the technical detail always shown in plain text — human-in-the-loop by design, which also reduces prompt injection risk.
+- Action chips (Enterprise, `actions`): the LLM proposes follow-up questions and dashboard actions — apply or clear filters, change parameters, highlight marks (for example “show me the top 3 regions”) and show or hide a dashboard zone. Actions run only on click, with the technical detail always shown in plain text — human-in-the-loop by design, which also reduces prompt injection risk. Without a license the model is not told the action syntax and never proposes one.
 - It knows what you are looking at: the context lists which views are currently hidden behind a show/hide zone, so the assistant can say “that view is closed — shall I open it?” instead of describing something you cannot see. It also names the real controls of the dashboard when you ask where to change something. Mark highlights are counted too, not just what you click. The chat panel inherits the workbook font and text color so it does not stick out on a dashboard with a corporate theme.
 - Transparency: analysis trace (every tool call is visible and expandable), source references in answers, transcript export as Markdown.
 - Personal context: an author-managed glossary for everyone; with an Enterprise license also user memory (name/preferences, visible and deletable by the user) and saved queries — answer-focus onboarding plus up to 5 standard questions per dashboard.
@@ -60,7 +60,7 @@ Everything below happens inside the open dashboard, in the viewer's own Tableau 
 | `/compare North South` | Groups both sides and returns a comparison table (metric · A · B · difference absolute and in %) plus a short reading of what drives the gap. Typed as a question it answers too, just without the fixed format. |
 | `/top 5 products` | Produces a ranking with each entry's share of the total and a statement on concentration — how much the top entries actually account for. |
 | “Which filters are active right now?” | Lists the filters per worksheet with their selected values, ranges and exclude mode — the answer says what the numbers are currently based on. |
-| “Show only the North region.” | Offers the filter as an action chip for the worksheet in question, spelled out in plain text; it is applied only when the user clicks. Chips set categorical values — date ranges are chosen in the dashboard itself. |
+| “Show only the North region.” | With an Enterprise license (`actions`), offers the filter as an action chip for the worksheet in question, spelled out in plain text; it is applied only when the user clicks. Chips set categorical values — date ranges are chosen in the dashboard itself. |
 | “What have I selected right now?” | Reads the selected marks — and if nothing is selected but something is highlighted (highlighter, legend, highlight action), it uses that and says so. |
 | “Where do I change the region?” | Names the actual control on the dashboard (“Region”, filter control) instead of guessing a field, because the context knows the dashboard's zones. |
 | “What does ‘Order details’ show?” | If Tableau reports that view's zone as hidden, the assistant says so instead of describing something the user cannot see — and offers to show it as a chip. |
@@ -82,7 +82,7 @@ An open question, answered with sources. “What stands out in the data? Name th
 
 ![Example: OpenVizPilot names the three most important findings in a profitability dashboard — profit ratio, weakest category, worst loss ratio — each with figures and its source worksheet](docs/images/three-things.png)
 
-A filter as an action chip. Asked to filter the order date to the last 90 days, the assistant does not touch the dashboard itself — it computes the date range, explains where the filter currently applies and offers the change as a chip. The filter is applied only when the user clicks it; the follow-up chips below continue the analysis on the filtered view:
+A filter as an action chip (Enterprise, `actions`). Asked to filter the order date to the last 90 days, the assistant does not touch the dashboard itself — it computes the date range, explains where the filter currently applies and offers the change as a chip. The filter is applied only when the user clicks it; the follow-up chips below continue the analysis on the filtered view:
 
 ![Example: the assistant proposes a “last 90 days” order-date filter as an action chip, applied only on click](docs/images/image_filter_1.png)
 
@@ -94,10 +94,11 @@ Settings panel. Backend URL (empty = same origin, the recommended production set
 
 ![Example: the extension settings panel](docs/images/image_settings.png)
 
-## User memory and saved queries (Enterprise)
+## User memory, saved queries and dashboard actions (Enterprise)
 
-Both are Enterprise features (`memory` and `savedQueries` in the license) and live in [`ee/`](ee/).
-Without a license the core runs unchanged, only without personalization: nothing is extracted, the answer focus is ignored, `/api/memory/prefs` returns `402 license_required`, and the extension hides what cannot be saved. Reading and deleting already stored facts stays available regardless of the license (`GET`/`DELETE /api/memory`), so the rights of access and erasure never depend on a license key — and the settings panel keeps showing existing facts with their delete button.
+`memory`, `savedQueries` and `actions` are Enterprise features and live in [`ee/`](ee/) (`actions` gates the
+prompt section and client-side rendering in the core; see [`packages/server/src/system-prompt.ts`](packages/server/src/system-prompt.ts)).
+Without a license the core runs unchanged, only without personalization and action chips: nothing is extracted, the answer focus is ignored, `/api/memory/prefs` returns `402 license_required`, the model is never told the action syntax and a chip never appears or executes. Reading and deleting already stored facts stays available regardless of the license (`GET`/`DELETE /api/memory`), so the rights of access and erasure never depend on a license key — and the settings panel keeps showing existing facts with their delete button.
 
 Both need a user identity from Tableau (`uniqueUserId`, Extensions API 1.11), so they require Tableau 2023.2 or newer — on older versions the extension still runs, and the settings panel explains why the personal sections are missing instead of hiding them silently.
 

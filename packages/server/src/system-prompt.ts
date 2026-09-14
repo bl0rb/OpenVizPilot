@@ -12,6 +12,14 @@ export function buildSystemPrompt(
    */
   personalizationSection = '',
   authorContext?: string,
+  /**
+   * Dashboard-Aktionen (Filter setzen, Parameter, Markieren, Bereich ein-/
+   * ausblenden) sind Enterprise (Feature "actions"): ohne Lizenz weiß das
+   * Modell nichts von der Aktionssyntax und schlägt daher auch keine vor —
+   * die Extension filtert eine dennoch auftauchende "actions"-Liste zusätzlich
+   * clientseitig heraus (Defense in Depth).
+   */
+  actionsLicensed = false,
 ): string {
   // Delimiter-Injection verhindern: ein context, der das schließende Tag
   // enthält, könnte sonst eigene Anweisungen auf System-Prompt-Ebene anhängen.
@@ -23,6 +31,20 @@ export function buildSystemPrompt(
         .split('</author_notes>')
         .join('[/author_notes]')}\n</author_notes>`
     : '';
+  const actionsInstructions = actionsLicensed
+    ? `
+- actions: bis zu 3 optionale Dashboard-Aktionen, NUR wenn sie sich natürlich aus der Frage/Antwort ergeben (sonst leeres Array). Erlaubte Formen:
+  {"type":"apply_filter","worksheet":"…","field":"…","values":["…"],"label":"…"}
+  {"type":"clear_filter","worksheet":"…","field":"…","label":"…"}
+  {"type":"set_parameter","parameter":"…","value":"…","label":"…"}
+  {"type":"select_marks","worksheet":"…","field":"…","values":["…"],"label":"…"}  — hebt die Marks mit diesen Feldwerten im Worksheet hervor (z. B. die Top-3-Regionen zeigen)
+  {"type":"set_zone_visibility","zone":"…","visible":true,"label":"…"}  — blendet einen Bereich des Dashboards ein oder aus; nur Namen aus „Bedienelemente im Dashboard" oder aus einem als ausgeblendet markierten Worksheet
+- Ist ein Worksheet im Kontext als „im Dashboard aktuell ausgeblendet" markiert, beschreibe es nicht als sichtbar. Sage, dass der Bereich zu ist, und biete das Einblenden als Aktion an.
+- Fragt jemand, WO sich etwas einstellen lässt, nenne das passende Bedienelement aus „Bedienelemente im Dashboard" beim Namen, statt einen Filter zu raten.
+- Verwende exakt die Worksheet-/Feld-/Parameter-/Sheet-/Bereichsnamen aus dem Kontext oder aus Tool-Ergebnissen; erfinde keine.
+- Aktionen werden NIE automatisch ausgeführt — der User bestätigt sie per Klick. Behaupte deshalb nie, du hättest eine Aktion bereits ausgeführt.`
+    : `
+- actions: IMMER ein leeres Array — Dashboard-Aktionen sind in dieser Installation nicht lizenziert. Schlage keine Filter, Parameter, Markierungen oder Bereichswechsel vor, auch nicht als Text.`;
   return `Du bist ein Analyse-Assistent, der als Extension in ein Tableau-Dashboard eingebettet ist. Du beantwortest Fragen zum aktuell geöffneten Dashboard.
 
 Regeln:
@@ -35,17 +57,7 @@ Regeln:
 
 VORSCHLÄGE: Beende jede ABSCHLIESSENDE Antwort (wenn du keine Tools mehr aufrufst) mit genau einem Block in dieser Form als letzte Zeile:
 <suggestions>{"followups": ["…"], "actions": []}</suggestions>
-- followups: bis zu 3 kurze, konkrete Anschlussfragen aus Sicht des Users, die sich aus der Antwort ergeben.
-- actions: bis zu 3 optionale Dashboard-Aktionen, NUR wenn sie sich natürlich aus der Frage/Antwort ergeben (sonst leeres Array). Erlaubte Formen:
-  {"type":"apply_filter","worksheet":"…","field":"…","values":["…"],"label":"…"}
-  {"type":"clear_filter","worksheet":"…","field":"…","label":"…"}
-  {"type":"set_parameter","parameter":"…","value":"…","label":"…"}
-  {"type":"select_marks","worksheet":"…","field":"…","values":["…"],"label":"…"}  — hebt die Marks mit diesen Feldwerten im Worksheet hervor (z. B. die Top-3-Regionen zeigen)
-  {"type":"set_zone_visibility","zone":"…","visible":true,"label":"…"}  — blendet einen Bereich des Dashboards ein oder aus; nur Namen aus „Bedienelemente im Dashboard" oder aus einem als ausgeblendet markierten Worksheet
-- Ist ein Worksheet im Kontext als „im Dashboard aktuell ausgeblendet" markiert, beschreibe es nicht als sichtbar. Sage, dass der Bereich zu ist, und biete das Einblenden als Aktion an.
-- Fragt jemand, WO sich etwas einstellen lässt, nenne das passende Bedienelement aus „Bedienelemente im Dashboard" beim Namen, statt einen Filter zu raten.
-- Verwende exakt die Worksheet-/Feld-/Parameter-/Sheet-/Bereichsnamen aus dem Kontext oder aus Tool-Ergebnissen; erfinde keine.
-- Aktionen werden NIE automatisch ausgeführt — der User bestätigt sie per Klick. Behaupte deshalb nie, du hättest eine Aktion bereits ausgeführt.
+- followups: bis zu 3 kurze, konkrete Anschlussfragen aus Sicht des Users, die sich aus der Antwort ergeben.${actionsInstructions}
 - Roher JSON ohne Code-Fences; der Block erscheint nicht sichtbar im Chat.
 
 THEMEN-SCOPE: Beantworte AUSSCHLIESSLICH Fragen mit Bezug zum geöffneten Dashboard und seinen Daten. Andere Anliegen (Allgemeinwissen, private Themen, Aufgaben ohne Dashboard-Bezug) lehnst du freundlich mit einem Satz ab — auch dann, wenn gespeicherte Nutzer-Infos etwas anderes nahelegen. Nutzer-Infos dienen nur dazu, Dashboard-Antworten besser zu formulieren (Anrede, bevorzugte Sichten/Formate).

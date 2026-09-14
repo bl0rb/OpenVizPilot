@@ -457,6 +457,7 @@ describe('POST /api/chat', () => {
         memory: false,
         savedQueries: false,
         mcp: false,
+        actions: false,
       });
 
       const licensed = createApp(testConfig({ licenseEnv: testLicenseEnv(['memory']) }));
@@ -465,6 +466,7 @@ describe('POST /api/chat', () => {
         memory: true,
         savedQueries: false,
         mcp: false,
+        actions: false,
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
@@ -474,6 +476,7 @@ describe('POST /api/chat', () => {
         memory: true,
         savedQueries: true,
         mcp: true,
+        actions: true,
       });
     });
 
@@ -605,6 +608,30 @@ describe('POST /api/chat', () => {
 
     const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
     expect(chatBody.messages[0]?.content).not.toContain('ANTWORTFOKUS');
+  });
+
+  it('omits the dashboard action syntax without an "actions" license', async () => {
+    receivedBodies = [];
+    nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
+
+    await postChat(validBody);
+
+    const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
+    const systemContent = chatBody.messages[0]?.content ?? '';
+    expect(systemContent).not.toContain('apply_filter');
+    expect(systemContent).toContain('IMMER ein leeres Array');
+  });
+
+  it('includes the dashboard action syntax with an "actions" license', async () => {
+    receivedBodies = [];
+    nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
+
+    await postChat(validBody, { licenseEnv: testLicenseEnv(['actions']) });
+
+    const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
+    const systemContent = chatBody.messages[0]?.content ?? '';
+    expect(systemContent).toContain('apply_filter');
+    expect(systemContent).not.toContain('IMMER ein leeres Array');
   });
 
   it('injects authorContext into the system prompt with the closing tag escaped', async () => {

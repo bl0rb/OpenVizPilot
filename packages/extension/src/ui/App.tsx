@@ -439,7 +439,13 @@ export function App(props: { dashboard: Dashboard }) {
             onRoundStart: () => dispatch({ type: 'round-start' }),
             onAssistantDelta: (text) => dispatch({ type: 'delta', text }),
             onAssistantFinal: (text) => dispatch({ type: 'finalize', text }),
-            onSuggestions: (suggestions) => dispatch({ type: 'suggestions', suggestions }),
+            onSuggestions: (suggestions) => dispatch({
+              type: 'suggestions',
+              // Dashboard-Aktionen sind Enterprise ("actions"): ohne Lizenz
+              // wird eine dennoch aufgetauchte Liste hart verworfen, statt nur
+              // den Button auszublenden — siehe runDashboardAction unten.
+              suggestions: features.actions ? suggestions : { ...suggestions, actions: [] },
+            }),
             onToolRun: (info) =>
               dispatch({
                 type: 'tool',
@@ -465,7 +471,7 @@ export function App(props: { dashboard: Dashboard }) {
         )
         .finally(() => setBusy(false));
     },
-    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, getContext, dashboard, logout],
+    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, getContext, dashboard, logout, features.actions],
   );
 
   const send = useCallback(
@@ -497,6 +503,13 @@ export function App(props: { dashboard: Dashboard }) {
   const runDashboardAction = useCallback(
     (action: DashboardAction) => {
       if (busy) return;
+      // Zweite Sperre neben dem Filtern in onSuggestions: Dashboard-Aktionen
+      // sind Enterprise ("actions") — ohne Lizenz nie ausführen, selbst wenn
+      // irgendwo doch ein Action-Chip gerendert würde.
+      if (!features.actions) {
+        dispatch({ type: 'notice', text: t('app.chat.actionsUnlicensed') });
+        return;
+      }
       // Die gleich folgende Markierung stammt von uns, nicht vom Nutzer.
       if (action.type === 'select_marks') ownSelectionRef.current = true;
       void executeDashboardAction(action, dashboard)
@@ -511,7 +524,7 @@ export function App(props: { dashboard: Dashboard }) {
           }),
         );
     },
-    [busy, dashboard, baseUrl, apiToken],
+    [busy, dashboard, baseUrl, apiToken, features.actions],
   );
 
   // Vorschlagsfragen für den leeren Zustand — client-seitig, ohne LLM-Call.

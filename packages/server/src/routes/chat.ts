@@ -253,6 +253,10 @@ export function createChatRoute(
           }
 
           const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
+          // Dashboard-Aktionen (Filter, Parameter, Markieren, Bereich) sind
+          // Enterprise (Feature "actions") — ohne Lizenz kennt das Modell die
+          // Aktionssyntax gar nicht (siehe system-prompt.ts).
+          const actionsLicensed = await hasEeFeature('actions');
           const completion = await client.chat.completions.create(
             {
               model,
@@ -265,6 +269,7 @@ export function createChatRoute(
                     // beide Eingaben leer und der Abschnitt entfällt komplett.
                     personalizationPromptSection({ facts: memoryFacts, answerFocus }),
                     req.authorContext,
+                    actionsLicensed,
                   ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : ''),
                 },
                 ...req.messages,

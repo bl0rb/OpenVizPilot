@@ -16,6 +16,11 @@ import {
   type PersonalizationStore,
   type McpService,
   MCP_PROMPT_SECTION,
+  type TableauService,
+  TABLEAU_SEARCH_TOOL,
+  TABLEAU_PROMPT_SECTION,
+  TABLEAU_METADATA_TOOLS,
+  TABLEAU_METADATA_PROMPT_SECTION,
 } from '@openvizpilot/ee/server';
 import type { MemoryStore } from '../memory/store';
 import { buildSystemPrompt } from '../system-prompt';
@@ -92,6 +97,7 @@ export function createChatRoute(
   /** Lizenzprüfung: das User-Memory ist eine Enterprise-Funktion (ee/personalization.ts). */
   hasEeFeature: (feature: EeFeature) => Promise<boolean>,
   mcp: McpService | null = null,
+  tableau: TableauService | null = null,
 ): Hono<AuthVariables> {
   const app = new Hono<AuthVariables>();
 
@@ -120,7 +126,16 @@ export function createChatRoute(
       // OIDC-Modus: die vom IdP verifizierte Nutzer-ID ersetzt die
       // client-asserted Tableau-ID (Memory, Präferenzen, Statistik).
       const authUser = c.get('authUser');
+      const oidcUser = c.get('oidcUser');
       const req = authUser ? { ...parsedReq, userId: authUser } : parsedReq;
+      let tableauServerEnabled = false;
+      if (tableau && c.get('userAccess')?.tableauApi) {
+        try {
+          tableauServerEnabled = await tableau.available(oidcUser);
+        } catch {
+          tableauServerEnabled = false;
+        }
+      }
 
       // Modellwahl über den Admin-Katalog (Admin-UI → „Modelle") — Regeln
       // und Fail-Closed-Verhalten in resolveModel() oben.
@@ -200,6 +215,7 @@ export function createChatRoute(
               messages: req.messages,
               question: scopeQuestion,
               signal: abortSignal,
+              tableauServerEnabled,
             });
             if (abortSignal.aborted) return;
             if (verdict === 'out_of_scope') {
@@ -253,6 +269,7 @@ export function createChatRoute(
           }
 
           const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
+          const tableauTools = tableauServerEnabled ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS] : [];
           // Dashboard-Aktionen (Filter, Parameter, Markieren, Bereich) sind
           // Enterprise (Feature "actions") — ohne Lizenz kennt das Modell die
           // Aktionssyntax gar nicht (siehe system-prompt.ts).
@@ -270,7 +287,8 @@ export function createChatRoute(
                     personalizationPromptSection({ facts: memoryFacts, answerFocus }),
                     req.authorContext,
                     actionsLicensed,
-                  ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : ''),
+                  ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : '')
+                    + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION : ''),
                 },
                 ...req.messages,
               ],
@@ -279,7 +297,7 @@ export function createChatRoute(
               // Tools werden IMMER mitgesendet (auch bei toolChoice "none"):
               // die Historie kann tool-Messages enthalten, die manche Provider
               // ohne Tool-Definitionen ablehnen. "none" verbietet nur neue Calls.
-              tools: [...toolDefinitions, ...externalTools],
+              tools: [...toolDefinitions, ...tableauTools, ...externalTools],
               tool_choice: req.toolChoice === 'none' ? 'none' : 'auto',
             },
             { signal: abortSignal },

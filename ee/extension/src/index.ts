@@ -18,6 +18,7 @@ export { MemoryFactsPanel } from './MemoryFactsPanel';
 export { SavedQueriesPanel } from './SavedQueriesPanel';
 export { loadPrefs, savePrefs } from './prefs-client';
 export { executeMcpTool } from './mcp-client';
+export { executeTableauTool } from './tableau-client';
 export {
   addStandardQuestion,
   dashboardPrefsSchema,

@@ -95,6 +95,19 @@ describe('local user login (open core)', () => {
 
     const auth = { authorization: `Bearer ${session.token}` };
     expect((await app.request('/api/commands', { headers: auth })).status).toBe(200);
+    expect((await app.request('/api/models', { headers: auth })).status).toBe(403);
+    const accessList = await (await app.request('/api/admin/user-access', { headers: admin })).json() as { users: Array<{ id: string; ai: boolean; tableauApi: boolean }> };
+    expect(accessList.users[0]).toMatchObject({ ai: false, tableauApi: false });
+    expect((await app.request('/api/admin/user-access', { headers: auth })).status).toBe(401);
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ ai: true, tableauApi: true }),
+    })).status).toBe(401);
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false, role: 'admin' }),
+    })).status).toBe(400);
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false }),
+    })).status).toBe(200);
     // Nutzer-ID kommt aus der Sitzung, nicht aus dem Header.
     const put = await app.request('/api/memory/prefs', {
       method: 'PUT',
@@ -104,6 +117,13 @@ describe('local user login (open core)', () => {
     expect(put.status).toBe(200);
     const read = await app.request('/api/memory/prefs', { headers: { ...auth, 'x-tableau-user': 'anna', 'x-dashboard-key': 'D' } });
     expect(((await read.json()) as { prefs: { focus: string } | null }).prefs?.focus).toBe('Kurzfassung');
+    expect((await app.request('/api/tableau-server/metadata/search', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: '{}' })).status).toBe(403);
+    await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: admin, body: JSON.stringify({ ai: false, tableauApi: false }),
+    });
+    expect((await app.request('/api/memory/prefs', { headers: auth })).status).toBe(403);
+    const pending = await (await app.request('/api/session', { headers: auth })).json();
+    expect(pending).toMatchObject({ user: 'anna', access: { ai: false, tableauApi: false } });
 
     // Logout beendet die Sitzung serverseitig.
     expect((await app.request('/api/auth/logout', { method: 'POST', headers: auth })).status).toBe(200);

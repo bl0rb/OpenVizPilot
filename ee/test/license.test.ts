@@ -40,7 +40,7 @@ describe('license verification', () => {
     expect(status.status).toBe('valid');
     expect(hasFeature(status, 'sso')).toBe(true);
     expect(hasFeature(status, 'mcp')).toBe(true);
-    if (status.status === 'valid') expect(status.license.effectiveFeatures).toEqual(['sso', 'memory', 'savedQueries', 'mcp', 'actions']);
+    if (status.status === 'valid') expect(status.license.effectiveFeatures).toEqual(['sso', 'memory', 'savedQueries', 'mcp', 'actions', 'tableauServer']);
   });
 
   it('honours an explicit (narrower) feature list', () => {
@@ -59,6 +59,21 @@ describe('license verification', () => {
     const mcpOnly = verifyLicense(token(k.privateKey, { features: ['mcp'] }), k.publicKey, new Date('2026-09-02'));
     expect(hasFeature(mcpOnly, 'mcp')).toBe(true);
     expect(hasFeature(mcpOnly, 'sso')).toBe(false);
+  });
+
+  it('accepts an explicit tableauServer feature license', () => {
+    const k = keys();
+    const status = verifyLicense(token(k.privateKey, { features: ['tableauServer'] }), k.publicKey, new Date('2026-09-02'));
+    expect(status.status).toBe('valid');
+    expect(hasFeature(status, 'tableauServer')).toBe(true);
+    expect(hasFeature(status, 'sso')).toBe(false);
+  });
+
+  it('keeps legacy licenses without a feature list on the expanded tier default', () => {
+    const k = keys();
+    const status = verifyLicense(token(k.privateKey), k.publicKey, new Date('2026-09-02'));
+    expect(status.status).toBe('valid');
+    expect(hasFeature(status, 'tableauServer')).toBe(true);
   });
 
   it('rejects a token signed with another key, a tampered payload and garbage', () => {

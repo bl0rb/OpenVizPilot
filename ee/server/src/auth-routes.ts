@@ -1,7 +1,7 @@
 import type { AuthConfigResponse } from '@openvizpilot/shared';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
-import { OidcClient, OidcError, PROVIDER_LABELS } from './oidc';
+import { OidcClient, OidcError, PROVIDER_LABELS, type VerifiedUser } from './oidc';
 
 /**
  * OIDC-Bausteine für die Auth-Routen der Middleware (Enterprise):
@@ -17,7 +17,7 @@ import { OidcClient, OidcError, PROVIDER_LABELS } from './oidc';
  */
 
 export interface AuthVariables {
-  Variables: { authUser?: string };
+  Variables: { authUser?: string; oidcUser?: VerifiedUser; userAccess?: { ai: boolean; tableauApi: boolean } };
 }
 
 export type AuthLog = (level: 'info' | 'warn' | 'error', msg: string, data?: Record<string, unknown>) => void;
@@ -65,6 +65,7 @@ export async function handleOidcExchange(
   publicUrl: string | null,
   requestUrl: string,
   log: AuthLog,
+  onAuthenticated?: (user: VerifiedUser) => Promise<void>,
 ): Promise<{ status: 200 | 400 | 401 | 503; body: Record<string, unknown> }> {
   const parsed = exchangeSchema.safeParse(rawBody);
   if (!parsed.success) return { status: 400, body: { error: 'Ungültiger Request' } };
@@ -80,6 +81,7 @@ export async function handleOidcExchange(
       codeVerifier: parsed.data.codeVerifier,
       redirectUri: expected,
     });
+    await onAuthenticated?.(user);
     log('info', 'oidc login', { provider: oidc.settings.provider });
     return { status: 200, body: { token: idToken, expiresAt: user.expiresAt, user: { name: user.name, email: user.email } } };
   } catch (err) {
@@ -151,6 +153,7 @@ export function requireOidcUser(oidc: OidcClient, log: AuthLog): MiddlewareHandl
     try {
       const user = await oidc.verifyIdToken(token);
       c.set('authUser', user.sub);
+      c.set('oidcUser', user);
     } catch (err) {
       const kind = err instanceof OidcError ? err.kind : 'config';
       if (kind === 'config') {

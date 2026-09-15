@@ -162,6 +162,13 @@ describe('OIDC auth flow', () => {
     // Mit dem ID-Token sind die Routen offen …
     const auth = { authorization: `Bearer ${session.token}` };
     expect((await app.request('/api/commands', { headers: auth })).status).toBe(200);
+    expect((await app.request('/api/models', { headers: auth })).status).toBe(403);
+    const admin = { authorization: 'Bearer geheim', 'content-type': 'application/json' };
+    const accessList = await (await app.request('/api/admin/user-access', { headers: admin })).json() as { users: Array<{ id: string }> };
+    expect(accessList.users).toHaveLength(1);
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false }),
+    })).status).toBe(200);
 
     // … und die Nutzer-ID kommt aus dem Token, nicht aus dem client-asserted Header.
     const memAsOther = await app.request('/api/memory/prefs', {

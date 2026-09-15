@@ -25,6 +25,8 @@ import {
   type TelemetryStore,
   createMcpAdminRoute,
   type McpStore,
+  createTableauAdminRoute,
+  type TableauService,
 } from '@openvizpilot/ee/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
@@ -153,6 +155,7 @@ export function createAdminRoute(
   /** Zustand des Lizenz-Heartbeats (ee/) — nur für die Anzeige. */
   telemetryStore: TelemetryStore | null = null,
   mcpStore: McpStore | null = null,
+  tableau: TableauService | null = null,
 ): Hono {
   const app = new Hono();
   const tokenMode = Boolean(config.adminToken);
@@ -320,6 +323,7 @@ export function createAdminRoute(
     listDashboards: () => memoryStore!.listDashboards(),
     listUsers: () => memoryStore!.listUsers(),
   }, logger, async (feature) => hasFeature((await authState.get()).license, feature)));
+  app.route('/tableau-server', createTableauAdminRoute(tableau, logger));
 
   /**
    * Manifest-Download für Tableau: liefert das .trex mit der angegebenen
@@ -580,6 +584,31 @@ export function createAdminRoute(
     await memoryStore.setAuthSettings(null);
     authState.invalidate();
     return c.json(await describeAuth());
+  });
+
+  app.get('/user-access', async (c) => {
+    if (!memoryStore) return c.json({ users: [], storeAvailable: false });
+    try {
+      return c.json({ users: await memoryStore.listUserAccess(), storeAvailable: true });
+    } catch {
+      return c.json({ error: 'Freigaben nicht lesbar' }, 503);
+    }
+  });
+
+  app.put('/user-access/:id', zValidator('json', z.object({ ai: z.boolean(), tableauApi: z.boolean() }).strict(), (result, c) => {
+    if (!result.success) return c.json({ error: 'Ungültige Freigaben' }, 400);
+  }), async (c) => {
+    if (!memoryStore) return c.json({ error: 'Freigaben benötigen einen Memory-Store' }, 503);
+    const id = c.req.param('id');
+    if (!/^[a-f0-9]{64}$/.test(id)) return c.json({ error: 'Ungültige Benutzer-ID' }, 400);
+    try {
+      const grants = c.req.valid('json');
+      if (!await memoryStore.setUserAccess(id, grants)) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
+      logger.info('user access updated', { id, ...grants });
+      return c.json({ ok: true });
+    } catch {
+      return c.json({ error: 'Freigaben konnten nicht gespeichert werden' }, 503);
+    }
   });
 
   // ---- Benutzerkonten (Open Core, Modus 'local') ----

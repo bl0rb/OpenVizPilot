@@ -8,6 +8,20 @@ import type { AuthConfigResponse, AuthSession } from '@openvizpilot/shared';
 
 const SESSION_KEY = 'openvizpilot.session';
 
+export interface UserAccess { ai: boolean; tableauApi: boolean }
+
+export async function fetchUserAccess(baseUrl: string, token: string, signal?: AbortSignal): Promise<UserAccess> {
+  const res = await fetch(`${baseUrl}/api/session`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}, signal, cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Freigabestatus nicht verfügbar (HTTP ${res.status}).`);
+  const body = await res.json();
+  if (typeof body?.access?.ai !== 'boolean' || typeof body?.access?.tableauApi !== 'boolean') {
+    throw new Error('Freigabestatus nicht verfügbar.');
+  }
+  return { ai: body.access.ai, tableauApi: body.access.tableauApi };
+}
+
 export async function fetchAuthConfig(baseUrl: string): Promise<AuthConfigResponse> {
   try {
     const res = await fetch(`${baseUrl}/api/auth/config`);

@@ -11,6 +11,14 @@ import { createLogger } from '../src/logger';
 import { aggregateDashboardUsage, MIN_USER_COHORT } from '../src/routes/admin';
 import { generateUsageSalt, pseudonymizeUser, USAGE_PSEUDONYM_CHARS } from '../src/usage-pseudonym';
 
+// Diese Legacy-Downstream-Tests nehmen einen bereits genehmigten AI-Zugriff an.
+vi.mock('../src/user-access', () => ({
+  requireUserAccess: () => async (c: any, next: () => Promise<void>) => {
+    c.set('userAccess', { ai: true, tableauApi: false });
+    await next();
+  },
+}));
+
 /**
  * Dashboard-Nutzung pro Anwender OHNE Namen: Pseudonyme, Store, Zählung in
  * der Chat-Route und Aggregation für die Admin-UI.

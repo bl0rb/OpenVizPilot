@@ -11,7 +11,7 @@ import {
 import { Pool } from 'pg';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import type { LocalUser, LocalUserAuth, MemoryStore } from './store';
+import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessIdentity } from './store';
 
 /**
  * Postgres-Backend der Middleware-Datenbank — Produktionspfad auf EKS:
@@ -36,6 +36,30 @@ export interface PgPoolLike {
 }
 
 type PgClient = Awaited<ReturnType<PgPoolLike['connect']>>;
+
+type UserAccessRow = {
+  id: string;
+  provider: UserAccess['provider'];
+  issuer: string;
+  subject: string;
+  display_name: string;
+  email: string;
+  ai: boolean;
+  tableau_api: boolean;
+};
+
+function toUserAccess(row: UserAccessRow): UserAccess {
+  return {
+    id: row.id,
+    provider: row.provider,
+    issuer: row.issuer,
+    subject: row.subject,
+    displayName: row.display_name,
+    email: row.email,
+    ai: Boolean(row.ai),
+    tableauApi: Boolean(row.tableau_api),
+  };
+}
 
 const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS admin_slash_commands (
@@ -99,6 +123,17 @@ const SCHEMA_SQL = `
     disabled BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+  CREATE TABLE IF NOT EXISTS user_access (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    issuer TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    ai BOOLEAN NOT NULL DEFAULT false,
+    tableau_api BOOLEAN NOT NULL DEFAULT false,
+    UNIQUE (provider, issuer, subject)
+  );
   CREATE TABLE IF NOT EXISTS user_sessions (
     token_hash TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -135,7 +170,17 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
   const ensureSchema = (): Promise<void> => {
     ready ??= pool
       .query(SCHEMA_SQL)
-      .then(() => undefined)
+      .then(async () => {
+        const result = await pool.query('SELECT username, display_name FROM users');
+        for (const row of result.rows as Array<{ username: string; display_name: string }>) {
+          const identity: UserAccessIdentity = { provider: 'local', issuer: '', subject: row.username, displayName: row.display_name, email: '' };
+          await pool.query(
+            `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name`,
+            [userAccessId(identity), identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email],
+          );
+        }
+      })
       .catch((err: unknown) => {
         ready = null;
         logger.error('memory schema init failed', {
@@ -445,11 +490,33 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
 
     async createUser(username: string, displayName: string, passwordHash: string): Promise<boolean> {
       await ensureSchema();
-      const result = await pool.query(
-        'INSERT INTO users (username, display_name, password_hash) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',
-        [username, displayName, passwordHash],
-      );
-      return (result.rowCount ?? 0) === 1;
+      const identity: UserAccessIdentity = { provider: 'local', issuer: '', subject: username, displayName, email: '' };
+      const id = userAccessId(identity);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await client.query(
+          `WITH inserted_user AS (
+             INSERT INTO users (username, display_name, password_hash)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (username) DO NOTHING
+             RETURNING username
+           )
+           INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+           SELECT $4, $5, $6, $1, $2, $7
+           FROM inserted_user
+           ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email, ai = FALSE, tableau_api = FALSE
+           RETURNING id`,
+          [username, displayName, passwordHash, id, identity.provider, identity.issuer, identity.email],
+        );
+        await client.query('COMMIT');
+        return (result.rowCount ?? 0) === 1;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async setUserPassword(username: string, passwordHash: string): Promise<boolean> {
@@ -466,8 +533,58 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
 
     async deleteUser(username: string): Promise<boolean> {
       await ensureSchema();
-      await pool.query('DELETE FROM user_sessions WHERE username = $1', [username]);
-      const result = await pool.query('DELETE FROM users WHERE username = $1', [username]);
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM user_sessions WHERE username = $1', [username]);
+        const result = await client.query(
+          `WITH deleted_user AS (
+             DELETE FROM users WHERE username = $1 RETURNING username
+           ), deleted_access AS (
+             DELETE FROM user_access
+             WHERE id = $2 AND EXISTS (SELECT 1 FROM deleted_user)
+           )
+           SELECT username FROM deleted_user`,
+          [username, userAccessId({ provider: 'local', issuer: '', subject: username })],
+        );
+        await client.query('COMMIT');
+        return (result.rowCount ?? 0) === 1;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async ensureUserAccess(identity: UserAccessIdentity): Promise<UserAccess> {
+      await ensureSchema();
+      const id = userAccessId(identity);
+      await pool.query(
+        `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email`,
+        [id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email],
+      );
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = $1', [id]);
+      return toUserAccess(result.rows[0] as UserAccessRow);
+    },
+
+    async getUserAccess(id: string): Promise<UserAccess | null> {
+      await ensureSchema();
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = $1', [id]);
+      return result.rows[0] ? toUserAccess(result.rows[0] as UserAccessRow) : null;
+    },
+
+    async listUserAccess(): Promise<UserAccess[]> {
+      await ensureSchema();
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access ORDER BY id');
+      return (result.rows as UserAccessRow[]).map(toUserAccess);
+    },
+
+    async setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean> {
+      await ensureSchema();
+      const result = await pool.query('UPDATE user_access SET ai = $1, tableau_api = $2 WHERE id = $3', [grants.ai, grants.tableauApi, id]);
       return (result.rowCount ?? 0) === 1;
     },
 

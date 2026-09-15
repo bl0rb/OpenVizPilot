@@ -3,13 +3,21 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { modelCatalogSchema } from '@openvizpilot/shared';
 import { effectiveDefaultModel, resolveModel } from '../src/routes/chat';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
 import { createSqliteMemoryStore, openSqliteDatabase } from '../src/memory/sqlite-store';
 import { createLogger } from '../src/logger';
+
+// Diese Legacy-Downstream-Tests nehmen einen bereits genehmigten AI-Zugriff an.
+vi.mock('../src/user-access', () => ({
+  requireUserAccess: () => async (c: any, next: () => Promise<void>) => {
+    c.set('userAccess', { ai: true, tableauApi: false });
+    await next();
+  },
+}));
 
 /**
  * Admin-verwalteter Modell-Katalog: GET /api/models, Chat-Validierung und die

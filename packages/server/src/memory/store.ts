@@ -1,4 +1,5 @@
 import type { AuthSettings, DashboardRegistration, RegisteredDashboard, DashboardPlaybook, ModelOption, SlashCommand } from '@openvizpilot/shared';
+import { createHash } from 'node:crypto';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
 import {
@@ -11,6 +12,9 @@ import {
   type PersonalizationStore,
   type TelemetryStore,
   type McpStore,
+  createPgTableauStore,
+  createSqliteTableauStore,
+  type TableauStore,
 } from '@openvizpilot/ee/server';
 import { createPgMemoryStore, openPgPool } from './pg-store';
 import { createSqliteMemoryStore, openSqliteDatabase } from './sqlite-store';
@@ -53,6 +57,24 @@ export interface LocalUserAuth extends LocalUser {
   failedCount: number;
   lastFailedAt: number | null;
   lockedUntil: number | null;
+}
+
+export interface UserAccessIdentity {
+  provider: 'local' | 'oidc';
+  issuer: string;
+  subject: string;
+  displayName: string;
+  email: string;
+}
+
+export interface UserAccess extends UserAccessIdentity {
+  id: string;
+  ai: boolean;
+  tableauApi: boolean;
+}
+
+export function userAccessId(identity: Pick<UserAccessIdentity, 'provider' | 'issuer' | 'subject'>): string {
+  return createHash('sha256').update(JSON.stringify([identity.provider, identity.issuer, identity.subject])).digest('hex');
 }
 
 export interface MemoryStore {
@@ -150,6 +172,10 @@ export interface MemoryStore {
   getUserSession(tokenHash: string, nowMs: number): Promise<string | null>;
   deleteUserSession(tokenHash: string): Promise<void>;
   deleteUserSessions(username: string): Promise<void>;
+  ensureUserAccess(identity: UserAccessIdentity): Promise<UserAccess>;
+  getUserAccess(id: string): Promise<UserAccess | null>;
+  listUserAccess(): Promise<UserAccess[]>;
+  setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean>;
   // --- Admin-Einstellungen: Anmeldung/OIDC/Lizenz (überschreiben Env) ---
   getAuthSettings(): Promise<AuthSettings | null>;
   setAuthSettings(settings: AuthSettings | null): Promise<void>;
@@ -162,6 +188,7 @@ export interface MemoryStore {
 }
 
 export interface MemoryBackend {
+  tableau: TableauStore;
   mcp: McpStore;
   /** Kern-Store: Admin, Anmeldung, Befehle, Playbooks, Modelle, Statistik. */
   store: MemoryStore;
@@ -190,6 +217,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     return {
       store,
       mcp: createPgMcpStore(pool),
+      tableau: createPgTableauStore(pool),
       personalization: createPgPersonalizationStore(pool, logger),
       telemetry: createPgTelemetryStore(pool, logger),
       close: () => store.close(),
@@ -201,6 +229,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
     return {
       store,
       mcp: createSqliteMcpStore(db),
+      tableau: createSqliteTableauStore(db),
       personalization: createSqlitePersonalizationStore(db),
       telemetry: createSqliteTelemetryStore(db),
       close: () => store.close(),

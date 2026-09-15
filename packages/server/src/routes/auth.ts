@@ -1,4 +1,4 @@
-import { handleOidcExchange, oidcConfigResponse, type AuthLog, type AuthVariables } from '@openvizpilot/ee/server';
+import { handleOidcExchange, oidcConfigResponse, type AuthLog, type AuthVariables, type TableauService } from '@openvizpilot/ee/server';
 import { localLoginSchema, type AuthConfigResponse } from '@openvizpilot/shared';
 import { Hono, type MiddlewareHandler } from 'hono';
 import {
@@ -46,8 +46,8 @@ export function requireLocalUser(store: MemoryStore): MiddlewareHandler<AuthVari
   };
 }
 
-export function createAuthRoutes(deps: { authState: AuthStateProvider; store: MemoryStore | null; logger: Logger }): Hono<AuthVariables> {
-  const { authState, store, logger } = deps;
+export function createAuthRoutes(deps: { authState: AuthStateProvider; store: MemoryStore | null; logger: Logger; tableau?: TableauService | null }): Hono<AuthVariables> {
+  const { authState, store, logger, tableau } = deps;
   const log: AuthLog = (level, msg, data) => logger[level](msg, data);
   const app = new Hono<AuthVariables>();
   // Konstantzeit-Verhalten für unbekannte Konten: immer einen Hash prüfen.
@@ -100,6 +100,13 @@ export function createAuthRoutes(deps: { authState: AuthStateProvider; store: Me
 
   app.post('/logout', async (c) => {
     const token = bearerOf(c.req.header('authorization'));
+    if (token && tableau) {
+      const state = await authState.get();
+      if (state.mode === 'oidc' && state.oidc) {
+        try { await tableau.logout(await state.oidc.verifyIdToken(token)); }
+        catch { logger.warn('tableau logout unavailable'); }
+      }
+    }
     if (token && store) await store.deleteUserSession(hashSessionToken(token));
     return c.json({ ok: true });
   });
@@ -108,7 +115,10 @@ export function createAuthRoutes(deps: { authState: AuthStateProvider; store: Me
     const state = await authState.get();
     if (state.mode !== 'oidc') return c.json({ error: 'Single Sign-On ist nicht aktiv' }, 404);
     if (state.blockedReason || !state.oidc) return c.json({ error: state.blockedReason ?? 'Single Sign-On nicht verfügbar' }, 503);
-    const result = await handleOidcExchange(state.oidc, await c.req.json().catch(() => null), state.publicUrl, c.req.url, log);
+    if (!store) return c.json({ error: 'Benutzerfreigaben benötigen einen Memory-Store' }, 503);
+    const result = await handleOidcExchange(state.oidc, await c.req.json().catch(() => null), state.publicUrl, c.req.url, log, async user => {
+      await store.ensureUserAccess({ provider: 'oidc', issuer: user.issuer, subject: user.sub, displayName: user.name ?? '', email: user.email ?? '' });
+    });
     return c.json(result.body, result.status);
   });
 

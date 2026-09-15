@@ -29,13 +29,13 @@ import { getTableau, type Dashboard } from '../tableau/api';
 import { buildContextSnapshot } from '../tableau/context-snapshot';
 import { describeContextChange, registerContextInvalidation } from '../tableau/events';
 import { executeToolCall } from '../tools/registry';
-import { executeMcpTool } from '@openvizpilot/ee/extension';
+import { executeMcpTool, executeTableauTool } from '@openvizpilot/ee/extension';
 import { Composer } from './Composer';
 import { summarizeToolArgs, type ChatItem } from './items';
 import { MessageList } from './MessageList';
 import { SettingsPanel } from './SettingsPanel';
 import type { AuthConfigResponse, AuthSession } from '@openvizpilot/shared';
-import { clearSession, fetchAuthConfig, isAuthRequiredError, loadSession, logoutRemote, saveSession, validateSession } from '../chat/auth-session';
+import { clearSession, fetchAuthConfig, fetchUserAccess, isAuthRequiredError, loadSession, logoutRemote, saveSession, type UserAccess } from '../chat/auth-session';
 import { fetchFeatures, NO_EE_FEATURES, type EeFeatures } from '../chat/features-client';
 import { LoginGate } from './LoginGate';
 
@@ -234,9 +234,13 @@ export function App(props: { dashboard: Dashboard }) {
   const needsLogin = (authConfig?.mode === 'oidc' || authConfig?.mode === 'local') && !authSession;
   // Freigeschaltete Enterprise-Funktionen (User-Memory, eigene Abfragen).
   const [features, setFeatures] = useState<EeFeatures>(NO_EE_FEATURES);
+  const [accessState, setAccessState] = useState<{ key: string; value?: UserAccess; error?: string } | null>(null);
+  const [accessReload, setAccessReload] = useState(0);
+  const accessKey = JSON.stringify([baseUrl, apiToken]);
+  const access = accessState?.key === accessKey ? accessState.value : undefined;
   // Daten erst laden, wenn die Anmeldung geklärt ist — sonst 401-Rauschen mit
   // veralteten Tokens, bevor das Gate überhaupt sichtbar ist.
-  const authReady = authConfig !== null && !needsLogin;
+  const authReady = authConfig !== null && !needsLogin && access?.ai === true;
 
   useEffect(() => {
     if (!authReady) return;
@@ -247,7 +251,7 @@ export function App(props: { dashboard: Dashboard }) {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, apiToken, authReady]);
+  }, [baseUrl, apiToken, authReady, access?.tableauApi]);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,20 +290,34 @@ export function App(props: { dashboard: Dashboard }) {
     };
   }, [baseUrl, onLoggedIn]);
 
-  // Gespeicherte Sitzung beim Start gegen die Middleware prüfen (401 → Login-Gate).
+  // The same authenticated endpoint reports session validity and current grants.
   useEffect(() => {
-    if (!authConfig || !authSession) return;
-    if (authConfig.mode !== 'local' && authConfig.mode !== 'oidc') return;
+    if (!authConfig || needsLogin) return;
     let cancelled = false;
-    void validateSession(baseUrl, authSession.token).then((valid) => {
-      if (!cancelled && !valid) logout();
-    });
+    const controller = new AbortController();
+    const refresh = async () => {
+      try {
+        const value = await fetchUserAccess(baseUrl, apiToken, controller.signal);
+        if (cancelled) return;
+        setAccessState({ key: accessKey, value });
+        if (!value.ai) { session.stop(); setFeatures(NO_EE_FEATURES); }
+      } catch (error) {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : 'Freigabestatus nicht verfügbar.';
+        setAccessState({ key: accessKey, error: message });
+        session.stop();
+        setFeatures(NO_EE_FEATURES);
+        if (isAuthRequiredError(message)) logout();
+      }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 30_000);
     return () => {
       cancelled = true;
+      controller.abort();
+      clearInterval(timer);
     };
-    // Nur beim Laden der Auth-Konfiguration bzw. Wechsel der Sitzung prüfen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authConfig, authSession?.token, baseUrl]);
+  }, [authConfig, needsLogin, accessKey, accessReload, logout, session]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -418,6 +436,7 @@ export function App(props: { dashboard: Dashboard }) {
 
   const runTurn = useCallback(
     (userText: string | null) => {
+      if (!authReady) return;
       setBusy(true);
       void session
         .runTurn(
@@ -431,9 +450,11 @@ export function App(props: { dashboard: Dashboard }) {
             answerFocus,
             dashboardKey: dashboardKey || undefined,
             getContext,
-            executeTool: (call, approval, signal) => call.function.name.startsWith('mcp__')
-              ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
-              : executeToolCall(call, dashboard),
+            executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field'].includes(call.function.name)
+              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined })
+              : call.function.name.startsWith('mcp__')
+                ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
+                : executeToolCall(call, dashboard),
           },
           {
             onRoundStart: () => dispatch({ type: 'round-start' }),
@@ -459,6 +480,7 @@ export function App(props: { dashboard: Dashboard }) {
             onError: (text, retryable) => {
               // Abgelaufene/ungültige SSO-Sitzung: zurück zum Login statt Retry-Schleife.
               if (isAuthRequiredError(text)) logout();
+              if (/HTTP 403/.test(text)) setAccessReload(value => value + 1);
               dispatch({ type: 'error', text, retryable });
             },
             onDone: (data) => {
@@ -471,7 +493,7 @@ export function App(props: { dashboard: Dashboard }) {
         )
         .finally(() => setBusy(false));
     },
-    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, getContext, dashboard, logout, features.actions],
+    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, getContext, dashboard, logout, features.actions, authReady],
   );
 
   const send = useCallback(
@@ -715,6 +737,18 @@ export function App(props: { dashboard: Dashboard }) {
       ) : needsLogin && authConfig ? (
         // Einstellungen bleiben auch vor der Anmeldung erreichbar (z. B. falsche Backend-URL).
         <LoginGate baseUrl={baseUrl} config={loginError ? { ...authConfig, error: loginError } : authConfig} onLoggedIn={onLoggedIn} />
+      ) : !authReady ? (
+        <section class="login-panel" aria-live="polite">
+          <h2>{access ? 'Freigabe ausstehend' : 'Freigabestatus'}</h2>
+          {access ? (
+            <>
+              <p>KI-Chat: {access.ai ? 'Freigegeben' : 'Nicht freigegeben'}</p>
+              <p>Tableau-API: {access.tableauApi ? 'Freigegeben' : 'Nicht freigegeben'}</p>
+              <p class="memory-hint">{authSession ? 'Die Freigabe erfolgt durch einen Administrator.' : 'Eine persönliche Anmeldung per SSO oder Benutzerkonto ist erforderlich.'}</p>
+            </>
+          ) : <p>{accessState?.key === accessKey && accessState.error ? accessState.error : 'Wird geprüft …'}</p>}
+          <button type="button" onClick={() => setAccessReload(value => value + 1)}>Status aktualisieren</button>
+        </section>
       ) : (
         <>
           <MessageList

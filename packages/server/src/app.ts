@@ -12,8 +12,11 @@ import {
   type EeFeature,
   McpService,
   createMcpRoute,
+  TableauService,
+  createTableauRoute,
 } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
+import { createHash } from 'node:crypto';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { adminPageHtml } from './admin-page';
@@ -30,6 +33,7 @@ import { createDashboardsRoute } from './routes/dashboards';
 import { createHealthRoute } from './routes/health';
 import { createModelsRoute } from './routes/models';
 import { createStatsRoute } from './routes/stats';
+import { requireUserAccess } from './user-access';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
@@ -74,6 +78,15 @@ export function createApp(config: AppConfig): {
       return !state.blockedReason && (state.mode === 'local' || state.mode === 'oidc') ? `${state.mode}:${user}` : null;
     },
   }, logger) : null;
+  const tableau = backend ? new TableauService(backend.tableau, async () => {
+    const state = await authState.get();
+    return {
+      licensed: hasFeature(state.license, 'tableauServer') && hasFeature(state.license, 'sso'),
+      oidcReady: state.mode === 'oidc' && Boolean(state.oidc) && !state.blockedReason,
+      issuer: state.oidcSettings?.issuer ?? null,
+      identityRevision: createHash('sha256').update(JSON.stringify([state.mode, state.oidcSettings])).digest('hex'),
+    };
+  }, logger, () => backend.store.getUsageSalt()) : null;
 
   /**
    * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft.
@@ -185,13 +198,14 @@ export function createApp(config: AppConfig): {
     }
   });
 
-  app.route('/api/auth', createAuthRoutes({ authState, store: memoryStore, logger }));
+  app.use('/api/*', requireUserAccess(memoryStore, logger));
+  app.route('/api/auth', createAuthRoutes({ authState, store: memoryStore, logger, tableau }));
   app.route('/auth/callback', createAuthCallbackRoute());
 
   // Sitzungs-Check der Extension beim Start: läuft durch den Guard oben, liefert
   // also 401, wenn das gespeicherte Token (nach Moduswechsel, Ablauf, Sperre)
   // nicht mehr gilt — die Extension zeigt dann sofort das Login-Gate.
-  app.get('/api/session', (c) => c.json({ user: c.get('authUser') ?? null }));
+  app.get('/api/session', (c) => c.json({ user: c.get('authUser') ?? null, access: c.get('userAccess') }));
 
   // Welche Enterprise-Funktionen die Lizenz gerade freischaltet — die Extension
   // blendet danach Memory- und Abfragen-Bereiche ein oder aus, statt sie
@@ -199,14 +213,16 @@ export function createApp(config: AppConfig): {
   app.get('/api/features', async (c) => {
     const { license } = await authState.get();
     return c.json({
-      features: Object.fromEntries(EE_FEATURES.map((feature) => [feature, hasFeature(license, feature)])),
+      features: Object.fromEntries(EE_FEATURES.map((feature) => [feature, hasFeature(license, feature)
+        && (feature === 'tableauServer' ? Boolean(c.get('userAccess')?.tableauApi) : Boolean(c.get('userAccess')?.ai))])),
     });
   });
 
   app.route('/healthz', createHealthRoute());
   app.route('/api/models', createModelsRoute(config, logger, client, memoryStore));
-  app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature, mcp));
+  app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature, mcp, tableau));
   app.route('/api/mcp', createMcpRoute(mcp, logger, licensedFeature));
+  app.route('/api/tableau-server', createTableauRoute(tableau));
   // Personalisierung (User-Memory, eigene Abfragen) liegt in ee/ und ist
   // lizenzpflichtig — der Pfad bleibt /api/memory, damit ältere Extensions
   // weiter funktionieren.
@@ -214,7 +230,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/commands', createCommandsRoute(memoryStore, logger));
   app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau));
 
   // Admin-UI: erreichbar mit statischem ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert
@@ -227,5 +243,5 @@ export function createApp(config: AppConfig): {
     app.use('*', serveStatic({ root: config.serveStaticDir }));
   }
 
-  return { app, logger, memoryStore, authState, stopHeartbeat };
+  return { app, logger, memoryStore, authState, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); } };
 }

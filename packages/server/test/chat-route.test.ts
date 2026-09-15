@@ -11,6 +11,14 @@ import { createSqlitePersonalizationStore } from '@openvizpilot/ee/server';
 import { createSqliteMemoryStore, openSqliteDatabase } from '../src/memory/sqlite-store';
 import { createLogger } from '../src/logger';
 
+// Diese Legacy-Downstream-Tests nehmen einen bereits genehmigten AI-Zugriff an.
+vi.mock('../src/user-access', () => ({
+  requireUserAccess: () => async (c: any, next: () => Promise<void>) => {
+    c.set('userAccess', { ai: true, tableauApi: false });
+    await next();
+  },
+}));
+
 /**
  * Integrationstest: POST /api/chat Ende-zu-Ende gegen einen OpenAI-kompatiblen
  * Fixture-Server, der aufgezeichnete SSE-Antworten abspielt — CI-fähig ohne
@@ -458,6 +466,7 @@ describe('POST /api/chat', () => {
         savedQueries: false,
         mcp: false,
         actions: false,
+        tableauServer: false,
       });
 
       const licensed = createApp(testConfig({ licenseEnv: testLicenseEnv(['memory']) }));
@@ -467,6 +476,7 @@ describe('POST /api/chat', () => {
         savedQueries: false,
         mcp: false,
         actions: false,
+        tableauServer: false,
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
@@ -477,6 +487,7 @@ describe('POST /api/chat', () => {
         savedQueries: true,
         mcp: true,
         actions: true,
+        tableauServer: false, // The AI-only fixture has no separate Tableau API grant.
       });
     });
 

@@ -12,6 +12,7 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `savedQueries` | Eigene Abfragen speichern: Antwortfokus und Standardfragen je Dashboard (`/api/memory/prefs`) |
 | `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Site-Freigaben |
 | `actions` | Dashboard-Aktionen aus dem Chat: Filter setzen/zurücksetzen, Parameter ändern, Marks markieren, Bereiche ein-/ausblenden |
+| `tableauServer` | Tableau-Server-Konfiguration und persönlicher Connected-App-Sign-in; benötigt OIDC und `sso`. Suche/Metadaten folgen in weiteren Phasen. |
 
 Eine Lizenz kann alle oder einzelne davon enthalten (Feld `features`; fehlt es, gilt der volle
 Umfang des Tiers). Ohne passende Lizenz läuft der Kern unverändert weiter — die Extension blendet
@@ -25,6 +26,13 @@ läuft eine Lizenz aus, bleiben bereits gespeicherte Fakten im Panel sichtbar un
 nur keine neuen hinzu. Welche Features gerade aktiv sind, sagt `GET /api/features`.
 
 ## Warum SSO?
+
+Die **Tableau Server Integration** mit Feature-Schlüssel `tableauServer` ist für Tableau Server
+ab **2025.3 einschließlich** vorgesehen. Phase 1 stellt Konfiguration und persönlichen Sign-in
+bereit; Live-Abnahme und Content-Funktionen stehen noch aus. Sie setzt OIDC mit `sso` und eine
+Connected App voraus. `/api/features` zeigt die Lizenzfreigabe; die Integration bleibt bis zur
+Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md),
+[Roadmap](tableau-server-integration.md) und [Threat Model](tableau-server-phase-0.md).
 
 MCP wird unter **MCP & Sites (Enterprise)** in der Admin-UI eingerichtet. Es benötigt
 persönliche Anmeldung, explizite Site-Mitgliedschaften und eine eigene `mcp`-Freigabe.

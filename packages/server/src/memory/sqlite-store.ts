@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import type { LocalUser, LocalUserAuth, MemoryStore } from './store';
+import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessIdentity } from './store';
 
 /**
  * SQLite-Backend über das Node-Builtin `node:sqlite` — für die lokale
@@ -116,6 +116,17 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       disabled INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS user_access (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      issuer TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      display_name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      ai INTEGER NOT NULL DEFAULT 0,
+      tableau_api INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (provider, issuer, subject)
+    );
     CREATE TABLE IF NOT EXISTS user_sessions (
       token_hash TEXT PRIMARY KEY,
       username TEXT NOT NULL,
@@ -128,6 +139,14 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  const localUsers = db.prepare('SELECT username, display_name FROM users').all() as Array<{ username: string; display_name: string }>;
+  for (const user of localUsers) {
+    const identity: UserAccessIdentity = { provider: 'local', issuer: '', subject: user.username, displayName: user.display_name, email: '' };
+    db.prepare(
+      `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name`
+    ).run(userAccessId(identity), identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
+  }
   logger.debug('sqlite memory store geöffnet');
 
   return {
@@ -382,10 +401,24 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
     },
 
     async createUser(username: string, displayName: string, passwordHash: string): Promise<boolean> {
+      db.exec('BEGIN IMMEDIATE');
+      try {
       const result = db
         .prepare('INSERT INTO users (username, display_name, password_hash) VALUES (?, ?, ?) ON CONFLICT(username) DO NOTHING')
         .run(username, displayName, passwordHash);
-      return Number(result.changes) === 1;
+      if (Number(result.changes) !== 1) { db.exec('COMMIT'); return false; }
+      const identity: UserAccessIdentity = { provider: 'local', issuer: '', subject: username, displayName, email: '' };
+      db.prepare(
+        `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email, ai = 0, tableau_api = 0`
+      ).run(userAccessId(identity), identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
+      db.exec('COMMIT');
+      return true;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
     },
 
     async setUserPassword(username: string, passwordHash: string): Promise<boolean> {
@@ -397,8 +430,48 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
     },
 
     async deleteUser(username: string): Promise<boolean> {
+      db.exec('BEGIN IMMEDIATE');
+      try {
       db.prepare('DELETE FROM user_sessions WHERE username = ?').run(username);
-      return Number(db.prepare('DELETE FROM users WHERE username = ?').run(username).changes) === 1;
+      const result = db.prepare('DELETE FROM users WHERE username = ?').run(username);
+      if (Number(result.changes) === 1) {
+        db.prepare('DELETE FROM user_access WHERE id = ?').run(userAccessId({ provider: 'local', issuer: '', subject: username }));
+        db.exec('COMMIT');
+        return true;
+      }
+      db.exec('COMMIT');
+      return false;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+
+    async ensureUserAccess(identity: UserAccessIdentity): Promise<UserAccess> {
+      const id = userAccessId(identity);
+      db.prepare(
+        `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email`
+      ).run(id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const row = rows[0]!;
+      return { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 };
+    },
+
+    async getUserAccess(id: string): Promise<UserAccess | null> {
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const row = rows[0];
+      return row ? { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 } : null;
+    },
+
+    async listUserAccess(): Promise<UserAccess[]> {
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access ORDER BY id').all() as Array<Record<string, string | number>>;
+      return rows.map((row) => ({ id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 }));
+    },
+
+    async setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean> {
+      return Number(db.prepare('UPDATE user_access SET ai = ?, tableau_api = ? WHERE id = ?').run(grants.ai ? 1 : 0, grants.tableauApi ? 1 : 0, id).changes) === 1;
     },
 
     async registerFailedUserLogin(username: string, nowMs: number, windowMs: number): Promise<number> {

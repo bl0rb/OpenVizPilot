@@ -141,6 +141,7 @@ const FEATURE_MESSAGES: Record<EeFeature, string> = {
   savedQueries: 'Gespeicherte eigene Abfragen sind eine Enterprise-Funktion — dafür wird eine gültige Lizenz benötigt.',
   mcp: 'MCP-Quellen sind eine Enterprise-Funktion — dafür wird eine gültige Lizenz benötigt.',
   actions: 'Dashboard-Aktionen aus dem Chat sind eine Enterprise-Funktion — dafür wird eine gültige Lizenz benötigt.',
+  tableauServer: 'Der Tableau-Server-Connector ist eine Enterprise-Funktion — dafür wird eine gültige Lizenz benötigt.',
 };
 
 /** 402: bezahlpflichtige Funktion — bewusst nicht 403 (die Berechtigung ist in Ordnung). */

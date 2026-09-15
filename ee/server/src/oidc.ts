@@ -38,6 +38,10 @@ export interface Discovery {
 export interface VerifiedUser {
   /** Stabiler Subject-Identifier des IdP — die vertrauenswürdige Nutzer-ID. */
   sub: string;
+  /** Exakter Issuer des verifizierten, signierten ID-Tokens. */
+  issuer: string;
+  /** Vollständige, serverseitig verifizierte Claims — nie Teil der Browser-Antwort. */
+  claims: Readonly<Record<string, unknown>>;
   email?: string;
   name?: string;
   /** Ablauf des Tokens (Epoch-Millisekunden). */
@@ -218,6 +222,8 @@ export class OidcClient {
 
     return {
       sub: payload.sub,
+      issuer: payload.iss,
+      claims: Object.freeze({ ...payload }),
       email: typeof payload.email === 'string' ? payload.email : typeof payload.preferred_username === 'string' ? payload.preferred_username : undefined,
       name: typeof payload.name === 'string' ? payload.name : undefined,
       expiresAt: exp * 1000,

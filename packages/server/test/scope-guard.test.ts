@@ -165,3 +165,30 @@ describe('SCOPE_REFUSAL_MESSAGE', () => {
     expect(SCOPE_REFUSAL_MESSAGE).not.toContain('<suggestions>');
   });
 });
+
+describe('Tableau Server scope extension', () => {
+  it('adds discovery scope only when enabled', async () => {
+    let enabledPrompt = '';
+    await checkScope({
+      client: fakeClient((body) => {
+        enabledPrompt = String((body.messages as Array<{ content: unknown }>)[0]!.content);
+        return 'JA';
+      }),
+      model: 'm', context: '', messages: userTurn, question: 'Suche eine Arbeitsmappe', tableauServerEnabled: true,
+    });
+    expect(enabledPrompt).toContain('unabhängig vom aktuell geöffneten Dashboard');
+    expect(enabledPrompt).toContain('einschließlich anderer Projekte');
+    expect(enabledPrompt).toContain('tableau_metadata_search');
+    expect(enabledPrompt).toContain('tableau_metadata_field');
+
+    let disabledPrompt = '';
+    await checkScope({
+      client: fakeClient((body) => {
+        disabledPrompt = String((body.messages as Array<{ content: unknown }>)[0]!.content);
+        return 'JA';
+      }),
+      model: 'm', context: '', messages: userTurn, question: 'Suche eine Arbeitsmappe', tableauServerEnabled: false,
+    });
+    expect(disabledPrompt).not.toContain('Zusatzregel bei aktivierter Tableau-Server-Suche');
+  });
+});

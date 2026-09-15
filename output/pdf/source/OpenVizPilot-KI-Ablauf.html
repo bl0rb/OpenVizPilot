@@ -1,0 +1,45 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenVizPilot: ein Chat, zwei Fragen, zwei Wege</title><style>body{margin:0;padding:32px;background:#fff;color:#18212f;font-family:Arial,sans-serif}main{max-width:1100px;margin:auto}h1{font-size:28px;letter-spacing:0}svg{width:100%;height:auto}p{color:#526071}</style>
+<main><h1>OpenVizPilot: ein Chat, zwei Fragen, zwei Wege</h1><p>Fragen und Antworten bleiben im selben Chatfenster im Dashboard. Persönliche Anmeldung und separate Admin-Freigaben für KI und Tableau-API.</p>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 345" role="img" aria-labelledby="ovp-flow-title ovp-flow-desc">
+<title id="ovp-flow-title">Ein gemeinsamer Chat mit zwei Datenwegen</title>
+<desc id="ovp-flow-desc">Im selben OpenVizPilot-Chat führen Fragen zum Dashboard über die Extensions API und Fragen zu Felddefinitionen über die Tableau Server APIs zum KI-Modell. Die Antwort mit Quellen kehrt in dasselbe Chatfenster zurück.</desc>
+<defs><marker id="ovp-flow-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#526071"/></marker></defs>
+<text x="0" y="20" font-size="17" font-weight="700" fill="#2563EB">CHAT</text>
+<text x="245" y="20" font-size="17" font-weight="700" fill="#2563EB">BEISPIELFRAGEN</text>
+<text x="540" y="20" font-size="17" font-weight="700" fill="#2563EB">DATENWEGE</text>
+<text x="850" y="20" font-size="17" font-weight="700" fill="#2563EB">KI-VERARBEITUNG</text>
+<rect x="0" y="110" width="190" height="115" rx="4" fill="#EFF5FF" stroke="#2563EB"/>
+<text x="14" y="148" font-size="20" font-weight="700" fill="#18212F">OpenVizPilot</text>
+<text x="14" y="176" font-size="17" font-weight="400" fill="#18212F">Chat im Dashboard</text>
+<text x="14" y="207" font-size="15" font-weight="400" fill="#526071">Ein Fenster für beides</text>
+<rect x="245" y="35" width="255" height="80" rx="4" fill="#FFFFFF" stroke="#D8E1EE"/>
+<text x="259" y="69" font-size="20" font-weight="700" fill="#18212F">„Was fällt im</text>
+<text x="259" y="97" font-size="20" font-weight="700" fill="#18212F">Dashboard auf?“</text>
+<rect x="540" y="35" width="270" height="80" rx="4" fill="#FFFFFF" stroke="#D8E1EE"/>
+<text x="554" y="69" font-size="20" font-weight="700" fill="#18212F">Dashboarddaten</text>
+<text x="554" y="96" font-size="15" font-weight="400" fill="#526071">Extensions API · Nutzersitzung</text>
+<text x="540" y="139" font-size="15" font-weight="700" fill="#2563EB">CORE + ENTERPRISE</text>
+<text x="245" y="138" font-size="14" font-weight="400" fill="#526071">KI-Freigabe</text>
+<path d="M500 75L540 75" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<path d="M810 75L850 75" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<rect x="245" y="200" width="255" height="80" rx="4" fill="#FFFFFF" stroke="#D8E1EE"/>
+<text x="259" y="234" font-size="20" font-weight="700" fill="#18212F">„Wie ist die</text>
+<text x="259" y="262" font-size="20" font-weight="700" fill="#18212F">Marge definiert?“</text>
+<rect x="540" y="200" width="270" height="80" rx="4" fill="#FFFFFF" stroke="#D8E1EE"/>
+<text x="554" y="234" font-size="20" font-weight="700" fill="#18212F">Tableau Server APIs</text>
+<text x="554" y="261" font-size="15" font-weight="400" fill="#526071">REST + Metadata · OIDC-Nutzer</text>
+<text x="540" y="304" font-size="15" font-weight="700" fill="#2563EB">ENTERPRISE</text>
+<text x="245" y="303" font-size="14" font-weight="400" fill="#526071">KI- und API-Freigabe + Tableau-Rechte</text>
+<path d="M500 240L540 240" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<path d="M810 240L850 240" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<rect x="850" y="35" width="250" height="245" rx="4" fill="#EFF5FF" stroke="#2563EB"/>
+<text x="867" y="150" font-size="20" font-weight="700" fill="#18212F">OpenVizPilot + KI</text>
+<text x="867" y="181" font-size="17" font-weight="400" fill="#526071">Konfiguriertes Modell</text>
+<text x="867" y="207" font-size="17" font-weight="400" fill="#526071">analysiert und erklärt</text>
+<path d="M190 165L220 165" fill="none" stroke="#526071" stroke-width="2"/>
+<path d="M220 75L220 240" fill="none" stroke="#526071" stroke-width="2"/>
+<path d="M220 75L245 75" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<path d="M220 240L245 240" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<path d="M975 280L975 334L95 334L95 225" fill="none" stroke="#526071" stroke-width="2" marker-end="url(#ovp-flow-arrow)"/>
+<text x="283" y="327" font-size="17" font-weight="700" fill="#18212F">Antwort mit Quellen zurück in dasselbe Chatfenster</text></svg><p>Vereinfacht: Die KI veranlasst gezielte Tool-Abfragen. Benötigter Datenkontext und Metadaten werden an den konfigurierten KI-Anbieter übertragen. Tableau-Rechte und Lizenzen bleiben zusätzlich erforderlich.</p></main></html>

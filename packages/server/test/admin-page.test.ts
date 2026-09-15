@@ -47,8 +47,8 @@ describe('admin presentation', () => {
 
   it('keeps every navigation destination unique and available in the mobile selector', () => {
     const targets = [...adminPageHtml.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
-    expect(targets).toHaveLength(8);
-    expect(new Set(targets).size).toBe(8);
+    expect(targets).toHaveLength(9);
+    expect(new Set(targets).size).toBe(9);
     for (const target of targets) {
       expect(adminPageHtml.split(`id="${target}"`)).toHaveLength(2);
       expect(adminPageHtml).toContain(`value="${target}"`);
@@ -90,5 +90,19 @@ describe('admin page inline script', () => {
     for (const id of ['commands-body', 'playbook-commands-body', 'models-body', 'trex-url', 'dashboard-stats-body', 'stats-grid']) {
       expect(adminPageHtml, id).toContain(`id="${id}"`);
     }
+  });
+
+  it('renders separate local and SSO access controls with explicit grants', () => {
+    expect(adminPageHtml).toContain('id="user-access-table"');
+    expect(adminPageHtml).toContain('id="user-access-refresh"');
+    expect(adminPageHtml).toContain("adminFetch('/user-access')");
+    expect(adminPageHtml).toContain("adminFetch('/user-access/' + encodeURIComponent(u.id)");
+    expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked }");
+    expect(adminPageHtml).toContain("'SSO · ' + (u.issuer || 'Issuer unbekannt') + ' · subject: '");
+    expect(adminPageHtml).toContain("'Lokal · ' + (u.subject || u.id)");
+    expect(adminPageHtml).toContain("status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend'");
+    expect(adminPageHtml).toContain('name.textContent = u.displayName || u.email || u.subject || u.id;');
+    expect(adminPageHtml).toContain('email.textContent = u.email || \'—\';');
+    expect(adminPageHtml).toContain('return loadUsers().then(loadUserAccess)');
   });
 });

@@ -8,8 +8,8 @@
  * jedem Request als "Authorization: Bearer <token>" an /api/admin/* gesendet
  * — nie in der URL (siehe Datenschutz-Regel: keine Secrets in URLs/Logs).
  */
-import { mcpAdminScript, mcpAdminSection, mcpAdminStyles } from '@openvizpilot/ee/server';
-import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
+import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles } from '@openvizpilot/ee/server';
+import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
 import { adminFont } from './admin-font';
 
 const adminLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -121,6 +121,14 @@ export const adminPageHtml = `<!doctype html>
   #models-table { min-width: 520px; }
   #users-table { min-width: 520px; }
   #users-table .col-del { width: 144px; white-space: nowrap; }
+  #user-access-table { min-width: 760px; }
+  #user-access-table .col-access { width: 110px; text-align: center; }
+  #user-access-table .col-save { width: 90px; white-space: nowrap; }
+  .user-access-table-wrapper { max-width: 100%; overflow-x: auto; }
+  .user-access-identity { min-width: 180px; }
+  .user-access-identity small { display: block; color: var(--text-muted); overflow-wrap: anywhere; }
+  .user-access-checkbox { display: flex; justify-content: center; min-width: 44px; }
+  .user-access-checkbox input { width: 18px; height: 18px; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; flex-shrink: 0; }
   #users-table .icon-button + .icon-button { margin-left: 4px; }
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
@@ -142,6 +150,7 @@ export const adminPageHtml = `<!doctype html>
   #gate .row { justify-content: center; margin-top: 0.75rem; }
   #app { display: none; }
   ${mcpAdminStyles}
+  ${tableauAdminStyles}
   [hidden] { display: none !important; }
   .ui-icon { flex: 0 0 18px; vertical-align: middle; }
   .masthead { height: 72px; padding: 0 2rem; background: var(--graphite); color: #e7e9f2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -259,6 +268,7 @@ export const adminPageHtml = `<!doctype html>
       <nav aria-label="Administration">
         <p class="nav-group">Arbeitsbereich</p>
         <a href="#mcp-admin" aria-current="page">${adminIcon(Network)}MCP &amp; Sites <span class="nav-ee">EE</span></a>
+        <a href="#tableau-server-admin">${adminIcon(Network)}Tableau Server <span class="nav-ee">EE</span></a>
         <a href="#commands-admin">${adminIcon(Terminal)}Slash-Befehle</a>
         <a href="#playbooks-admin">${adminIcon(LayoutDashboard)}Dashboard-Analysen</a>
         <a href="#models-admin">${adminIcon(Settings)}Modelle</a>
@@ -270,7 +280,7 @@ export const adminPageHtml = `<!doctype html>
         <a href="#usage-admin">${adminIcon(ChartNoAxesCombined)}Nutzung</a>
       </nav>
       <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
-        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="models-admin">Modelle</option></optgroup>
+        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="tableau-server-admin">Tableau Server</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="models-admin">Modelle</option></optgroup>
         <optgroup label="Zugriff"><option value="auth-admin">Anmeldung &amp; Lizenz</option><option value="users-admin">Benutzerkonten</option></optgroup>
         <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option></optgroup>
       </select>
@@ -280,6 +290,7 @@ export const adminPageHtml = `<!doctype html>
       <header class="workspace-heading"><p id="view-group">Arbeitsbereich</p><h1 id="view-title" tabindex="-1">MCP &amp; Sites</h1></header>
 
     ${mcpAdminSection}
+    ${tableauAdminSection}
 
     <section class="card" id="commands-admin" hidden>
       <h2>Slash-Befehle</h2>
@@ -411,6 +422,21 @@ export const adminPageHtml = `<!doctype html>
       </div>
       </fieldset>
       </form>
+
+      <fieldset class="form-section" id="user-access-section">
+        <legend>Benutzerzugriff</legend>
+        <p class="hint">Lokale und SSO-Identitäten werden getrennt geführt. Neue SSO-Identitäten erscheinen nach dem Aktualisieren.</p>
+        <p id="user-access-banner" class="banner" role="status"></p>
+        <div class="form-actions">
+          <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
+        </div>
+        <div class="user-access-table-wrapper">
+          <table id="user-access-table">
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access">AI-Chat</th><th class="col-access">Tableau API</th><th class="col-save"></th></tr></thead>
+            <tbody id="user-access-body"></tbody>
+          </table>
+        </div>
+      </fieldset>
     </section>
 
     <section class="card" id="playbooks-admin" hidden>
@@ -565,7 +591,7 @@ export const adminPageHtml = `<!doctype html>
   var gate = document.getElementById('gate');
   var app = document.getElementById('app');
   var gateError = document.getElementById('gate-error');
-  var actionIcons = { remove: ${JSON.stringify(adminIcon(Trash2))}, password: ${JSON.stringify(adminIcon(KeyRound))}, lock: ${JSON.stringify(adminIcon(LockKeyhole))}, unlock: ${JSON.stringify(adminIcon(LockKeyholeOpen))} };
+  var actionIcons = { remove: ${JSON.stringify(adminIcon(Trash2))}, password: ${JSON.stringify(adminIcon(KeyRound))}, lock: ${JSON.stringify(adminIcon(LockKeyhole))}, unlock: ${JSON.stringify(adminIcon(LockKeyholeOpen))}, refresh: ${JSON.stringify(adminIcon(RefreshCw))}, save: ${JSON.stringify(adminIcon(Save))} };
 
   function setActionIcon(button, icon, label) {
     button.innerHTML = actionIcons[icon];
@@ -637,7 +663,19 @@ export const adminPageHtml = `<!doctype html>
     gate.style.display = 'none';
     app.style.display = 'block';
     selectAdminView(false);
+    loadAll();
+  }
+
+  function loadAll() {
     loadMcp();
+    loadTableauServer(false);
+    loadAuth();
+    loadUsers();
+    loadUserAccess();
+    loadCommands();
+    loadPlaybooks();
+    loadModels();
+    loadStats();
   }
 
   function selectAdminView(focus) {
@@ -676,6 +714,7 @@ export const adminPageHtml = `<!doctype html>
   }
 
   ${mcpAdminScript}
+  ${tableauAdminScript}
 
   // ---------- Slash-Befehle ----------
 
@@ -947,6 +986,97 @@ export const adminPageHtml = `<!doctype html>
 
   var usersBody = document.getElementById('users-body');
   var usersBanner = document.getElementById('users-banner');
+  var userAccessBody = document.getElementById('user-access-body');
+  var userAccessBanner = document.getElementById('user-access-banner');
+
+  function renderUserAccess(users) {
+    userAccessBody.innerHTML = '';
+    if (users.length === 0) {
+      var empty = document.createElement('tr');
+      var emptyCell = document.createElement('td');
+      emptyCell.colSpan = 6;
+      emptyCell.className = 'hint';
+      emptyCell.textContent = 'Keine Identitäten gefunden.';
+      empty.appendChild(emptyCell);
+      userAccessBody.appendChild(empty);
+      return;
+    }
+    users.forEach(function (u) {
+      var tr = document.createElement('tr');
+      var identity = document.createElement('td');
+      identity.className = 'user-access-identity';
+      var name = document.createElement('div');
+      name.textContent = u.displayName || u.email || u.subject || u.id;
+      identity.appendChild(name);
+      var details = document.createElement('small');
+      details.textContent = u.provider === 'oidc'
+        ? 'SSO · ' + (u.issuer || 'Issuer unbekannt') + ' · subject: ' + (u.subject || 'unbekannt')
+        : 'Lokal · ' + (u.subject || u.id);
+      identity.appendChild(details);
+      var email = document.createElement('td');
+      email.textContent = u.email || '—';
+      var status = document.createElement('td');
+      var ai = document.createElement('td');
+      ai.className = 'col-access';
+      var aiLabel = document.createElement('label');
+      aiLabel.className = 'user-access-checkbox';
+      var aiInput = document.createElement('input');
+      aiInput.type = 'checkbox';
+      aiInput.checked = u.ai === true;
+      aiInput.setAttribute('aria-label', 'AI-Chat für ' + (u.displayName || u.email || u.id));
+      aiLabel.appendChild(aiInput);
+      ai.appendChild(aiLabel);
+      var tableau = document.createElement('td');
+      tableau.className = 'col-access';
+      var tableauLabel = document.createElement('label');
+      tableauLabel.className = 'user-access-checkbox';
+      var tableauInput = document.createElement('input');
+      tableauInput.type = 'checkbox';
+      tableauInput.checked = u.tableauApi === true;
+      tableauInput.setAttribute('aria-label', 'Tableau API für ' + (u.displayName || u.email || u.id));
+      tableauLabel.appendChild(tableauInput);
+      tableau.appendChild(tableauLabel);
+      status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
+      var actions = document.createElement('td');
+      actions.className = 'col-save';
+      var save = document.createElement('button');
+      save.type = 'button';
+      setActionIcon(save, 'save', 'Zugriff speichern');
+      save.addEventListener('click', function () {
+        save.disabled = true;
+        aiInput.disabled = true;
+        tableauInput.disabled = true;
+        adminFetch('/user-access/' + encodeURIComponent(u.id), jsonRequest('PUT', { ai: aiInput.checked, tableauApi: tableauInput.checked }))
+          .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+          .then(function (result) {
+            if (!result.ok) throw new Error(errorText(result.data, 'Zugriff konnte nicht gespeichert werden.'));
+            showBanner(userAccessBanner, 'Zugriff gespeichert.', 'ok');
+            status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
+          })
+          .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriff konnte nicht gespeichert werden.', 'error'); })
+          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; });
+      });
+      actions.appendChild(save);
+      tr.appendChild(identity);
+      tr.appendChild(email);
+      tr.appendChild(status);
+      tr.appendChild(ai);
+      tr.appendChild(tableau);
+      tr.appendChild(actions);
+      userAccessBody.appendChild(tr);
+    });
+  }
+
+  function loadUserAccess() {
+    return adminFetch('/user-access')
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) throw new Error(errorText(result.data, 'Zugriffe konnten nicht geladen werden.'));
+        renderUserAccess(result.data.users || []);
+        if (result.data.storeAvailable === false) showBanner(userAccessBanner, 'Benutzerzugriff benötigt einen Memory-Store.', 'error');
+      })
+      .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriffe konnten nicht geladen werden.', 'error'); });
+  }
 
   function userAction(path, options, okText) {
     return adminFetch(path, options)
@@ -957,7 +1087,7 @@ export const adminPageHtml = `<!doctype html>
           return false;
         }
         showBanner(usersBanner, okText, 'ok');
-        return loadUsers().then(function () { return true; });
+        return loadUsers().then(loadUserAccess).then(function () { return true; });
       })
       .catch(function () { showBanner(usersBanner, 'Aktion fehlgeschlagen', 'error'); });
   }
@@ -1026,6 +1156,12 @@ export const adminPageHtml = `<!doctype html>
       .then(function (data) { renderUsers(data.users || []); })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
+
+  document.getElementById('user-access-refresh').addEventListener('click', function () {
+    var button = document.getElementById('user-access-refresh');
+    button.disabled = true;
+    loadUserAccess().finally(function () { button.disabled = false; });
+  });
 
   var passwordDialog = document.getElementById('user-password-dialog');
   var passwordForm = document.getElementById('user-password-form');
@@ -1141,7 +1277,7 @@ export const adminPageHtml = `<!doctype html>
   }
 
   window.addEventListener('beforeunload', function (event) {
-    if (mcpDirty || playbookIsDirty()) { event.preventDefault(); event.returnValue = ''; }
+    if (mcpDirty || tableauServerDirty || playbookIsDirty()) { event.preventDefault(); event.returnValue = ''; }
   });
 
   function dashboardLabel(key) {
@@ -1546,12 +1682,6 @@ export const adminPageHtml = `<!doctype html>
     ['setup-password', 'setup-confirm', 'login-password', 'token-input'].forEach(function (id) { document.getElementById(id).value = ''; });
     showBanner(gateError, '', 'error');
     showApp();
-    loadAuth();
-    loadUsers();
-    loadCommands();
-    loadPlaybooks();
-    loadModels();
-    loadStats();
   }
 
   document.getElementById('token-submit').addEventListener('click', function () {
@@ -1632,12 +1762,6 @@ export const adminPageHtml = `<!doctype html>
 
   if (getToken()) {
     showApp();
-    loadAuth();
-    loadUsers();
-    loadCommands();
-    loadPlaybooks();
-    loadModels();
-    loadStats();
   } else {
     showGate();
   }

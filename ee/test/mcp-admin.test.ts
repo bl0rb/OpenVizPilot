@@ -18,6 +18,8 @@ async function withApp(licensed: boolean, run: (instance: ReturnType<typeof crea
   try {
     await instance.memoryStore!.registerDashboard({ dashboardKey, name: 'Sales dashboard' });
     await instance.memoryStore!.createUser('alice', 'Alice', 'unused');
+    const access = await instance.memoryStore!.ensureUserAccess({ provider: 'local', issuer: '', subject: 'alice', displayName: 'Alice', email: '' });
+    await instance.memoryStore!.setUserAccess(access.id, { ai: true, tableauApi: false });
     await instance.memoryStore!.createUserSession(hashSessionToken('user-session'), 'alice', Date.now() + 60_000);
     await run(instance);
   } finally {

@@ -65,6 +65,7 @@ jobs:
             -e LITELLM_BASE_URL=http://localhost:9 -e LITELLM_API_KEY=sk-ci \
             -e DEFAULT_MODEL=m -e MEMORY_DB_PATH=/tmp/memory.db \
             -p 3000:3000 openvizpilot:ci
+          trap 'docker rm -f tchat' EXIT
           ok=""
           for i in $(seq 1 20); do
             if curl -sf http://localhost:3000/healthz > /dev/null; then ok=1; break; fi
@@ -72,8 +73,12 @@ jobs:
           done
           docker logs tchat
           [ "$ok" = "1" ]
-          curl -sf -H 'x-tableau-user: ci' http://localhost:3000/api/memory | grep -q '"facts"'
-          docker rm -f tchat
+          curl -sf http://localhost:3000/api/session | python3 -c 'import json, sys; s = json.load(sys.stdin); assert s == {"user": None, "access": {"ai": False, "tableauApi": False}}, s'
+          # A supplied Tableau header must not bypass the per-user AI approval.
+          status=$(curl -sS -o /tmp/memory-response.json -w '%{http_code}' -H 'x-tableau-user: ci' http://localhost:3000/api/memory)
+          cat /tmp/memory-response.json
+          [ "$status" = "403" ]
+          python3 -c 'import json; r = json.load(open("/tmp/memory-response.json")); assert r.get("code") == "approval_required" and r.get("capability") == "ai", r'
 
       - name: Install Helm
         run: |

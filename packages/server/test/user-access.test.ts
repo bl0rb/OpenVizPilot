@@ -66,4 +66,12 @@ describe('per-user capability approvals', () => {
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('database secret');
   });
+
+  it('requires AI approval for anonymous memory access even with a Tableau user header', async () => {
+    const { app, store } = fixture('none');
+    const response = await app.request('/api/memory', { headers: { 'x-tableau-user': 'ci' } });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'approval_required', capability: 'ai' });
+    expect(store.ensureUserAccess).not.toHaveBeenCalled();
+  });
 });

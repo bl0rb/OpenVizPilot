@@ -134,11 +134,9 @@ export const adminPageHtml = `<!doctype html>
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   dialog input { min-height: 44px; }
-  .help { position: relative; display: inline-flex; vertical-align: middle; margin-left: 0.3rem; }
-  .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 1; cursor: help; }
-  .help-icon:hover, .help-icon:focus-visible, .help-icon[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
-  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 6px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; }
-  .help-icon:hover + .help-tip, .help-icon:focus-visible + .help-tip, .help-icon[aria-expanded="true"] + .help-tip { display: block; }
+  .has-help { position: relative; cursor: help; text-decoration: underline dotted; text-decoration-color: var(--text-muted); text-underline-offset: 2px; }
+  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 6px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
+  .has-help:hover > .help-tip, .has-help:focus-within > .help-tip, .has-help:has(+ :focus) > .help-tip, .has-help[aria-expanded="true"] > .help-tip { display: block; }
   .help-left .help-tip { left: auto; right: 0; }
   .help-tip code { font-size: 11px; }
   .hint { color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
@@ -308,10 +306,10 @@ export const adminPageHtml = `<!doctype html>
         <table id="commands-table">
           <thead>
             <tr>
-              <th class="col-name">Name<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Name" aria-describedby="help-cmd-name" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-name" class="help-tip">Gilt dashboardübergreifend; für einzelne Dashboards siehe „Dashboard-Analysen“.</span></span></th>
+              <th class="col-name has-help" aria-expanded="false">Name<span role="tooltip" id="help-cmd-name" class="help-tip">Gilt dashboardübergreifend; für einzelne Dashboards siehe „Dashboard-Analysen“.</span></th>
               <th class="col-desc">Beschreibung</th>
-              <th class="col-hint">Arg-Hinweis<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Arg-Hinweis" aria-describedby="help-cmd-arghint" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></span></th>
-              <th>Template<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Template" aria-describedby="help-cmd-template" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></span></th>
+              <th class="col-hint has-help" aria-expanded="false">Arg-Hinweis<span role="tooltip" id="help-cmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></th>
+              <th class="has-help" aria-expanded="false">Template<span role="tooltip" id="help-cmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -331,8 +329,8 @@ export const adminPageHtml = `<!doctype html>
       <p id="auth-source" class="hint"></p>
       <p id="auth-banner" class="banner"></p>
       <div class="form-grid">
-        <label>Anmeldemodus<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Anmeldemodus" aria-describedby="help-auth-mode" aria-expanded="false">?</button><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter Benutzerzugriff. Benutzerkonten: Anmeldung mit Konten aus „Benutzerkonten“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span></span>
-          <select id="auth-mode">
+        <label class="has-help">Anmeldemodus<span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter Benutzerzugriff. Benutzerkonten: Anmeldung mit Konten aus „Benutzerkonten“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span>
+          <select id="auth-mode" aria-describedby="help-auth-mode">
             <option value="none">Offen (kein Login — Chat &amp; Tableau API bleiben gesperrt)</option>
             <option value="local">Benutzerkonten (Core-Edition)</option>
             <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
@@ -344,8 +342,8 @@ export const adminPageHtml = `<!doctype html>
       </div>
       <div id="oidc-fields">
         <div class="form-grid">
-          <label>Identity-Provider<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Identity-Provider" aria-describedby="help-oidc-provider" aria-expanded="false">?</button><span role="tooltip" id="help-oidc-provider" class="help-tip">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL); Einrichtung siehe docs/enterprise.md.</span></span>
-            <select id="oidc-provider">
+          <label class="has-help">Identity-Provider<span role="tooltip" id="help-oidc-provider" class="help-tip">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL); Einrichtung siehe docs/enterprise.md.</span>
+            <select id="oidc-provider" aria-describedby="help-oidc-provider">
               <option value="entra">Microsoft Entra ID</option>
               <option value="keycloak">Keycloak</option>
               <option value="generic">Anderer OIDC-Provider</option>
@@ -368,8 +366,8 @@ export const adminPageHtml = `<!doctype html>
         </div>
       </div>
       <fieldset class="form-section"><legend>Enterprise-Lizenz</legend>
-      <label class="form-field">Lizenzschlüssel<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Lizenzschlüssel" aria-describedby="help-license-token" aria-expanded="false">?</button><span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span></span>
-        <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false"></textarea>
+      <label class="form-field has-help">Lizenzschlüssel<span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span>
+        <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false" aria-describedby="help-license-token"></textarea>
       </label>
       <p id="license-summary" class="hint">Lade …</p>
       <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
@@ -401,7 +399,7 @@ export const adminPageHtml = `<!doctype html>
             <tr>
               <th>Benutzername</th>
               <th>Anzeigename</th>
-              <th>Status<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Status" aria-describedby="help-users-status" aria-expanded="false">?</button><span role="tooltip" id="help-users-status" class="help-tip">Sperren beendet laufende Sitzungen sofort.</span></span></th>
+              <th class="has-help" aria-expanded="false">Status<span role="tooltip" id="help-users-status" class="help-tip">Sperren beendet laufende Sitzungen sofort.</span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -409,11 +407,11 @@ export const adminPageHtml = `<!doctype html>
         </table>
       </div>
       <form id="create-user-form">
-      <fieldset class="form-section"><legend>Benutzer anlegen<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Benutzer anlegen" aria-describedby="help-users-create" aria-expanded="false">?</button><span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Benutzerzugriff“ Zugriff auf Chat oder Tableau API.</span></span></legend>
+      <fieldset class="form-section"><legend class="has-help" aria-expanded="false">Benutzer anlegen<span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Benutzerzugriff“ Zugriff auf Chat oder Tableau API.</span></legend>
       <div class="form-grid">
         <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
         <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
-        <label for="new-password">Passwort (mindestens 10 Zeichen)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Passwort" aria-describedby="help-users-password" aria-expanded="false">?</button><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span></span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required /></label>
+        <label for="new-password" class="has-help">Passwort (mindestens 10 Zeichen)<span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required aria-describedby="help-users-password" /></label>
       </div>
       <div class="form-actions">
         <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
@@ -422,14 +420,14 @@ export const adminPageHtml = `<!doctype html>
       </form>
 
       <fieldset class="form-section" id="user-access-section">
-        <legend>Benutzerzugriff<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Benutzerzugriff" aria-describedby="help-access-legend" aria-expanded="false">?</button><span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></span></legend>
+        <legend class="has-help" aria-expanded="false">Benutzerzugriff<span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></legend>
         <p id="user-access-banner" class="banner" role="status"></p>
         <div class="form-actions">
           <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
         </div>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
-            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access">AI-Chat<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu AI-Chat" aria-describedby="help-access-ai" aria-expanded="false">?</button><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></span></th><th class="col-access">Tableau API<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Tableau API" aria-describedby="help-access-tableau" aria-expanded="false">?</button><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></span></th><th class="col-save"></th></tr></thead>
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false">AI-Chat<span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false">Tableau API<span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-save"></th></tr></thead>
             <tbody id="user-access-body"></tbody>
           </table>
         </div>
@@ -441,23 +439,23 @@ export const adminPageHtml = `<!doctype html>
       <p class="hint">Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard.</p>
       <p id="playbooks-banner" class="banner"></p>
       <div class="row" style="margin-bottom: 0.75rem;">
-        <label for="playbook-key">Dashboard:<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Dashboard" aria-describedby="help-playbook-key" aria-expanded="false">?</button><span role="tooltip" id="help-playbook-key" class="help-tip">Eingebundene Dashboards erscheinen automatisch nach dem ersten angemeldeten Start — auch ohne Chatfragen; die Zuordnung wird im Workbook gespeichert.</span></span></label>
-        <select id="playbook-key" style="flex: 1 1 260px;"><option value="">Dashboard auswählen …</option></select>
+        <label for="playbook-key" class="has-help">Dashboard:<span role="tooltip" id="help-playbook-key" class="help-tip">Eingebundene Dashboards erscheinen automatisch nach dem ersten angemeldeten Start — auch ohne Chatfragen; die Zuordnung wird im Workbook gespeichert.</span></label>
+        <select id="playbook-key" style="flex: 1 1 260px;" aria-describedby="help-playbook-key"><option value="">Dashboard auswählen …</option></select>
         <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
       <p id="playbook-status" class="hint"></p>
       <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten (erst nach Dashboard-Auswahl oben verfügbar)</legend>
-      <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Starter-Fragen" aria-describedby="help-playbook-starters" aria-expanded="false">?</button><span role="tooltip" id="help-playbook-starters" class="help-tip">Erscheinen im Chat vor den generischen Vorschlägen, z. B. <code>Wie hat sich der Umsatz im letzten Quartal entwickelt?</code></span></span></label>
-      <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?"></textarea>
+      <label for="playbook-starters" class="hint has-help" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)<span role="tooltip" id="help-playbook-starters" class="help-tip">Erscheinen im Chat vor den generischen Vorschlägen, z. B. <code>Wie hat sich der Umsatz im letzten Quartal entwickelt?</code></span></label>
+      <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?" aria-describedby="help-playbook-starters"></textarea>
       <p class="hint" style="margin-top: 0.75rem;">Slash-Befehle nur für dieses Dashboard</p>
       <div style="overflow-x: auto;">
         <table id="playbook-commands-table">
           <thead>
             <tr>
-              <th class="col-name">Name<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Name" aria-describedby="help-pcmd-name" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-name" class="help-tip">Überlagert einen gleichnamigen globalen Slash-Befehl nur auf diesem Dashboard.</span></span></th>
+              <th class="col-name has-help" aria-expanded="false">Name<span role="tooltip" id="help-pcmd-name" class="help-tip">Überlagert einen gleichnamigen globalen Slash-Befehl nur auf diesem Dashboard.</span></th>
               <th class="col-desc">Beschreibung</th>
-              <th class="col-hint">Arg-Hinweis<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Arg-Hinweis" aria-describedby="help-pcmd-arghint" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></span></th>
-              <th>Template<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Template" aria-describedby="help-pcmd-template" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></span></th>
+              <th class="col-hint has-help" aria-expanded="false">Arg-Hinweis<span role="tooltip" id="help-pcmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></th>
+              <th class="has-help" aria-expanded="false">Template<span role="tooltip" id="help-pcmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -481,7 +479,7 @@ export const adminPageHtml = `<!doctype html>
         <table id="models-table">
           <thead>
             <tr>
-              <th style="width: 45%;">Modell-ID (am Endpunkt)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Modell-ID" aria-describedby="help-models-id" aria-expanded="false">?</button><span role="tooltip" id="help-models-id" class="help-tip">Ohne gespeicherte Liste zeigt die Extension alle vom Endpunkt gemeldeten Modelle (ggf. gefiltert über <code>MODEL_ALLOWLIST</code>).</span></span></th>
+              <th class="has-help" style="width: 45%;" aria-expanded="false">Modell-ID (am Endpunkt)<span role="tooltip" id="help-models-id" class="help-tip">Ohne gespeicherte Liste zeigt die Extension alle vom Endpunkt gemeldeten Modelle (ggf. gefiltert über <code>MODEL_ALLOWLIST</code>).</span></th>
               <th>Anzeigename in der Extension</th>
               <th class="col-del"></th>
             </tr>
@@ -502,8 +500,8 @@ export const adminPageHtml = `<!doctype html>
       <h2>Extension für Tableau</h2>
       <p class="hint">Lädt das Manifest (.trex) mit der eingetragenen Extension-URL herunter.</p>
       <p id="trex-banner" class="banner"></p>
-      <label class="form-field" for="trex-url">Öffentliche Extension-URL<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Öffentliche Extension-URL" aria-describedby="help-trex-url" aria-expanded="false">?</button><span role="tooltip" id="help-trex-url" class="help-tip">Die Adresse, unter der diese Middleware die Extension ausliefert — HTTPS-Pflicht auf Tableau Server; die Extension verbindet sich dann automatisch mit demselben Host.</span></span>
-        <input type="url" id="trex-url" placeholder="https://chat.example.com/" autocomplete="off" spellcheck="false" />
+      <label class="form-field has-help" for="trex-url">Öffentliche Extension-URL<span role="tooltip" id="help-trex-url" class="help-tip">Die Adresse, unter der diese Middleware die Extension ausliefert — HTTPS-Pflicht auf Tableau Server; die Extension verbindet sich dann automatisch mit demselben Host.</span>
+        <input type="url" id="trex-url" placeholder="https://chat.example.com/" autocomplete="off" spellcheck="false" aria-describedby="help-trex-url" />
       </label>
       <div class="form-actions">
         <button class="primary" id="trex-download" title="Danach die URL in der Server-Safelist eintragen und das Manifest im Dashboard auswählen.">Manifest (.trex) herunterladen</button>
@@ -531,7 +529,7 @@ export const adminPageHtml = `<!doctype html>
             <tr>
               <th>Dashboard</th>
               <th class="num">Fragen</th>
-              <th class="num">Anwender<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Anwender" aria-describedby="help-usage-users" aria-expanded="false">?</button><span role="tooltip" id="help-usage-users" class="help-tip">Nicht umkehrbare Pseudonyme — keine Namen, IDs oder Inhalte. Kennzahlen je Anwender erscheinen erst ab 3 Anwendern (darunter <code>&lt; 3</code>).</span></span></th>
+              <th class="num has-help" aria-expanded="false">Anwender<span role="tooltip" id="help-usage-users" class="help-tip">Nicht umkehrbare Pseudonyme — keine Namen, IDs oder Inhalte. Kennzahlen je Anwender erscheinen erst ab 3 Anwendern (darunter <code>&lt; 3</code>).</span></th>
               <th class="num">Ø Fragen/Anwender</th>
               <th class="num">max. je Anwender</th>
             </tr>
@@ -579,37 +577,39 @@ export const adminPageHtml = `<!doctype html>
     button.setAttribute('aria-label', label);
   }
 
-  // ---------- Hilfe-Symbole (?) ----------
-  // Reines CSS zeigt den Tooltip bei :hover/:focus-visible; hier kommt nur
-  // der Klick/Touch-Umschalter dazu (aria-expanded, Escape, Klick außerhalb)
-  // und die Rechtsrand-Heuristik für Tooltips, die sonst abgeschnitten würden.
+  // ---------- Hilfe-Tooltips (Hover/Fokus statt ?-Symbol) ----------
+  // Reines CSS zeigt den Tooltip bei :hover/:focus-within (bzw. Fokus auf ein
+  // Eingabefeld direkt hinter dem Label — siehe :has(+ :focus) im CSS); hier
+  // kommt nur der Klick/Touch-Umschalter für Header/Legenden ohne eigenes
+  // Eingabefeld dazu (aria-expanded, Escape, Klick außerhalb) und die
+  // Rechtsrand-Heuristik für Tooltips, die sonst abgeschnitten würden. Ein
+  // Klick auf ein Label MIT Eingabefeld wird nicht abgefangen, damit das
+  // normale Fokussieren des Feldes nicht gestört wird.
   function helpCloseAll() {
-    Array.prototype.forEach.call(document.querySelectorAll('.help-icon[aria-expanded="true"]'), function (icon) {
-      icon.setAttribute('aria-expanded', 'false');
+    Array.prototype.forEach.call(document.querySelectorAll('.has-help[aria-expanded="true"]'), function (el) {
+      el.setAttribute('aria-expanded', 'false');
     });
   }
-  function helpPosition(icon) {
-    var wrap = icon.closest('.help');
-    if (!wrap) return;
-    wrap.classList.remove('help-left');
-    var tip = wrap.querySelector('.help-tip');
-    if (tip && tip.getBoundingClientRect().right > document.documentElement.clientWidth) wrap.classList.add('help-left');
+  function helpPosition(el) {
+    el.classList.remove('help-left');
+    var tip = el.querySelector('.help-tip');
+    if (tip && tip.getBoundingClientRect().right > document.documentElement.clientWidth) el.classList.add('help-left');
   }
   document.addEventListener('mouseover', function (event) {
-    var icon = event.target.closest && event.target.closest('.help-icon');
-    if (icon) helpPosition(icon);
+    var el = event.target.closest && event.target.closest('.has-help');
+    if (el) helpPosition(el);
   });
   document.addEventListener('focusin', function (event) {
-    var icon = event.target.closest && event.target.closest('.help-icon');
-    if (icon) helpPosition(icon);
+    var el = event.target.closest && event.target.closest('.has-help');
+    if (el) helpPosition(el);
   });
   document.addEventListener('click', function (event) {
-    var icon = event.target.closest && event.target.closest('.help-icon');
-    if (icon) {
+    var el = event.target.closest && event.target.closest('.has-help');
+    if (el && el.tagName !== 'LABEL') {
       event.stopPropagation();
-      var wasOpen = icon.getAttribute('aria-expanded') === 'true';
+      var wasOpen = el.getAttribute('aria-expanded') === 'true';
       helpCloseAll();
-      if (!wasOpen) { icon.setAttribute('aria-expanded', 'true'); helpPosition(icon); }
+      if (!wasOpen) { el.setAttribute('aria-expanded', 'true'); helpPosition(el); }
       return;
     }
     if (!(event.target.closest && event.target.closest('.help-tip'))) helpCloseAll();

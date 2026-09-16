@@ -111,21 +111,19 @@ describe('admin page inline script', () => {
 });
 
 /**
- * Feld-Erklärungen leben im wiederverwendbaren ?-Symbol statt in Absätzen
- * (siehe Betreiber-Vorgabe: „nur Hover und Anleitungen, wenn es für Buttons
- * oder Felder erforderlich ist"). Diese Tests halten das durch.
+ * Feld-Erklärungen leben in einem Hover/Fokus-Tooltip statt in Absätzen
+ * (siehe Betreiber-Vorgabe: „Tausche das Fragezeichen durch ein Hover" —
+ * kein sichtbares ?-Symbol mehr, Erklärung beim Überfahren des Labels bzw.
+ * bei Tastaturfokus auf das zugehörige Eingabefeld). Diese Tests halten das
+ * durch.
  */
-describe('help icons', () => {
-  it('gives every .help-icon a working aria-describedby into an existing role="tooltip" element', () => {
-    const icons = [...adminPageHtml.matchAll(/<button[^>]*class="help-icon"[^>]*>/g)].map(m => m[0]);
-    expect(icons.length).toBeGreaterThan(0);
-    for (const tag of icons) {
-      expect(tag).toMatch(/aria-label="Erklärung zu [^"]+"/);
-      const id = tag.match(/aria-describedby="([^"]+)"/)?.[1];
-      expect(id, tag).toBeTruthy();
-      const tooltip = new RegExp(`role="tooltip"[^>]*id="${id}"|id="${id}"[^>]*role="tooltip"`);
-      expect(adminPageHtml, `no role="tooltip" element for #${id}`).toMatch(tooltip);
-    }
+describe('help tooltips', () => {
+  it('has no more .help-icon buttons and anchors every tooltip in a .has-help label/header/legend', () => {
+    expect(adminPageHtml).not.toContain('help-icon');
+    const tooltips = [...adminPageHtml.matchAll(/<span[^>]*\brole="tooltip"[^>]*\bid="([^"]+)"[^>]*>/g)];
+    expect(tooltips.length).toBeGreaterThan(0);
+    const anchored = adminPageHtml.match(/<\w+[^>]*\bclass="[^"]*\bhas-help\b[^"]*"[^>]*>[^<]*<span[^>]*\brole="tooltip"/g) ?? [];
+    expect(anchored.length, 'every role="tooltip" must be the direct child of a .has-help element').toBe(tooltips.length);
   });
 
   it('keeps every <p class="hint"> short — long explanations belong in a ?-icon', () => {

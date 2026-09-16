@@ -56,25 +56,25 @@ export const tableauAdminSection = `
                 <option value="oauth2-trust">Connected App – OAuth 2.0 Trust (Issuer-URL, JWKS)</option>
               </select>
             </label>
-            <label for="tableau-server-url">Server-URL<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Server-URL" aria-describedby="help-tableau-url" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-url" class="help-tip">HTTPS-Origin ohne Pfad, z. B. <code>https://tableau.example.com</code>.</span></span>
-              <input id="tableau-server-url" type="url" autocomplete="off" placeholder="https://tableau.example.com" />
+            <label for="tableau-server-url" class="has-help">Server-URL<span role="tooltip" id="help-tableau-url" class="help-tip">HTTPS-Origin ohne Pfad, z. B. <code>https://tableau.example.com</code>.</span>
+              <input id="tableau-server-url" type="url" autocomplete="off" placeholder="https://tableau.example.com" aria-describedby="help-tableau-url" />
             </label>
-            <label for="tableau-server-site">Site (Content-URL)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Site (Content-URL)" aria-describedby="help-tableau-site" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-site" class="help-tip">Der Site-Kürzel aus der Tableau-Adresse: <code>https://tableau.example.com/#/site/vertrieb/…</code> → <code>vertrieb</code>. Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.</span></span>
-              <input id="tableau-server-site" type="text" autocomplete="off" placeholder="site-content-url" />
+            <label for="tableau-server-site" class="has-help">Site (Content-URL)<span role="tooltip" id="help-tableau-site" class="help-tip">Der Site-Kürzel aus der Tableau-Adresse: <code>https://tableau.example.com/#/site/vertrieb/…</code> → <code>vertrieb</code>. Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.</span>
+              <input id="tableau-server-site" type="text" autocomplete="off" placeholder="site-content-url" aria-describedby="help-tableau-site" />
             </label>
             <div id="tableau-server-connected-app-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-client-id">Client-ID<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Client-ID" aria-describedby="help-tableau-client-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-client-id" class="help-tip">Aus Tableau: Connected App → Client ID.</span></span>
-                <input id="tableau-server-client-id" type="text" autocomplete="off" />
+              <label for="tableau-server-client-id" class="has-help">Client-ID<span role="tooltip" id="help-tableau-client-id" class="help-tip">Aus Tableau: Connected App → Client ID.</span>
+                <input id="tableau-server-client-id" type="text" autocomplete="off" aria-describedby="help-tableau-client-id" />
               </label>
-              <label for="tableau-server-secret-id">Secret-ID<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Secret-ID" aria-describedby="help-tableau-secret-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-secret-id" class="help-tip">Secret ID des erzeugten Secrets.</span></span>
-                <input id="tableau-server-secret-id" type="text" autocomplete="off" />
+              <label for="tableau-server-secret-id" class="has-help">Secret-ID<span role="tooltip" id="help-tableau-secret-id" class="help-tip">Secret ID des erzeugten Secrets.</span>
+                <input id="tableau-server-secret-id" type="text" autocomplete="off" aria-describedby="help-tableau-secret-id" />
               </label>
-              <label for="tableau-server-secret-env">Secret-Env-Referenz<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Secret-Env-Referenz" aria-describedby="help-tableau-secret-env" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-secret-env" class="help-tip">Name der Umgebungsvariable mit dem Secret value, Präfix <code>OVP_TABLEAU_</code>; der Wert wird nie hier eingegeben.</span></span>
-                <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" />
+              <label for="tableau-server-secret-env" class="has-help help-left">Secret-Env-Referenz<span role="tooltip" id="help-tableau-secret-env" class="help-tip">Name der Umgebungsvariable mit dem Secret value, Präfix <code>OVP_TABLEAU_</code>; der Wert wird nie hier eingegeben.</span>
+                <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" aria-describedby="help-tableau-secret-env" />
               </label>
             </div>
-            <label for="tableau-server-username-claim">Username-Claim<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Username-Claim" aria-describedby="help-tableau-username-claim" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-username-claim" class="help-tip">Muss dem Tableau-Benutzernamen entsprechen (Tableau Cloud: der E-Mail-Adresse).</span></span>
-              <select id="tableau-server-username-claim">
+            <label for="tableau-server-username-claim" class="has-help">Username-Claim<span role="tooltip" id="help-tableau-username-claim" class="help-tip">Muss dem Tableau-Benutzernamen entsprechen (Tableau Cloud: der E-Mail-Adresse).</span>
+              <select id="tableau-server-username-claim" aria-describedby="help-tableau-username-claim">
                 <option value="email">email</option>
                 <option value="preferred_username">preferred_username</option>
                 <option value="upn">upn</option>
@@ -85,9 +85,9 @@ export const tableauAdminSection = `
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
             <div id="tableau-server-oauth2-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-eas-issuer">Issuer URL<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Issuer URL" aria-describedby="help-tableau-issuer" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span></span>
+              <label for="tableau-server-eas-issuer" class="has-help help-left">Issuer URL<span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span>
                 <span class="tableau-server-inline-field">
-                  <input id="tableau-server-eas-issuer" type="text" readonly />
+                  <input id="tableau-server-eas-issuer" type="text" readonly aria-describedby="help-tableau-issuer" />
                   <button id="tableau-server-eas-issuer-copy" type="button" disabled>Kopieren</button>
                 </span>
               </label>
@@ -97,8 +97,8 @@ export const tableauAdminSection = `
               <label for="tableau-server-eas-kid">Key-ID
                 <input id="tableau-server-eas-kid" type="text" readonly />
               </label>
-              <label for="tableau-server-site-id">Site-ID<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Site-ID" aria-describedby="help-tableau-site-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span></span>
-                <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
+              <label for="tableau-server-site-id" class="has-help help-left">Site-ID<span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span>
+                <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" aria-describedby="help-tableau-site-id" />
               </label>
               <p id="tableau-server-eas-warning" class="hint error" role="status" hidden>
                 Für OAuth 2.0 Trust muss die Middleware unter einer HTTPS-Public-URL erreichbar sein. Im Abschnitt

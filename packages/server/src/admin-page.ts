@@ -135,7 +135,7 @@ export const adminPageHtml = `<!doctype html>
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   dialog input { min-height: 44px; }
   .has-help { position: relative; cursor: help; text-decoration: underline dotted; text-decoration-color: var(--text-muted); text-underline-offset: 2px; }
-  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 6px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
+  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 2px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
   .has-help:hover > .help-tip, .has-help:focus-within > .help-tip, .has-help:has(+ :focus) > .help-tip, .has-help[aria-expanded="true"] > .help-tip { display: block; }
   .help-left .help-tip { left: auto; right: 0; }
   .help-tip code { font-size: 11px; }
@@ -590,11 +590,24 @@ export const adminPageHtml = `<!doctype html>
       el.setAttribute('aria-expanded', 'false');
     });
   }
+  // Einmal je Element messen, nie eine statisch gesetzte Ausrichtung entfernen:
+  // mouseover feuert bei jeder Bewegung über Kindelemente — würde die Klasse
+  // dabei erst entfernt und dann neu gesetzt, spränge der Tooltip hin und her.
   function helpPosition(el) {
-    el.classList.remove('help-left');
+    if (el.dataset.helpPositioned) return;
     var tip = el.querySelector('.help-tip');
-    if (tip && tip.getBoundingClientRect().right > document.documentElement.clientWidth) el.classList.add('help-left');
+    if (!tip) return;
+    var wasHidden = getComputedStyle(tip).display === 'none';
+    if (wasHidden) tip.style.display = 'block';
+    if (tip.getBoundingClientRect().right > document.documentElement.clientWidth) el.classList.add('help-left');
+    if (wasHidden) tip.style.display = '';
+    el.dataset.helpPositioned = '1';
   }
+  window.addEventListener('resize', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.has-help[data-help-positioned]'), function (el) {
+      delete el.dataset.helpPositioned;
+    });
+  });
   document.addEventListener('mouseover', function (event) {
     var el = event.target.closest && event.target.closest('.has-help');
     if (el) helpPosition(el);

@@ -3,7 +3,7 @@ import type { ClientRequest, IncomingMessage } from 'node:http';
 import https from 'node:https';
 import type { RequestOptions } from 'node:https';
 import net from 'node:net';
-import { parseTableauServerOrigin } from './config';
+import { parseTableauServerOrigin, TABLEAU_REST_API_VERSION } from './config';
 import { TableauError } from './errors';
 
 export const TABLEAU_REQUEST_TIMEOUT_MS = 10_000;
@@ -100,14 +100,16 @@ async function systemLookup(hostname: string): Promise<ReadonlyArray<TableauReso
   return [{ address: entry.address, family: entry.family === 6 ? 6 : 4 }];
 }
 
-const ALLOWED_POST_PATHS = new Set(['/api/3.27/auth/signin', '/api/3.27/auth/signout', '/api/metadata/graphql']);
+const API_PREFIX = `/api/${TABLEAU_REST_API_VERSION}`;
+const ALLOWED_POST_PATHS = new Set([`${API_PREFIX}/auth/signin`, `${API_PREFIX}/auth/signout`, '/api/metadata/graphql']);
+const SITE_COLLECTION_PATH = new RegExp(`^${API_PREFIX.replace(/\./g, '\\.')}/sites/([^/?#]+)/(workbooks|views|projects|datasources)$`);
 
 function isAllowedGetPath(path: string): boolean {
   try {
     const url = new URL(path, 'https://tableau.invalid');
     if (url.origin !== 'https://tableau.invalid' || url.hash || url.username || url.password) return false;
-    if (url.pathname === '/api/3.27/serverinfo') return url.search === '';
-    const match = /^\/api\/3\.27\/sites\/([^/?#]+)\/(workbooks|views|projects|datasources)$/.exec(url.pathname);
+    if (url.pathname === `${API_PREFIX}/serverinfo`) return url.search === '';
+    const match = SITE_COLLECTION_PATH.exec(url.pathname);
     if (!match) return false;
     const keys = [...url.searchParams.keys()];
     if (keys.some((key) => key !== 'pageSize' && key !== 'pageNumber') || new Set(keys).size !== keys.length) return false;

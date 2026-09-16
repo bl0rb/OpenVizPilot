@@ -12,7 +12,7 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `savedQueries` | Eigene Abfragen speichern: Antwortfokus und Standardfragen je Dashboard (`/api/memory/prefs`) |
 | `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Site-Freigaben |
 | `actions` | Dashboard-Aktionen aus dem Chat: Filter setzen/zurücksetzen, Parameter ändern, Marks markieren, Bereiche ein-/ausblenden |
-| `tableauServer` | Tableau-Server-Konfiguration und persönlicher Connected-App-Sign-in; benötigt OIDC und `sso`. Suche/Metadaten folgen in weiteren Phasen. |
+| `tableauServer` | Tableau-Server-Konfiguration, persönlicher Connected-App-Sign-in, Workbook-/View-Suche und Metadata-API (Feldsuche/-detail); benötigt OIDC und `sso`. |
 
 Eine Lizenz kann alle oder einzelne davon enthalten (Feld `features`; fehlt es, gilt der volle
 Umfang des Tiers). Ohne passende Lizenz läuft der Kern unverändert weiter — die Extension blendet
@@ -28,8 +28,9 @@ nur keine neuen hinzu. Welche Features gerade aktiv sind, sagt `GET /api/feature
 ## Warum SSO?
 
 Die **Tableau Server Integration** mit Feature-Schlüssel `tableauServer` ist für Tableau Server
-ab **2025.3 einschließlich** vorgesehen. Phase 1 stellt Konfiguration und persönlichen Sign-in
-bereit; Live-Abnahme und Content-Funktionen stehen noch aus. Sie setzt OIDC mit `sso` und eine
+ab **2024.2 einschließlich** vorgesehen. Phasen 1–3 sind implementiert: Konfiguration und
+persönlicher Sign-in, REST-basierte Workbook-/View-Suche sowie Metadata-API mit Feldsuche/-detail;
+die Live-Abnahme gegen eine reale Tableau-Installation steht noch aus. Sie setzt OIDC mit `sso` und eine
 Connected App voraus. `/api/features` zeigt die Lizenzfreigabe; die Integration bleibt bis zur
 Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md),
 [Roadmap](tableau-server-integration.md) und [Threat Model](tableau-server-phase-0.md).

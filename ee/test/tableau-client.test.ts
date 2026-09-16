@@ -14,7 +14,7 @@ const config: TableauConfig = {
   secretEnv: 'OVP_TABLEAU_SECRET',
   usernameClaim: 'tableau_username',
   revision: '11111111-1111-4111-8111-111111111111',
-  apiVersion: '3.27',
+  apiVersion: '3.23',
   authMode: 'connected-app',
 };
 const user = (overrides: Partial<{ issuer: string; sub: string; expiresAt: number; claims: Readonly<Record<string, unknown>> }> = {}) => ({
@@ -36,8 +36,10 @@ function signinResponse(token = 'credentials-token', siteContentUrl = 'sales', u
 describe('Tableau Phase 1 primitives', () => {
   it('validates complete config and permits incomplete disabled input', () => {
     expect(tableauConfigSchema.parse(config)).toEqual(config);
+    expect(tableauConfigSchema.parse({ ...config, apiVersion: '3.27' })).toEqual(config);
+    expect(() => tableauConfigSchema.parse({ ...config, apiVersion: '3.22' })).toThrow();
     expect(tableauConfigInputSchema.parse({ enabled: false })).toEqual({
-      enabled: false, serverUrl: '', siteContentUrl: '', clientId: '', secretId: '', secretEnv: '', usernameClaim: '', apiVersion: '3.27', authMode: 'connected-app',
+      enabled: false, serverUrl: '', siteContentUrl: '', clientId: '', secretId: '', secretEnv: '', usernameClaim: '', apiVersion: '3.23', authMode: 'connected-app',
     });
     expect(tableauConfigSchema.parse({ enabled: false, revision: config.revision })).toMatchObject({ enabled: false, serverUrl: '', secretEnv: '' });
     expect(() => tableauConfigInputSchema.parse({ enabled: true, serverUrl: config.serverUrl })).toThrow();
@@ -64,7 +66,7 @@ describe('Tableau Phase 1 primitives', () => {
     expect(payload).toMatchObject({ iss: 'connected-app-id', sub: 'alice', aud: 'tableau', exp: 1_750_000_060, scp: ['tableau:content:read'] });
     expect(typeof payload.jti).toBe('string');
     expect(signature).toBe(createHmac('sha256', 'sentinel-secret').update(jwt.split('.').slice(0, 2).join('.')).digest('base64url'));
-    expect(request!.path).toBe('/api/3.27/auth/signin');
+    expect(request!.path).toBe('/api/3.23/auth/signin');
     expect(JSON.parse(request!.body!)).toMatchObject({ credentials: { site: { contentUrl: 'sales' } } });
   });
 

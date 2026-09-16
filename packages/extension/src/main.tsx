@@ -1,13 +1,22 @@
 import { render } from 'preact';
+import { t } from '@openvizpilot/shared';
 import { eventType, getTableau, type FormattingSheet } from './tableau/api';
 import { applyWorkbookFormatting } from './tableau/formatting';
 import { App } from './ui/App';
 import './ui/styles.css';
 
+// Ziel des Tableau-Menüpunkts „Konfigurieren" (initializeAsync-configure-
+// Callback). App.tsx registriert hier beim Mount denselben Handler, der auch
+// das Zahnrad im Header auslöst — reine Verdrahtung, kein zweiter Dialog.
+let onConfigure: (() => void) | null = null;
+export function setConfigureHandler(fn: (() => void) | null): void {
+  onConfigure = fn;
+}
+
 function showFatal(root: HTMLElement, message: string): void {
   render(
     <div style="padding:20px;color:#8f2a20;font-family:sans-serif;line-height:1.5">
-      <strong>OpenVizPilot konnte nicht starten.</strong>
+      <strong>{t('app.startup.failedTitle')}</strong>
       <div>{message}</div>
     </div>,
     root,
@@ -26,10 +35,10 @@ async function bootstrap(): Promise<void> {
 
   try {
     const tableau = getTableau();
-    await tableau.extensions.initializeAsync();
+    await tableau.extensions.initializeAsync({ configure: () => { onConfigure?.(); return {}; } });
     const dashboard = tableau.extensions.dashboardContent?.dashboard;
     if (!dashboard) {
-      throw new Error('Kein Dashboard-Kontext — die Extension muss in einem Dashboard geladen werden.');
+      throw new Error(t('app.startup.noDashboardContext'));
     }
     // Schrift und Textfarbe des Workbooks übernehmen, damit das Panel nicht
     // als einziges Objekt im Dashboard aus der Reihe fällt — und beim Ändern

@@ -84,6 +84,7 @@ export function MessageList(props: {
                   type="button"
                   class="btn-icon btn-star"
                   title={t('message.saveStandardTitle')}
+                  aria-label={t('message.saveStandardTitle')}
                   disabled={props.busy}
                   onClick={() => props.onSaveStandard?.(item.text)}
                    >
@@ -97,7 +98,7 @@ export function MessageList(props: {
             return (
               <div key={item.id} class="msg msg-assistant">
                 {item.text === '' ? (
-                 <span class="thinking">{t('message.thinking')}</span>
+                 <span class="thinking" role="status" aria-live="polite">{t('message.thinking')}</span>
                 ) : (
                   <div
                     class="markdown"
@@ -148,13 +149,13 @@ export function MessageList(props: {
             );
           case 'notice':
             return (
-              <div key={item.id} class="notice">
+              <div key={item.id} class="notice" role="status" aria-live="polite">
                 {item.text}
               </div>
             );
           case 'error':
             return (
-              <div key={item.id} class="error-banner">
+              <div key={item.id} class="error-banner" role="alert">
                 <span>{item.text}</span>
                 {item.retryable && (
                  <button type="button" disabled={props.busy} onClick={props.onRetry}>

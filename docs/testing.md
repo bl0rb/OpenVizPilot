@@ -3,7 +3,7 @@
 ## 0. Automatische Tests
 
 ```bash
-npm test          # 54+ Unit-/Integrationstests
+npm test          # Unit-/Integrationstests aller Workspaces (Vitest)
 npm run typecheck
 ```
 

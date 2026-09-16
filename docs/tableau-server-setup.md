@@ -1,6 +1,6 @@
 # Tableau Server: Konfiguration und Betrieb
 
-Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschließlich Phase 3. Phase 3 umfasst Feldsuche/-detail, Formeln sowie eine begrenzte Dictionary- und Impact-Grundlage; eine vollständige Lineagevisualisierung ist nicht enthalten. Sie setzt Tableau Server 2025.3 einschließlich und REST API 3.27 oder höher als Zieluntergrenze voraus. Die reale Live-Abnahme wurde auf Wunsch nicht durchgeführt; die Anleitung ist deshalb keine Kompatibilitätszusage für eine konkrete Installation.
+Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschließlich Phase 3. Phase 3 umfasst Feldsuche/-detail, Formeln sowie eine begrenzte Dictionary- und Impact-Grundlage; eine vollständige Lineagevisualisierung ist nicht enthalten. Sie setzt Tableau Server 2024.2 einschließlich und REST API 3.23 oder höher als Zieluntergrenze voraus; Anfragen verwenden fest die REST-Version 3.23. Die reale Live-Abnahme wurde auf Wunsch nicht durchgeführt; die Anleitung ist deshalb keine Kompatibilitätszusage für eine konkrete Installation.
 
 ## Voraussetzungen
 
@@ -27,8 +27,8 @@ Der Button öffnet synchron ein Popup und startet darin den bestehenden OIDC Aut
 
 Der persönliche Check ruft danach `/api/tableau-server/check` auf. Der Server prüft:
 
-- Tableau-Server-Version mindestens `2025.3`.
-- REST API mindestens `3.27`.
+- Tableau-Server-Version mindestens `2024.2`.
+- REST API mindestens `3.23`. Antwortet der Server auf die feste Request-Version mit Tableau-Fehler `404001`, erscheint `TABLEAU_VERSION_UNSUPPORTED`.
 - Lesbarkeit der vier Primitives `workbooks`, `views`, `projects` und `datasources`; zusammen mit `serverinfo` erscheinen fünf Status-Einträge.
 
 Das Ergebnis nennt Versionen und einzelne Probe-Status. Erfolg wird nur bei `stage: "connection"`, `ok: true` und ausschließlich erfolgreichen Probes angezeigt.

@@ -54,7 +54,7 @@ bewusst nicht konfigurierbar; der Heartbeat gehört zur Lizenz, nicht zu den
 Betriebseinstellungen. Für die Firewall: ausgehend HTTPS auf `werkworks.de`,
 Port 443.
 
-Der aktuelle Stand steht in der Admin-UI unter **„Telemetrie"**: aktiv oder
+Der aktuelle Stand steht in der Admin-UI unter **„Lizenz-Heartbeat"**: aktiv oder
 nicht, Gegenstelle, Intervall, letzter erfolgreicher Versand und die Liste
 dessen, was gesendet bzw. nie gesendet wird — aus derselben Quelle, die auch
 sendet.
@@ -98,7 +98,7 @@ in fachkundige Hände.
 > Lizenzen verwendet und [Aufbewahrungsdauer].
 >
 > (6) Der Lizenznehmer kann den Umfang der Meldung jederzeit in der
-> Administrationsoberfläche der Software im Abschnitt „Telemetrie" einsehen.
+> Administrationsoberfläche der Software im Abschnitt „Lizenz-Heartbeat" einsehen.
 >
 > (7) Eine ausbleibende oder fehlgeschlagene Meldung beeinträchtigt den Betrieb
 > der Software nicht; freigeschaltete Funktionen bleiben für die Laufzeit der
@@ -113,7 +113,7 @@ Kurzfassung für das Lizenzdokument, das mit dem Schlüssel ausgeliefert wird:
 > Anwender der letzten 30 Tage, Anzahl Dashboards). Inhalte, Dashboard-Namen,
 > Anwendernamen und IP-Adressen werden nicht übertragen und nicht gespeichert.
 > Den genauen Umfang und den letzten Sendezeitpunkt zeigt die
-> Administrationsoberfläche unter „Telemetrie". Fällt die Meldung aus, läuft
+> Administrationsoberfläche unter „Lizenz-Heartbeat". Fällt die Meldung aus, läuft
 > die Software unverändert weiter. Für die Firewall: ausgehend HTTPS auf
 > `werkworks.de` (Port 443).
 

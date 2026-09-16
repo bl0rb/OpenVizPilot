@@ -1,4 +1,6 @@
-// Erzeugt das 70x70-PNG-Icon für das .trex-Manifest (scripts/icon.png).
+// HISTORISCH: erzeugte das frühere Sprechblasen-Icon. Seit 1.2.0 stammt scripts/icon.png
+// aus docs/images/logo.svg (70x70, ImageMagick), identisch zum Exchange-Icon (280x280).
+// Nicht mehr ausführen, sonst weicht das Manifest-Icon vom Listing ab.
 // Bewusst ohne Abhängigkeiten: minimaler PNG-Encoder (RGBA, Filter 0, zlib).
 import fs from 'node:fs';
 import path from 'node:path';

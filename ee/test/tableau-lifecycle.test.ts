@@ -5,7 +5,7 @@ import type { TableauTransportRequest } from '../server/src/tableau-server/http'
 
 const config = tableauConfigSchema.parse({ enabled: true, serverUrl: 'https://tableau.example.com', siteContentUrl: '',
   clientId: 'app', secretId: 'key', secretEnv: 'OVP_TABLEAU_SECRET', usernameClaim: 'upn',
-  revision: '11111111-1111-4111-8111-111111111111', apiVersion: '3.27', authMode: 'connected-app' });
+  revision: '11111111-1111-4111-8111-111111111111', apiVersion: '3.23', authMode: 'connected-app' });
 const epoch = 1_750_000_000_000;
 const identity = { issuer: 'https://idp.example.com', sub: 'user', expiresAt: epoch + 600_000, claims: { upn: 'DOMAIN\\Alice' } };
 const result = { status: 200, headers: {}, body: JSON.stringify({ credentials: { token: 'session', site: { id: 'default', contentUrl: '' }, user: { id: 'alice-id' } } }) };
@@ -41,7 +41,7 @@ describe('Tableau authentication lifecycle', () => {
     await expect(client.signIn({ ...identity, expiresAt: epoch })).rejects.toMatchObject({ code: 'TABLEAU_IDENTITY_EXPIRED' });
     expect(calls).toHaveLength(0);
     await expect(client.signIn(identity)).rejects.toMatchObject({ code: 'TABLEAU_IDENTITY_EXPIRED' });
-    expect(calls).toEqual(['/api/3.27/auth/signin', '/api/3.27/auth/signout']);
+    expect(calls).toEqual(['/api/3.23/auth/signin', '/api/3.23/auth/signout']);
   });
 
   it.each(['global', 'user'])('invalidates a pending sign-in on %s clear', async (scope) => {
@@ -57,6 +57,6 @@ describe('Tableau authentication lifecycle', () => {
     else await client.clearUser(identity.issuer, identity.sub);
     resolve(result);
     await rejected;
-    expect(paths).toContain('/api/3.27/auth/signout');
+    expect(paths).toContain('/api/3.23/auth/signout');
   });
 });

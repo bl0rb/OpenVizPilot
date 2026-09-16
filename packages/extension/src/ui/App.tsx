@@ -30,6 +30,7 @@ import { buildContextSnapshot } from '../tableau/context-snapshot';
 import { describeContextChange, registerContextInvalidation } from '../tableau/events';
 import { executeToolCall } from '../tools/registry';
 import { executeMcpTool, executeTableauTool } from '@openvizpilot/ee/extension';
+import { setConfigureHandler } from '../main';
 import { Composer } from './Composer';
 import { summarizeToolArgs, type ChatItem } from './items';
 import { MessageList } from './MessageList';
@@ -193,6 +194,16 @@ export function App(props: { dashboard: Dashboard }) {
       return '';
     }
   }, []);
+  // Autorenmodus: gemeinsame Workbook-Konfiguration (Backend-URL, API-Token,
+  // Dashboard-Kontext, Zuordnungs-Reset) ist nur für Autoren sichtbar/änderbar
+  // — siehe SettingsPanel.tsx. Persönliche Einstellungen bleiben für alle da.
+  const isAuthor = useMemo(() => {
+    try {
+      return getTableau().extensions.environment.mode === 'authoring';
+    } catch {
+      return false;
+    }
+  }, []);
   // Schlüssel für die Per-Dashboard-Präferenzen (Antwortfokus, Standardfragen)
   // — der Dashboard-Name reicht als Identifikator innerhalb eines Workbooks.
   const dashboardKey = useMemo(() => dashboard.name.slice(0, MAX_DASHBOARD_KEY_CHARS), [dashboard]);
@@ -303,7 +314,7 @@ export function App(props: { dashboard: Dashboard }) {
         if (!value.ai) { session.stop(); setFeatures(NO_EE_FEATURES); }
       } catch (error) {
         if (cancelled) return;
-        const message = error instanceof Error ? error.message : 'Freigabestatus nicht verfügbar.';
+        const message = error instanceof Error ? error.message : t('app.access.statusUnavailable');
         setAccessState({ key: accessKey, error: message });
         session.stop();
         setFeatures(NO_EE_FEATURES);
@@ -665,11 +676,19 @@ export function App(props: { dashboard: Dashboard }) {
   }, [items, dashboard]);
 
   const onSaveSettings = useCallback(async (next: ExtensionSettings) => {
-    setSettings(next);
+    // Erst nach dem Speicherversuch übernehmen (Workbook-Erfolg oder bewusster
+    // Sitzungsmodus-Fallback) statt optimistisch davor — siehe saveSettings().
     const result = await saveSettings(next);
+    setSettings(next);
     return result.message ?? null;
   }, []);
 
+  // Tableau-Menüpunkt „Konfigurieren" (initializeAsync-configure-Callback in
+  // main.tsx) öffnet denselben SettingsPanel wie das Zahnrad im Header.
+  useEffect(() => {
+    setConfigureHandler(() => setSettingsOpen(true));
+    return () => setConfigureHandler(null);
+  }, []);
 
   return (
     <div class="app">
@@ -687,6 +706,7 @@ export function App(props: { dashboard: Dashboard }) {
             type="button"
             class="btn-icon"
             title={t('app.header.copyTranscriptTitle')}
+            aria-label={t('app.header.copyTranscriptTitle')}
             disabled={busy}
             onClick={copyTranscript}
           >
@@ -698,6 +718,7 @@ export function App(props: { dashboard: Dashboard }) {
             type="button"
             class="btn-icon"
             title={`${t('app.header.logoutTitle')}${authSession.user.name || authSession.user.email ? ` (${authSession.user.name ?? authSession.user.email})` : ''}`}
+            aria-label={t('app.header.logoutTitle')}
             onClick={logout}
           >
             ⎋
@@ -707,6 +728,7 @@ export function App(props: { dashboard: Dashboard }) {
           type="button"
           class="btn-icon"
           title={t('app.header.settingsTitle')}
+          aria-label={t('app.header.settingsTitle')}
           onClick={() => setSettingsOpen((v) => !v)}
         >
           ⚙
@@ -728,6 +750,7 @@ export function App(props: { dashboard: Dashboard }) {
           backendUrl={baseUrl}
           apiToken={apiToken}
           userId={userId}
+          isAuthor={isAuthor}
           prefs={prefs}
           features={features}
           onSave={onSaveSettings}
@@ -739,15 +762,15 @@ export function App(props: { dashboard: Dashboard }) {
         <LoginGate baseUrl={baseUrl} config={loginError ? { ...authConfig, error: loginError } : authConfig} onLoggedIn={onLoggedIn} />
       ) : !authReady ? (
         <section class="login-panel" aria-live="polite">
-          <h2>{access ? 'Freigabe ausstehend' : 'Freigabestatus'}</h2>
+          <h2>{access ? t('app.access.pendingTitle') : t('app.access.statusTitle')}</h2>
           {access ? (
             <>
-              <p>KI-Chat: {access.ai ? 'Freigegeben' : 'Nicht freigegeben'}</p>
-              <p>Tableau-API: {access.tableauApi ? 'Freigegeben' : 'Nicht freigegeben'}</p>
-              <p class="memory-hint">{authSession ? 'Die Freigabe erfolgt durch einen Administrator.' : 'Eine persönliche Anmeldung per SSO oder Benutzerkonto ist erforderlich.'}</p>
+              <p>{t('app.access.aiChatLabel')}: {access.ai ? t('app.access.granted') : t('app.access.notGranted')}</p>
+              <p>{t('app.access.tableauApiLabel')}: {access.tableauApi ? t('app.access.granted') : t('app.access.notGranted')}</p>
+              <p class="memory-hint">{authSession ? t('app.access.adminHint') : t('app.access.loginHint')}</p>
             </>
-          ) : <p>{accessState?.key === accessKey && accessState.error ? accessState.error : 'Wird geprüft …'}</p>}
-          <button type="button" onClick={() => setAccessReload(value => value + 1)}>Status aktualisieren</button>
+          ) : <p>{accessState?.key === accessKey && accessState.error ? accessState.error : t('app.access.checking')}</p>}
+          <button type="button" onClick={() => setAccessReload(value => value + 1)}>{t('app.access.refreshButton')}</button>
         </section>
       ) : (
         <>
@@ -783,7 +806,7 @@ export function App(props: { dashboard: Dashboard }) {
               >
                 {t('app.selection.evaluate', undefined, { worksheet: selectionIn })}
               </button>
-              <button type="button" class="btn-icon" title={t('app.selection.hideTitle')} onClick={() => setSelectionIn(null)}>
+              <button type="button" class="btn-icon" title={t('app.selection.hideTitle')} aria-label={t('app.selection.hideTitle')} onClick={() => setSelectionIn(null)}>
                 ×
               </button>
             </div>

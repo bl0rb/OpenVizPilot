@@ -1,4 +1,4 @@
-import { MAX_AUTHOR_CONTEXT_CHARS, t, type ModelOption } from '@openvizpilot/shared';
+import { EXTENSION_VERSION, MAX_AUTHOR_CONTEXT_CHARS, t, type ModelOption } from '@openvizpilot/shared';
 import { MemoryFactsPanel, SavedQueriesPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
 import { useState } from 'preact/hooks';
 import { isAllowedBackendUrl, type ExtensionSettings } from '../settings';
@@ -14,6 +14,11 @@ export function SettingsPanel(props: {
   backendUrl: string;
   apiToken: string;
   userId: string;
+  /** tableau.extensions.environment.mode === 'authoring' — siehe App.tsx.
+   * Gemeinsame Workbook-Konfiguration ist nur für Autoren sichtbar/änderbar;
+   * Viewer behalten ihre persönlichen Einstellungen (inkl. Modellwahl, die
+   * ohnehin nur für die aktuelle Sitzung gilt, siehe settings.ts). */
+  isAuthor: boolean;
   /** Per-Dashboard-Präferenzen — siehe PrefsState in App.tsx. */
   prefs: DashboardPrefs | null | 'loading' | 'unavailable';
   /** Freigeschaltete Enterprise-Funktionen — steuert, welche Bereiche erscheinen. */
@@ -27,52 +32,92 @@ export function SettingsPanel(props: {
   const [apiToken, setApiToken] = useState(props.settings.apiToken);
   const [dashboardContext, setDashboardContext] = useState(props.settings.dashboardContext);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageIsError, setMessageIsError] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const urlValidation = isAllowedBackendUrl(backendUrl);
 
   const save = async () => {
+    if (saving) return;
     if (!urlValidation.ok) {
       setMessage(urlValidation.reason ?? t('settings.invalidBackendUrl'));
+      setMessageIsError(true);
       return;
     }
-    const result = await props.onSave({
-      backendUrl: backendUrl.trim(),
-      model: model.trim(),
-      apiToken: apiToken.trim(),
-      dashboardContext: dashboardContext.trim(),
-    });
-    setMessage(result ?? t('settings.saved'));
+    setSaving(true);
+    try {
+      const result = await props.onSave({
+        backendUrl: backendUrl.trim(),
+        model: model.trim(),
+        apiToken: apiToken.trim(),
+        dashboardContext: dashboardContext.trim(),
+      });
+      setMessage(result ?? t('settings.saved'));
+      setMessageIsError(false);
+    } catch (err) {
+      // z. B. Tableau lehnt einen zu langen Wert schon in settings.set() ab.
+      setMessage(err instanceof Error ? err.message : String(err));
+      setMessageIsError(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div class="settings-panel">
       <h2>{t('settings.title')}</h2>
-      <section class="prefs-section">
-        <h3>{t('settings.standardAnalysesTitle')}</h3>
-        <p>{props.registrationMessage}</p>
-        {props.registrationKey && <p class="field-hint">{t('settings.registrationKey', undefined, { key: props.registrationKey })}</p>}
-        <button type="button" onClick={() => void props.onResetRegistration()}>{t('settings.resetRegistrationButton')}</button>
-        <p class="field-hint">{t('settings.resetRegistrationHint')}</p>
-      </section>
-      <label>
-        {t('settings.backendUrl')}
-        <input
-          type="text"
-          value={backendUrl}
-          placeholder={t('settings.backendUrlPlaceholder')}
-          onInput={(e) => setBackendUrl((e.target as HTMLInputElement).value)}
-        />
-        {!urlValidation.ok && <span class="field-error">{urlValidation.reason}</span>}
-      </label>
-      <label>
-        {t('settings.apiToken')}
-        <input
-          type="password"
-          value={apiToken}
-          placeholder={t('settings.apiTokenPlaceholder')}
-          onInput={(e) => setApiToken((e.target as HTMLInputElement).value)}
-        />
-      </label>
+      <p class="field-hint">
+        {t('settings.productInfo', undefined, { version: EXTENSION_VERSION })}
+        {' · '}
+        <a href="https://github.com/bl0rb/OpenVizPilot/wiki" target="_blank" rel="noopener noreferrer">
+          {t('settings.helpLink')}
+        </a>
+      </p>
+      {props.isAuthor && (
+        <section class="prefs-section">
+          <h3>{t('settings.standardAnalysesTitle')}</h3>
+          <p>{props.registrationMessage}</p>
+          {props.registrationKey && <p class="field-hint">{t('settings.registrationKey', undefined, { key: props.registrationKey })}</p>}
+          <button type="button" onClick={() => void props.onResetRegistration()}>{t('settings.resetRegistrationButton')}</button>
+          <p class="field-hint">{t('settings.resetRegistrationHint')}</p>
+        </section>
+      )}
+      {props.isAuthor && (
+        <section class="prefs-section">
+          <h3>{t('settings.authorSectionTitle')}</h3>
+          <label>
+            {t('settings.backendUrl')}
+            <input
+              type="text"
+              value={backendUrl}
+              placeholder={t('settings.backendUrlPlaceholder')}
+              onInput={(e) => setBackendUrl((e.target as HTMLInputElement).value)}
+            />
+            {!urlValidation.ok && <span class="field-error">{urlValidation.reason}</span>}
+          </label>
+          <label>
+            {t('settings.apiToken')}
+            <input
+              type="password"
+              value={apiToken}
+              placeholder={t('settings.apiTokenPlaceholder')}
+              onInput={(e) => setApiToken((e.target as HTMLInputElement).value)}
+            />
+            <span class="field-hint">{t('settings.apiTokenHint')}</span>
+          </label>
+          <label>
+            {t('settings.dashboardContext')}
+            <textarea
+              value={dashboardContext}
+              maxLength={MAX_AUTHOR_CONTEXT_CHARS}
+              rows={5}
+              placeholder={t('settings.dashboardContextPlaceholder')}
+              onInput={(e) => setDashboardContext((e.target as HTMLTextAreaElement).value)}
+            />
+            <span class="field-hint">{t('settings.dashboardContextHint')}</span>
+          </label>
+        </section>
+      )}
       <label>
         {t('settings.model')}
         <select value={model} onInput={(e) => setModel((e.target as HTMLSelectElement).value)}>
@@ -88,21 +133,14 @@ export function SettingsPanel(props: {
           ))}
         </select>
       </label>
-      <label>
-        {t('settings.dashboardContext')}
-        <textarea
-          value={dashboardContext}
-          maxLength={MAX_AUTHOR_CONTEXT_CHARS}
-          rows={5}
-          placeholder={t('settings.dashboardContextPlaceholder')}
-          onInput={(e) => setDashboardContext((e.target as HTMLTextAreaElement).value)}
-        />
-        <span class="field-hint">{t('settings.dashboardContextHint')}</span>
-      </label>
-      {message && <div class="settings-message">{message}</div>}
+      {message && (
+        <div class="settings-message" role={messageIsError ? 'alert' : 'status'} aria-live={messageIsError ? 'assertive' : 'polite'}>
+          {message}
+        </div>
+      )}
       <div class="settings-actions">
-        <button type="button" onClick={() => void save()}>
-          {t('settings.save')}
+        <button type="button" onClick={() => void save()} disabled={saving}>
+          {saving ? t('settings.saving') : t('settings.save')}
         </button>
         <button type="button" class="btn-secondary" onClick={props.onClose}>
           {t('settings.close')}

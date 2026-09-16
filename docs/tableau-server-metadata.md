@@ -15,7 +15,7 @@ Die Tools verwenden feste GraphQL-Queries mit Variablen. Beliebige GraphQL-Strin
 
 ## Tableau-Voraussetzungen
 
-Für OpenVizPilot gilt weiterhin Tableau Server 2025.3 einschließlich als Zieluntergrenze. Die Tableau-Dokumentation beschreibt die Metadata API grundsätzlich für Tableau Server 2019.3 oder höher; daraus wird keine Zusage für ältere Server oder für jede 2025.3-Konfiguration abgeleitet.
+Für OpenVizPilot gilt Tableau Server 2024.2 einschließlich als Zieluntergrenze; die Metadata API wird unabhängig von der REST-Request-Version über `/api/metadata/graphql` angesprochen. Die Tableau-Dokumentation beschreibt die Metadata API grundsätzlich für Tableau Server 2019.3 oder höher; daraus wird keine Zusage für ältere Server oder für jede 2024.2-/2025.3-Konfiguration abgeleitet.
 
 Auf Tableau Server ist die Metadata API installiert, aber standardmäßig deaktiviert. Ein Server-Admin muss sie über TSM aktivieren:
 

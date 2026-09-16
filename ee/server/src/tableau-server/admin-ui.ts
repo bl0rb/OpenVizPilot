@@ -1,3 +1,5 @@
+import { TABLEAU_MIN_SERVER_VERSION, TABLEAU_REST_API_VERSION } from './config';
+
 export const tableauAdminStyles = `
   #tableau-server-admin { border: 0; padding-top: 1.5rem; }
   #tableau-server-admin .tableau-server-panel { max-width: 820px; }
@@ -64,7 +66,7 @@ export const tableauAdminSection = `
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
             <div class="form-field"><span>Authentifizierung</span><span class="tableau-server-auth">Connected App (JWT)</span></div>
-            <div class="form-field"><span>Tableau-Mindestversion</span><span class="tableau-server-auth">2025.3</span></div>
+            <div class="form-field"><span>Tableau-Mindestversion</span><span class="tableau-server-auth">${TABLEAU_MIN_SERVER_VERSION} (REST API ${TABLEAU_REST_API_VERSION})</span></div>
           </div>
           <div class="form-actions tableau-server-actions">
             <button id="tableau-server-save" class="primary" type="button">Speichern</button>
@@ -307,7 +309,7 @@ export const tableauAdminScript = String.raw`
       secretId: tableauServerFields.secretId.value.trim(),
       secretEnv: tableauServerFields.secretEnv.value.trim(),
       usernameClaim: claim,
-      apiVersion: '3.27',
+      apiVersion: '${TABLEAU_REST_API_VERSION}',
       authMode: 'connected-app'
     };
   }

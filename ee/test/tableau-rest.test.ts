@@ -15,7 +15,7 @@ const config: TableauConfig = {
   secretEnv: 'OVP_TABLEAU_SECRET',
   usernameClaim: 'tableau_username',
   revision: '11111111-1111-4111-8111-111111111111',
-  apiVersion: '3.27',
+  apiVersion: '3.23',
   authMode: 'connected-app',
 };
 const user: TableauSignInUser = {
@@ -54,7 +54,7 @@ describe('Tableau Phase 2 REST primitives', () => {
     };
     const client = new TableauClient(config, { env: { OVP_TABLEAU_SECRET: 'secret' }, transport });
     await client.read(user, 'workbooks', { pageSize: 7, pageNumber: 2 });
-    expect(requests.at(-1)).toMatchObject({ method: 'GET', path: '/api/3.27/sites/site-luid/workbooks?pageSize=7&pageNumber=2' });
+    expect(requests.at(-1)).toMatchObject({ method: 'GET', path: '/api/3.23/sites/site-luid/workbooks?pageSize=7&pageNumber=2' });
     await expect(client.read(user, 'workbooks', { pageSize: 7, pageNumber: 2, raw: 'nope' } as never)).rejects.toMatchObject({ code: 'TABLEAU_QUERY_INVALID' });
   });
 
@@ -165,12 +165,30 @@ describe('Tableau Phase 2 REST primitives', () => {
       : collection(resource as 'workbooks', [], 0, 1, 1));
     await expect(rest.check(user)).resolves.toMatchObject({ ok: true, serverVersion: '2025.3.0', apiVersion: '3.27', checks: [{ ok: true }, { ok: true }, { ok: true }, { ok: true }, { ok: true }] });
 
+    const floor = restWithPages((resource) => resource === 'serverinfo'
+      ? { serverInfo: { productVersion: { value: '2024.2.5' }, restApiVersion: { value: '3.23' } } }
+      : collection(resource as 'workbooks', [], 0, 1, 1));
+    await expect(floor.rest.check(user)).resolves.toMatchObject({ ok: true, serverVersion: '2024.2.5', apiVersion: '3.23' });
+
     const failed = restWithPages((resource) => resource === 'serverinfo'
-      ? { serverInfo: { productVersion: { value: '2025.2.0' }, restApiVersion: { value: '3.26' } } }
+      ? { serverInfo: { productVersion: { value: '2024.1.0' }, restApiVersion: { value: '3.22' } } }
       : resource === 'views' ? responseDoesNotExist() : collection(resource as 'workbooks', [], 0, 1, 1));
     const check = await failed.rest.check(user);
     expect(check.ok).toBe(false);
+    expect(check.checks.find((item) => item.resource === 'serverinfo')).toMatchObject({ ok: false, code: 'TABLEAU_VERSION_UNSUPPORTED' });
     expect(check.checks.find((item) => item.resource === 'views')).toMatchObject({ ok: false, code: 'TABLEAU_RESPONSE_INVALID' });
+  });
+
+  it('classifies a server that does not serve the fixed REST version as unsupported', async () => {
+    const versionNotFound = response({ error: { summary: 'Version Not Found', detail: 'unsupported', code: '404001' } }, 404);
+    const transport: TableauTransport = async (request) => request.path.endsWith('/serverinfo') ? versionNotFound : response({}, 404);
+    const client = new TableauClient(config, { env: { OVP_TABLEAU_SECRET: 'secret' }, transport });
+    await expect(client.read(user, 'serverinfo')).rejects.toMatchObject({ code: 'TABLEAU_VERSION_UNSUPPORTED', status: 404 });
+    await expect(client.signIn(user)).rejects.toMatchObject({ code: 'TABLEAU_AUTH_FAILED', status: 404 });
+    const rest = new TableauRest(client, config);
+    const check = await rest.check(user);
+    expect(check.ok).toBe(false);
+    expect(check.checks[0]).toMatchObject({ resource: 'serverinfo', ok: false, code: 'TABLEAU_VERSION_UNSUPPORTED' });
   });
 
   it('keeps only verified same-origin upstream links and supports ID lookup', async () => {

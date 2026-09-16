@@ -1,6 +1,6 @@
 import { TableauError, isTableauError } from './errors';
 import type { TableauClient, TableauReadResource, TableauSignInUser } from './client';
-import type { TableauConfig } from './config';
+import { TABLEAU_MIN_SERVER_VERSION, TABLEAU_REST_API_VERSION, type TableauConfig } from './config';
 import { tableauSearchSchema, type TableauContent, type TableauSearchInput, type TableauSearchResult } from './schema';
 
 type ContentResource = 'workbooks' | 'views' | 'projects' | 'datasources';
@@ -178,6 +178,9 @@ function atLeast(value: string, required: [number, number]): boolean {
   return pair ? pair[0] > required[0] || (pair[0] === required[0] && pair[1] >= required[1]) : false;
 }
 
+const MIN_SERVER_VERSION = versionPair(TABLEAU_MIN_SERVER_VERSION)!;
+const MIN_API_VERSION = versionPair(TABLEAU_REST_API_VERSION)!;
+
 function versionField(value: unknown): string | undefined {
   const object = objectValue(value);
   return requiredString(object?.value) ?? requiredString(value);
@@ -288,7 +291,7 @@ export class TableauRest {
         const info = objectValue(root?.serverInfo);
         serverVersion = versionField(info?.productVersion) ?? '';
         apiVersion = versionField(info?.restApiVersion) ?? '';
-        compatibility = atLeast(serverVersion, [2025, 3]) && atLeast(apiVersion, [3, 27]);
+        compatibility = atLeast(serverVersion, MIN_SERVER_VERSION) && atLeast(apiVersion, MIN_API_VERSION);
         if (!serverVersion || !apiVersion) serverInfoError = 'TABLEAU_RESPONSE_INVALID';
         else if (!compatibility) serverInfoError = 'TABLEAU_VERSION_UNSUPPORTED';
       } catch (error) {

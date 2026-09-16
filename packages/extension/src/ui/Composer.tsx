@@ -41,11 +41,14 @@ export function Composer(props: {
   return (
     <div class="composer">
       {menu.length > 0 && (
-        <div class="slash-menu">
+        <div class="slash-menu" role="listbox">
           {menu.map((c, i) => (
             <button
               key={c.name}
+              id={`slash-option-${i}`}
               type="button"
+              role="option"
+              aria-selected={i === menuIndex}
               class={`slash-item${i === menuIndex ? ' slash-item-active' : ''}`}
               onMouseEnter={() => setMenuIndex(i)}
               onClick={() => completeCommand(c.name)}
@@ -63,6 +66,8 @@ export function Composer(props: {
         value={text}
         disabled={props.disabled}
         placeholder={t('composer.placeholder')}
+        aria-label={t('composer.placeholder')}
+        aria-activedescendant={menu.length > 0 ? `slash-option-${menuIndex}` : undefined}
         rows={2}
         maxLength={MAX_MESSAGE_CHARS}
         onInput={(e) => updateText((e.target as HTMLTextAreaElement).value)}

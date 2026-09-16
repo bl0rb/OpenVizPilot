@@ -15,14 +15,14 @@ Phase 0 liefert Entscheidungen und pruefbare Anforderungen. Die folgenden Sicher
 |---|---|---|
 | Edition | Enterprise; Connector-Implementierung unter `ee/` | Nutzerentscheidung |
 | Lizenz | Feature-Schluessel `tableauServer` | Nutzerentscheidung |
-| Mindestversion | Tableau Server 2025.3 einschliesslich | Nutzerentscheidung, im Chat praezisiert |
-| REST-Basis | API 3.27 fuer MVP-Endpunkte; keine Cloud-only-Funktionen | Technische Vorgabe |
+| Mindestversion | Tableau Server 2024.2 einschliesslich (am 16.09.2026 von 2025.3 abgesenkt) | Nutzerentscheidung, im Chat praezisiert |
+| REST-Basis | API 3.23 als feste Request-Version fuer MVP-Endpunkte; keine Cloud-only-Funktionen | Technische Vorgabe |
 | Authentifizierung | Connected App mit Direct Trust; verifizierte OIDC-Identitaet | Technische Vorgabe |
 | Aktivierung | Opt-in, gueltige `tableauServer`- und fuer OIDC `sso`-Freigabe, vollstaendige Konfiguration | Technische Vorgabe |
 | MVP | Read-only Content-Suche und Metadata; VDS und Admin-Funktionen bleiben Phase 6 | Technische Vorgabe |
 | PAT | Kein produktiver PAT-Fallback im MVP; spaetere Dev-/Admin-Variante separat bewerten | Technische Vorgabe |
 
-Die Mindestversion ist eine Produkt-Supportgrenze. Neuere Versionen sind Zielplattformen, aber erst nach einem dokumentierten Integrationstest als getestet auszuweisen. Die offizielle Zuordnung fuer 2025.3 ist REST API 3.27. [Tableau: API-Versionen](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm)
+Die Mindestversion ist eine Produkt-Supportgrenze. Neuere Versionen sind Zielplattformen, aber erst nach einem dokumentierten Integrationstest als getestet auszuweisen. Die offizielle Zuordnung fuer 2024.2 ist REST API 3.23, fuer 2025.3 REST API 3.27; neuere Server akzeptieren die aeltere Versionsangabe im Pfad. [Tableau: API-Versionen](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm)
 
 ## Gepruefte API-Voraussetzungen
 
@@ -89,7 +89,7 @@ Historischer Stand der Phase-0-Pruefung, vor Implementierung von Phase 1. Den ak
 3. [ ] Enterprise-Connector, versionierte Connection-Konfiguration und Secret-Referenzen mit Admin-Validierung implementieren.
 4. [ ] URL-/TLS-Policy, Sign-in/-out, isolierten Token-Cache und strukturierte Fehler implementieren; Sicherheitsfaelle aus obiger Tabelle testen.
 5. [ ] Connection-Test zweistufig planen: Admin prueft Konfiguration; persoenlich authentifizierter Test prueft User-Zugang. Admin-Login allein ist keine Tableau-Nutzeridentitaet.
-6. [ ] Fuer Phase 2 eine Endpoint-Matrix fuer Workbooks, Views, Projekte und Datenquellen mit Server-2025.3-Scope, Pagination und Rollenanforderungen erstellen. Jobs, Refreshes und Permissions separat auf Admin-Bedarf pruefen.
-7. [ ] Vor Release gegen Server 2025.3 und eine dann aktuelle unterstuetzte Version testen: zwei Nutzer mit unterschiedlichen Rechten, zwei Sites, abgelaufene Tokens, Secret-Rotation sowie Metadata mit/ohne externe Asset-Sichtbarkeit.
+6. [ ] Fuer Phase 2 eine Endpoint-Matrix fuer Workbooks, Views, Projekte und Datenquellen mit Server-2024.2-Scope (REST 3.23), Pagination und Rollenanforderungen erstellen. Jobs, Refreshes und Permissions separat auf Admin-Bedarf pruefen.
+7. [ ] Vor Release gegen Server 2024.2, 2025.3 und eine dann aktuelle unterstuetzte Version testen: zwei Nutzer mit unterschiedlichen Rechten, zwei Sites, abgelaufene Tokens, Secret-Rotation sowie Metadata mit/ohne externe Asset-Sichtbarkeit.
 
 Noch fuer die Integrationstests benoetigt: konkrete Testinstallation, aktivierte Connected App, Secret-Referenz, Site, freigegebener IdP-Claim und Testkonten. Diese Betriebswerte werden nicht in die Roadmap geschrieben.

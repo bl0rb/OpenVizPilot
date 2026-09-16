@@ -34,6 +34,10 @@ export interface MockState {
   /** Event manuell auslösen (Demo/Tests). */
   /** Feuert ein Ereignis — ohne `scope` überall, mit `scope` nur in diesem Worksheet. */
   emit(eventType: string, scope?: string): void;
+  /** Ruft den an initializeAsync({configure}) übergebenen Callback auf (UX-02-Verdrahtung
+   * manuell prüfen: `window.__tableauMockState.triggerConfigure()` in der Konsole).
+   * false, wenn main.tsx noch keinen registriert hat. */
+  triggerConfigure(): boolean;
 }
 
 interface MockWorksheetSpec {
@@ -329,6 +333,9 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
   });
 
   const settingsStore = new Map<string, string>(loadLocalSettings());
+  // Vom initializeAsync({configure})-Aufruf übergebener Handler — siehe
+  // MockState.triggerConfigure() und main.tsx/setConfigureHandler.
+  let configureHandler: (() => object) | null = null;
 
   // Zonen des Mock-Dashboards: zwei Sichten, ein ausgeblendetes Detailblatt
   // und zwei Bedienelemente — genug, um Sichtbarkeit und „wo stelle ich das
@@ -346,8 +353,8 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
     TableauEventType: { ...EVENT_TYPES },
     SelectionUpdateType: { Replace: 'select-replace', Add: 'select-add', Remove: 'select-remove' },
     extensions: {
-      async initializeAsync() {
-        /* sofort bereit */
+      async initializeAsync(config) {
+        configureHandler = config?.configure ?? null;
       },
       workbook: {
         async activateSheetAsync(sheetName: string) {
@@ -398,7 +405,9 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
         },
       },
       environment: {
-        mode: 'authoring',
+        // UX-01/UX-02 manuell prüfen: `localStorage.setItem('tableauChat.mockMode', 'viewing')`
+        // in der Konsole, dann neu laden — Standard bleibt 'authoring'.
+        mode: loadMockMode(),
         context: 'mock',
         apiVersion: 'mock',
         uniqueUserId: 'mock-user-1',
@@ -428,6 +437,11 @@ export function createMockTableau(): { api: TableauApi; state: MockState } {
         for (const h of [...(byType.get(eventType) ?? [])]) h(event);
       }
     },
+    triggerConfigure() {
+      if (!configureHandler) return false;
+      configureHandler();
+      return true;
+    },
   };
 
   return { api, state };
@@ -438,6 +452,15 @@ export function installMockTableau(): MockState {
   (globalThis as Record<string, unknown>).tableau = api;
   (globalThis as Record<string, unknown>).__tableauMockState = state;
   return state;
+}
+
+/** environment.mode fürs Mock-Dashboard — s. Kommentar bei environment oben. */
+function loadMockMode(): string {
+  try {
+    return localStorage.getItem('tableauChat.mockMode') === 'viewing' ? 'viewing' : 'authoring';
+  } catch {
+    return 'authoring';
+  }
 }
 
 function loadLocalSettings(): Array<[string, string]> {

@@ -4,6 +4,12 @@ import { TableauError } from './errors';
 const HTTPS_ORIGIN_MAX_LENGTH = 2048;
 const SECRET_ENV_PATTERN = /^OVP_TABLEAU_[A-Z0-9_]+$/;
 
+/** Fixed REST request version: the version of the oldest supported server; every connector primitive exists in it. */
+export const TABLEAU_REST_API_VERSION = '3.23';
+export const TABLEAU_MIN_SERVER_VERSION = '2024.2';
+/** '3.27' stays readable for settings persisted while that was the request version and normalizes to the fixed one. */
+const apiVersionSchema = z.enum([TABLEAU_REST_API_VERSION, '3.27']).transform(() => TABLEAU_REST_API_VERSION);
+
 function isHttpsOrigin(value: string): boolean {
   try {
     const url = new URL(value);
@@ -33,7 +39,7 @@ const enabledConfigFields = {
   secretEnv: secretEnvSchema,
   usernameClaim: nonEmptyConfigString,
   revision: z.string().uuid(),
-  apiVersion: z.literal('3.27'),
+  apiVersion: apiVersionSchema,
   authMode: z.literal('connected-app'),
 } as const;
 
@@ -46,7 +52,7 @@ const disabledConfigFields = {
   secretEnv: z.union([secretEnvSchema, z.literal('')]).default(''),
   usernameClaim: z.string().max(500).default(''),
   revision: z.string().uuid(),
-  apiVersion: z.literal('3.27').default('3.27'),
+  apiVersion: apiVersionSchema.default(TABLEAU_REST_API_VERSION),
   authMode: z.literal('connected-app').default('connected-app'),
 } as const;
 

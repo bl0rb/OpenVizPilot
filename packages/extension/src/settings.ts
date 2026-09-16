@@ -1,4 +1,4 @@
-import { MAX_AUTHOR_CONTEXT_CHARS } from '@openvizpilot/shared';
+import { MAX_AUTHOR_CONTEXT_CHARS, t } from '@openvizpilot/shared';
 import { getTableau } from './tableau/api';
 
 /**
@@ -40,13 +40,13 @@ export function isAllowedBackendUrl(url: string): { ok: boolean; reason?: string
   try {
     parsed = new URL(trimmed);
   } catch {
-    return { ok: false, reason: 'Keine gültige absolute URL (erwartet: https://…).' };
+    return { ok: false, reason: t('settings.urlInvalidFormat') };
   }
   if (parsed.protocol === 'https:') return { ok: true };
   if (parsed.protocol === 'http:' && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
     return { ok: true };
   }
-  return { ok: false, reason: 'Nur HTTPS-URLs (oder http://localhost für die Entwicklung) sind erlaubt.' };
+  return { ok: false, reason: t('settings.urlProtocolNotAllowed') };
 }
 
 export function loadSettings(): ExtensionSettings {
@@ -68,7 +68,7 @@ export async function saveSettings(
 ): Promise<{ persisted: boolean; message?: string }> {
   const validation = isAllowedBackendUrl(settings.backendUrl);
   if (!validation.ok) {
-    return { persisted: false, message: `Backend-URL nicht gespeichert: ${validation.reason}` };
+    return { persisted: false, message: t('settings.urlNotSaved', undefined, { reason: validation.reason ?? '' }) };
   }
   const s = getTableau().extensions.settings;
   s.set(KEY_BACKEND_URL, settings.backendUrl.trim());
@@ -82,8 +82,7 @@ export async function saveSettings(
   } catch {
     return {
       persisted: false,
-      message:
-        'Einstellungen gelten nur für diese Sitzung (Speichern ins Workbook ist nur im Bearbeitungsmodus möglich).',
+      message: t('settings.sessionOnly'),
     };
   }
 }

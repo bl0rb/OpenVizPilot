@@ -7,7 +7,7 @@ import { METADATA_SEARCH_QUERY } from '../server/src/tableau-server/metadata-que
 const config = {
   enabled: true, serverUrl: 'https://tableau.example.test', siteContentUrl: 'sales',
   clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST', usernameClaim: 'upn',
-  revision: '11111111-1111-4111-8111-111111111111', apiVersion: '3.27', authMode: 'connected-app',
+  revision: '11111111-1111-4111-8111-111111111111', apiVersion: '3.23', authMode: 'connected-app',
 } satisfies TableauConfig;
 const user: TableauSignInUser = { issuer: 'https://idp.example.test', sub: 'alice', expiresAt: Date.now() + 3600_000, claims: { upn: 'alice' } };
 const response = (body: unknown, status = 200, headers = {}) => ({ status, headers, body: JSON.stringify(body) });

@@ -18,6 +18,7 @@ export type TableauErrorCode =
   | 'TABLEAU_HTTP_ERROR'
   | 'TABLEAU_QUERY_INVALID'
   | 'TABLEAU_METADATA_FAILED'
+  | 'TABLEAU_VERSION_UNSUPPORTED'
   | 'TABLEAU_ABORTED';
 
 /** Connector errors contain only a stable classification and optional HTTP status. */

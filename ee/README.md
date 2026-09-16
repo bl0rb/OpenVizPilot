@@ -41,7 +41,7 @@ Identisch zum bestehenden WerkWorks-Lizenzgenerator (`certpulse-license-generato
 ```json
 { "formatVersion": "openvizpilot-license-v1", "licenseId": "…", "tier": "enterprise",
   "licensee": "Firma GmbH", "issuedAt": "2026-09-02T…", "validUntil": "2027-09-02T…",
-    "features": ["sso", "memory", "savedQueries", "mcp", "actions"] }
+    "features": ["sso", "memory", "savedQueries", "mcp", "actions", "tableauServer"] }
 ```
 
 Lizenzen stellt der WerkWorks-Lizenzgenerator direkt aus:

@@ -5,11 +5,12 @@ import type { AuthVariables } from '../server/src/auth-routes';
 import { createSqliteTableauStore, createPgTableauStore } from '../server/src/tableau-server/store';
 import { TableauService, type TableauAccess } from '../server/src/tableau-server/service';
 import { createTableauAdminRoute, createTableauRoute } from '../server/src/tableau-server/routes';
+import { TableauError } from '../server/src/tableau-server/errors';
 
 const input = {
   enabled: true, serverUrl: 'https://tableau.example.com', siteContentUrl: 'sales',
   clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST_SECRET',
-  usernameClaim: 'upn', apiVersion: '3.27' as const, authMode: 'connected-app' as const,
+  usernameClaim: 'upn', apiVersion: '3.23' as const, authMode: 'connected-app' as const,
 };
 const user = { issuer: 'https://idp.example.com', sub: 'oidc-user', expiresAt: Date.now() + 3600_000, claims: { upn: 'TableauUser' } };
 const cleanups: Array<() => void> = [];
@@ -212,6 +213,16 @@ describe('Tableau user access lifecycle', () => {
     const valid = await app.request('/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     expect(valid.status).toBe(200);
     expect(await valid.json()).toMatchObject({ source: 'Tableau Server', items: [], truncated: false, scanned: 0 });
+  });
+
+  it('names the required Tableau version when the server does not serve the fixed REST version', async () => {
+    const service = { search: vi.fn(async () => { throw new TableauError('TABLEAU_VERSION_UNSUPPORTED', 404); }) };
+    const app = new Hono<AuthVariables>();
+    app.use('*', async (c, next) => { c.set('oidcUser', user); await next(); });
+    app.route('/', createTableauRoute(service as never));
+    const response = await app.request('/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'Tableau Server unterstützt REST API 3.23 nicht; mindestens Tableau Server 2024.2 erforderlich.', code: 'TABLEAU_VERSION_UNSUPPORTED' });
   });
 
   it('discards a search when configuration is revoked during a read', async () => {

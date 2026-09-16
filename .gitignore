@@ -16,3 +16,6 @@ keys/
 # schaltet jede Installation frei.
 *.openvizpilot-license
 *.license
+
+# Interne Vorbereitung der Tableau-Exchange-Einreichung — nicht veröffentlichen.
+docs/exchange-submission/

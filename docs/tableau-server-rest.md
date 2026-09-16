@@ -1,6 +1,6 @@
 # Tableau Server REST: Phase-2-Matrix
 
-Dieses Dokument beschreibt den implementierten REST-Ausschnitt und seine Grenzen. Tableau-Objekte werden nur unter der persönlichen Tableau-Identität gelesen. Der Connector verwendet REST API 3.27 als feste Request-Version und akzeptiert im Connection-Test nur Server `>= 2025.3` und REST API `>= 3.27`.
+Dieses Dokument beschreibt den implementierten REST-Ausschnitt und seine Grenzen. Tableau-Objekte werden nur unter der persönlichen Tableau-Identität gelesen. Der Connector verwendet REST API 3.23 als feste Request-Version, die Version von Tableau Server 2024.2, und akzeptiert im Connection-Test nur Server `>= 2024.2` und REST API `>= 3.23`. Neuere Server beantworten Anfragen mit dieser älteren Versionsangabe; nur später eingeführte Methoden würden fehlschlagen, und der Connector verwendet keine ([Tableau: API-Versionen](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_versions.htm)). Meldet ein älterer Server Tableau-Fehler `404001` (Version nicht gefunden), klassifiziert der Connector das als `TABLEAU_VERSION_UNSUPPORTED`.
 
 ## OpenVizPilot-Endpunkte
 
@@ -14,7 +14,7 @@ Dieses Dokument beschreibt den implementierten REST-Ausschnitt und seine Grenzen
 
 | Ressource | Verwendete REST-Primitives | Phase-2-Verwendung | Scope / Rolle | Quelle |
 |---|---|---|---|---|
-| Serverinfo | `GET /api/3.27/serverinfo` | Version und REST-API-Version im persönlichen Connection-Test. | Laut Tableau ohne Authentifizierung; kein JWT-Scope erforderlich. | [Server Methods](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm) |
+| Serverinfo | `GET /api/3.23/serverinfo` | Version und REST-API-Version im persönlichen Connection-Test. | Laut Tableau ohne Authentifizierung; kein JWT-Scope erforderlich. | [Server Methods](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_server.htm) |
 | Workbooks | Site-Collection `GET .../sites/{site-id}/workbooks` mit `pageSize`/`pageNumber` | Eine der vier Collection-Probes; Finder nach Name/ID, Projekt, Owner und Tag. | Leserechte des persönlichen Tableau-Users; `tableau:content:read`. | [Workbooks and Views Methods](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm) |
 | Views | Site-Collection `GET .../sites/{site-id}/views` mit `pageSize`/`pageNumber` | Eine der vier Collection-Probes; Finder nach Name/ID, Projekt, Owner und Tag. Workbook-Zuordnung wird für sichere View-Links genutzt. | Leserechte des persönlichen Tableau-Users; `tableau:content:read`. | [Workbooks and Views Methods](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_workbooks_and_views.htm) |
 | Projects | Site-Collection `GET .../sites/{site-id}/projects` mit `pageSize`/`pageNumber` | Eine der vier Connection-Test-Probes; read-only Primitive, nicht Teil des aktuellen Finders. | Leserechte des persönlichen Tableau-Users; `tableau:content:read`. | [Projects Methods](https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_ref_projects.htm) |

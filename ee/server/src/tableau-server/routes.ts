@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AuthVariables } from '../auth-routes';
 import type { PersonalizationLogger } from '../personalization';
-import { resolveTableauSecret, tableauConfigInputSchema } from './config';
+import { resolveTableauSecret, tableauConfigInputSchema, TABLEAU_MIN_SERVER_VERSION, TABLEAU_REST_API_VERSION } from './config';
 import { TableauService, TableauServiceError } from './service';
 import { TableauError } from './errors';
 import { tableauSearchSchema } from './schema';
@@ -86,6 +86,8 @@ export function createTableauRoute(service: TableauService | null): Hono<AuthVar
           ? 'Der konfigurierte Tableau-Username-Claim fehlt oder ist ungültig.'
           : error.code === 'TABLEAU_METADATA_FAILED'
           ? 'Tableau-Metadaten nicht verfügbar. Metadata API, Indexierung und Berechtigungen prüfen.'
+          : error.code === 'TABLEAU_VERSION_UNSUPPORTED'
+          ? `Tableau Server unterstützt REST API ${TABLEAU_REST_API_VERSION} nicht; mindestens Tableau Server ${TABLEAU_MIN_SERVER_VERSION} erforderlich.`
           : 'Tableau-Abfrage fehlgeschlagen. Konfiguration und Berechtigungen prüfen.';
         return c.json({ error: message, code: error.code }, error.code === 'TABLEAU_CLAIM_INVALID' || error.status === 403 ? 403 : error.status === 429 ? 429 : 502);
       }

@@ -6,7 +6,7 @@ Die optionale Tableau-Server-Integration ergänzt den bestehenden Live-Kontext d
 
 Phase 0 ist abgeschlossen. Phase 1 ist implementiert. Phase 2 ist für die unten beschriebenen REST-Basisfunktionen implementiert. Phase 3 Metadata und Semantik ist **umgesetzt**: Feldsuche/-detail, Formeln sowie eine begrenzte Dictionary- und Impact-Grundlage sind vorhanden; eine vollständige Lineagevisualisierung ist nicht enthalten. Die Live-Abnahme gegen eine reale Tableau-Installation wurde auf Wunsch ausdrücklich ausgelassen. Das ist kein Blocker für diesen Entwicklungsstand und stellt keine Kompatibilitätszusage für eine konkrete Installation dar.
 
-Die Zieluntergrenze bleibt Tableau Server 2025.3 einschließlich mit REST API 3.27 oder höher. Diese Untergrenze ist eine Implementierungsanforderung, kein durch einen Live-Test bestätigtes Supportversprechen.
+Die Zieluntergrenze ist Tableau Server 2024.2 einschließlich mit REST API 3.23 oder höher; sie wurde am 16.09.2026 von 2025.3/3.27 abgesenkt, weil alle genutzten REST-Primitives bereits in 3.23 enthalten sind und der Connector 3.23 als feste Request-Version verwendet. Diese Untergrenze ist eine Implementierungsanforderung, kein durch einen Live-Test bestätigtes Supportversprechen.
 
 ## Implementierte Funktionen
 
@@ -15,7 +15,7 @@ Die Zieluntergrenze bleibt Tableau Server 2025.3 einschließlich mit REST API 3.
 | Benutzerfreigaben | KI-Chat und Tableau-API pro lokaler oder verifizierter SSO-Identität getrennt durch Admins freigegeben; standardmäßig gesperrt, serverseitig geprüft. [Ablauf und Migration](user-approvals.md). |
 | Admin-Konfiguration | Enterprise-Feature `tableauServer`; HTTPS-Server-Origin, Site, Connected-App-IDs, Secret-Env-Referenz und Username-Claim; SQLite/PostgreSQL-Revisionen. |
 | Persönlicher Connection-Test | Admin-Button **Verbindung als Nutzer prüfen**; OIDC Authorization Code + PKCE im Popup; persönlicher Bearer-ID-Token nur im Browser-Speicher der laufenden Operation; kein manueller Token-Input. |
-| Connection-Test | Authentifiziert persönlich, prüft Server-Version `>= 2025.3`, REST API `>= 3.27` und liest vier Endpoint-Probes: Workbooks, Views, Projects und Datasources. Die Antwort enthält fünf Status-Einträge inklusive `serverinfo`. Gesamtbudget: 10 Sekunden. Mocked PKCE-, Timeout-, Desktop- und Mobile-Browser-Verifikation ist erfolgreich. |
+| Connection-Test | Authentifiziert persönlich, prüft Server-Version `>= 2024.2`, REST API `>= 3.23` und liest vier Endpoint-Probes: Workbooks, Views, Projects und Datasources. Die Antwort enthält fünf Status-Einträge inklusive `serverinfo`. Gesamtbudget: 10 Sekunden. Mocked PKCE-, Timeout-, Desktop- und Mobile-Browser-Verifikation ist erfolgreich. |
 | Workbook-/View-Finder | Chat-Tool `tableau_server_search`; Suche nach Name/ID, Projekt, Owner und Tag; nur zugängliche Metadaten und sichere Quelllinks, keine Dashboarddaten. Der `all`-Modus umfasst nur Workbooks und Views. |
 | Projekte und Datenquellen | Read-only REST-Primitives sind für den Connection-Test vorhanden. Sie sind aktuell keine Finder-Ressourcen. |
 | Metadata API | **Umgesetzt**; `tableau_metadata_search { query, datasourceId?, limit }` und `tableau_metadata_field { fieldId }` mit festen GraphQL-Abfragen, Formeln und begrenzten Upstream-/Downstream-Beziehungen. Kein beliebiges GraphQL aus User-Eingaben. |
@@ -30,9 +30,9 @@ Diese Funktionen bleiben bewusst außerhalb der implementierten Phase 2. Die Met
 
 | Status | Feature | API / Hinweis |
 |---|---|---|
-| Geplant | Dashboardübergreifende Suche | REST + Metadata; Suche in Workbooks, Views, Datenquellen und Feldern. |
+| Teilweise umgesetzt | Dashboardübergreifende Suche | REST + Metadata; Workbooks/Views über `tableau_server_search`, Felder über `tableau_metadata_search` umgesetzt; Datenquellen sind noch keine Finder-Ressource. |
 | Geplant | Explain this metric | Metadata + Extension-Kontext; Feld-, Workbook- und Lineage-Bezug. |
-| Geplant | Calculated-Field-Erklärung | Metadata; Formel und verwendete Felder verständlich machen. |
+| Teilweise umgesetzt | Calculated-Field-Erklärung | Metadata; `tableau_metadata_field` liefert Formel und begrenzte Upstream-Felder; die fachliche Erklärung bleibt dem Chat überlassen. |
 | Teilweise umgesetzt | Data Dictionary | Begrenzte Metadata-Grundlage für Feld, Beschreibung, Formel, Datenquelle, Tabelle/Spalte und gelieferte Beziehungen; Ausbau offen. |
 | Geplant | Lineage Explorer | Vollständige visuelle Lineage über Datenquelle, Tabelle, Spalte, Workbook und Worksheet. |
 | Teilweise umgesetzt | Impact Analysis | Begrenzte Downstream-Grundlage über gelieferte Sheets und Workbooks; kein vollständiger Impact Explorer. |

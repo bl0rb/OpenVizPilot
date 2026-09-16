@@ -50,7 +50,7 @@ function LocalLogin(props: { baseUrl: string; error?: string; onLoggedIn: (sessi
       <button type="submit" disabled={busy}>
         {busy ? t('login.submitting') : t('login.submit')}
       </button>
-      {(error ?? props.error) && <div class="settings-message">{error ?? props.error}</div>}
+      {(error ?? props.error) && <div class="settings-message" role="alert">{error ?? props.error}</div>}
     </form>
   );
 }

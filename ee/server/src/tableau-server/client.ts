@@ -1,11 +1,12 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
-import { resolveTableauSecret, tableauConfigSchema, type TableauConfig } from './config';
+import { resolveTableauSecret, tableauConfigSchema, TABLEAU_REST_API_VERSION, type TableauConfig } from './config';
 import { TableauError, isTableauError } from './errors';
 import { createTableauHttpsTransport, TABLEAU_REQUEST_TIMEOUT_MS, type TableauTransport, type TableauTransportResponse } from './http';
 import { METADATA_SEARCH_QUERY, METADATA_FIELD_QUERY } from './metadata-queries';
 
 const CACHE_TTL_MS = 5 * 60_000;
 const SCOPE = 'tableau:content:read';
+const API_PREFIX = `/api/${TABLEAU_REST_API_VERSION}`;
 
 export interface TableauSignInUser {
   issuer: string;
@@ -99,6 +100,17 @@ function isRetryableStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
+/** Tableau answers a REST version it does not serve with error 404001, which is a server-version problem rather than a request failure. */
+function isVersionNotFound(response: TableauTransportResponse): boolean {
+  if (response.status !== 404) return false;
+  try {
+    const error = (JSON.parse(response.body) as { error?: { code?: unknown } } | null)?.error;
+    return error?.code === '404001';
+  } catch {
+    return false;
+  }
+}
+
 function isSafePathSegment(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9._~-]{1,200}$/.test(value);
 }
@@ -185,7 +197,7 @@ export class TableauClient {
 
   private async signOutToken(token: string, signal?: AbortSignal): Promise<void> {
     try {
-      await this.transport({ method: 'POST', path: '/api/3.27/auth/signout', headers: { accept: 'application/json', 'x-tableau-auth': token }, signal });
+      await this.transport({ method: 'POST', path: `${API_PREFIX}/auth/signout`, headers: { accept: 'application/json', 'x-tableau-auth': token }, signal });
     } catch {
       // Sign-out is best effort; the token is never included in the error.
     }
@@ -218,7 +230,7 @@ export class TableauClient {
     try {
       response = await this.transport({
         method: 'POST',
-        path: '/api/3.27/auth/signin',
+        path: `${API_PREFIX}/auth/signin`,
         headers: { accept: 'application/json', 'content-type': 'application/json' },
         body: JSON.stringify({ credentials: { jwt, site: { contentUrl: this.config.siteContentUrl } } }),
         signal,
@@ -228,6 +240,7 @@ export class TableauClient {
       throw new TableauError('TABLEAU_REQUEST_FAILED');
     }
     throwIfAborted(signal);
+    if (isVersionNotFound(response)) throw new TableauError('TABLEAU_VERSION_UNSUPPORTED', response.status);
     if (response.status < 200 || response.status >= 300) throw new TableauError('TABLEAU_AUTH_FAILED', response.status);
 
     let receivedToken: string | undefined;
@@ -337,7 +350,7 @@ export class TableauClient {
     if (!queryEntries) throw new TableauError('TABLEAU_QUERY_INVALID');
     if (resource === 'serverinfo') {
       if (queryEntries.length > 0) throw new TableauError('TABLEAU_QUERY_INVALID');
-      return '/api/3.27/serverinfo';
+      return `${API_PREFIX}/serverinfo`;
     }
     if (!siteId || !isSafePathSegment(siteId)) throw new TableauError('TABLEAU_RESPONSE_INVALID');
     const params = new URLSearchParams();
@@ -348,7 +361,7 @@ export class TableauClient {
       params.set(key, String(value));
     }
     const suffix = params.toString();
-    return `/api/3.27/sites/${encodeURIComponent(siteId)}/${resource}${suffix ? `?${suffix}` : ''}`;
+    return `${API_PREFIX}/sites/${encodeURIComponent(siteId)}/${resource}${suffix ? `?${suffix}` : ''}`;
   }
 
   private async readTransport(
@@ -442,6 +455,7 @@ export class TableauClient {
           continue;
         }
         if (response.status === 401) throw new TableauError('TABLEAU_AUTH_FAILED', response.status);
+        if (isVersionNotFound(response)) throw new TableauError('TABLEAU_VERSION_UNSUPPORTED', response.status);
         if (response.status < 200 || response.status >= 300) throw new TableauError('TABLEAU_HTTP_ERROR', response.status);
         this.validateUser(user, this.now());
         return responseJson(response);

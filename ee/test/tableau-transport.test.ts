@@ -4,7 +4,7 @@ import type { RequestOptions } from 'node:https';
 import { describe, expect, it, vi } from 'vitest';
 import { createTableauHttpsTransport, type TableauHttpsRequest } from '../server/src/tableau-server/http';
 
-const request = { method: 'POST' as const, path: '/api/3.27/auth/signin', headers: {}, body: '{}' };
+const request = { method: 'POST' as const, path: '/api/3.23/auth/signin', headers: {}, body: '{}' };
 const lookup = async () => [{ address: '10.20.30.40', family: 4 as const }];
 
 function wire(status: number, chunks: string[], end = true) {

@@ -3,6 +3,7 @@ import type { VerifiedUser } from '../oidc';
 import type { PersonalizationLogger } from '../personalization';
 import { TableauClient } from './client';
 import { resolveTableauSecret, type TableauConfig } from './config';
+import { easIssuerUrl, type TableauEasKey } from './eas';
 import type { TableauStore } from './store';
 import { TableauRest } from './rest';
 import { tableauSearchSchema, type TableauSearchInput } from './schema';
@@ -16,7 +17,11 @@ export interface TableauAccess {
   issuer: string | null;
   /** Changes to OIDC configuration must invalidate cached Tableau sessions. */
   identityRevision: string;
+  /** Öffentliche URL der Middleware (Admin-UI/PUBLIC_URL) — Grundlage der EAS-Issuer-URL im oauth2-trust-Modus. */
+  publicUrl: string | null;
 }
+
+type TableauEasContext = { key: TableauEasKey; issuer: string } | null;
 
 export class TableauServiceError extends Error {
   constructor(readonly code: 'license_required' | 'oidc_required' | 'tableau_disabled' | 'tableau_changed' | 'tableau_unavailable' | 'tableau_busy') {
@@ -37,7 +42,7 @@ export class TableauService {
     readonly access: () => Promise<TableauAccess>,
     private readonly logger: PersonalizationLogger,
     private readonly salt: () => Promise<string>,
-    private readonly makeClient: (config: TableauConfig) => Client = (config) => new TableauClient(config),
+    private readonly makeClient: (config: TableauConfig, eas: TableauEasContext) => Client = (config, eas) => new TableauClient(config, { eas: eas ?? undefined }),
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {
     this.timer = setInterval(() => { void this.reconcile(); }, 30_000);
@@ -56,15 +61,33 @@ export class TableauService {
     void this.invalidate();
   }
 
+  /**
+   * Für `oauth2-trust`: lädt den persistierten EAS-Schlüssel und leitet die Issuer-URL aus der
+   * Public URL ab. Beides muss vorhanden sein (der Admin-Route legt den Schlüssel beim ersten
+   * Speichern an) — fehlt eines, ist die Middleware aus Tableau-Sicht nicht erreichbar/konfiguriert.
+   */
+  private async easContext(access: TableauAccess): Promise<TableauEasContext> {
+    const key = await this.store.getEasKey();
+    if (!key || !access.publicUrl) throw new TableauServiceError('tableau_unavailable');
+    try {
+      return { key, issuer: easIssuerUrl(access.publicUrl) };
+    } catch {
+      throw new TableauServiceError('tableau_unavailable');
+    }
+  }
+
   private async snapshot() {
     const access = await this.access();
     if (!access.licensed) throw new TableauServiceError('license_required');
     if (!access.oidcReady) throw new TableauServiceError('oidc_required');
     const { config } = await this.store.get();
     if (!config?.enabled) throw new TableauServiceError('tableau_disabled');
-    const secret = resolveTableauSecret(config, this.env);
-    const key = createHmac('sha256', secret).update(JSON.stringify([config, access.identityRevision])).digest('hex');
-    return { config, access, key };
+    const eas = config.authMode === 'oauth2-trust' ? await this.easContext(access) : null;
+    // Der Cache-Invalidierungs-Schlüssel bindet an das jeweils geheime Material: das Shared Secret
+    // bei Direct Trust, den privaten EAS-Schlüssel bei OAuth 2.0 Trust (Rotation kommt später).
+    const material = config.authMode === 'oauth2-trust' ? eas!.key.privateKeyPem : resolveTableauSecret(config, this.env);
+    const key = createHmac('sha256', material).update(JSON.stringify([config, access.identityRevision])).digest('hex');
+    return { config, access, key, eas };
   }
 
   private async reconcile(): Promise<void> {
@@ -108,14 +131,14 @@ export class TableauService {
     let used: { key: string; client: Client } | null = null;
     try {
       if (this.stopped) throw new TableauServiceError('tableau_unavailable');
-      const { config, access, key } = await this.snapshot();
+      const { config, access, key, eas } = await this.snapshot();
       this.verifyUser(user, access, config);
       actor = createHmac('sha256', await this.salt()).update(JSON.stringify(['tableau', user.issuer, user.sub])).digest('hex');
       operationSignal.throwIfAborted();
       if (this.active?.key !== key) {
         // Swap synchronously; a slow sign-out must not overwrite a newer client.
         const old = this.active;
-        this.active = { key, client: this.makeClient(config) };
+        this.active = { key, client: this.makeClient(config, eas) };
         if (old) void old.client.clear().catch(() => undefined);
       }
       const active = this.active;

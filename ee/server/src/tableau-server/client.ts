@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { resolveTableauSecret, tableauConfigSchema, TABLEAU_REST_API_VERSION, type TableauConfig } from './config';
+import { signEasJwt, type TableauEasKey } from './eas';
 import { TableauError, isTableauError } from './errors';
 import { createTableauHttpsTransport, TABLEAU_REQUEST_TIMEOUT_MS, type TableauTransport, type TableauTransportResponse } from './http';
 import { METADATA_SEARCH_QUERY, METADATA_FIELD_QUERY } from './metadata-queries';
@@ -23,6 +24,8 @@ export interface TableauClientOptions {
   /** Alias useful to callers that already expose a now function. */
   now?: () => number;
   env?: NodeJS.ProcessEnv;
+  /** Required when `config.authMode === 'oauth2-trust'` — the EAS signing key and its issuer URL. */
+  eas?: { key: TableauEasKey; issuer: string };
 }
 
 interface CachedSession {
@@ -119,6 +122,7 @@ export class TableauClient {
   readonly config: TableauConfig;
   private readonly secret: string;
   private readonly secretFingerprint: string;
+  private readonly eas: { key: TableauEasKey; issuer: string } | undefined;
   private readonly transport: TableauTransport;
   private readonly time: TableauTime | undefined;
   private readonly fallbackNow: () => number;
@@ -139,7 +143,13 @@ export class TableauClient {
     this.transport = options.transport ?? (this.config.enabled
       ? createTableauHttpsTransport(this.config.serverUrl)
       : async () => { throw new TableauError('TABLEAU_DISABLED'); });
-    this.secret = this.config.enabled ? resolveTableauSecret(this.config, options.env ?? process.env) : '';
+    this.eas = options.eas;
+    // Direct Trust braucht das Shared Secret; OAuth 2.0 Trust signiert mit dem EAS-Schlüssel
+    // (this.eas) und lässt secretEnv absichtlich leer/unbenutzt — resolveTableauSecret würde
+    // dafür fehlschlagen.
+    this.secret = this.config.enabled && this.config.authMode === 'connected-app'
+      ? resolveTableauSecret(this.config, options.env ?? process.env)
+      : '';
     this.secretFingerprint = createHash('sha256').update(this.secret, 'utf8').digest('hex');
   }
 
@@ -160,6 +170,11 @@ export class TableauClient {
     return JSON.stringify([user.issuer, user.sub]);
   }
 
+  /** Identifies the signing key in the cache: the secret fingerprint for Direct Trust, the `kid` for OAuth 2.0 Trust. */
+  private get sessionKeyFingerprint(): string {
+    return this.config.authMode === 'oauth2-trust' ? this.eas?.key.kid ?? '' : this.secretFingerprint;
+  }
+
   private cacheBaseKey(user: TableauSignInUser, username: string): string {
     return JSON.stringify([
       this.config.revision,
@@ -167,7 +182,7 @@ export class TableauClient {
       this.config.siteContentUrl,
       this.config.clientId,
       this.config.secretId,
-      this.secretFingerprint,
+      this.sessionKeyFingerprint,
       SCOPE,
       user.issuer,
       user.sub,
@@ -204,6 +219,13 @@ export class TableauClient {
   }
 
   private signInJwt(username: string, now: number, expiresAt: number): string {
+    return this.config.authMode === 'oauth2-trust'
+      ? this.signInJwtOauth2Trust(username, now)
+      : this.signInJwtDirectTrust(username, now, expiresAt);
+  }
+
+  /** Direct Trust (unverändert): HS256 mit dem Connected-App-Secret, an die verbleibende OIDC-Sitzungsdauer gekoppelt. */
+  private signInJwtDirectTrust(username: string, now: number, expiresAt: number): string {
     const exp = Math.min(Math.floor(expiresAt / 1000), Math.floor(now / 1000) + 60);
     if (exp <= Math.floor(now / 1000)) throw new TableauError('TABLEAU_IDENTITY_EXPIRED');
     const header = { alg: 'HS256', typ: 'JWT', kid: this.config.secretId, iss: this.config.clientId };
@@ -213,6 +235,12 @@ export class TableauClient {
     const signingInput = `${encodedHeader}.${encodedPayload}`;
     const signature = createHmac('sha256', this.secret).update(signingInput, 'utf8').digest('base64url');
     return `${signingInput}.${signature}`;
+  }
+
+  /** OAuth 2.0 Trust: RS256 mit dem middleware-eigenen EAS-Schlüssel, `aud` gegen die konfigurierte Site-LUID. */
+  private signInJwtOauth2Trust(username: string, now: number): string {
+    if (!this.eas) throw new TableauError('TABLEAU_EAS_KEY_MISSING');
+    return signEasJwt(this.eas.key, { issuer: this.eas.issuer, username, siteId: this.config.siteId, now });
   }
 
   private async performSignIn(

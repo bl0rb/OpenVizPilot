@@ -29,18 +29,29 @@ const serverUrlSchema = z.string().max(HTTPS_ORIGIN_MAX_LENGTH).refine(isHttpsOr
 const siteContentUrlSchema = z.string().max(200);
 const nonEmptyConfigString = z.string().trim().min(1);
 const secretEnvSchema = z.string().regex(SECRET_ENV_PATTERN);
+/** Tableau Site-LUID (aus dem Connected-App-Dialog nach dem Anlegen), UUID-Format. */
+const siteIdSchema = z.string().uuid();
+const authModeSchema = z.enum(['connected-app', 'oauth2-trust']);
 
+// Feldschemas sind für beide `authMode`-Werte gleich locker gefasst (kein Feld wird
+// hier je Modus zwingend gemacht) — die je Modus zwingenden Felder erzwingt der
+// `superRefine` unten. So bleibt `TableauConfig` weiterhin ein einfacher
+// enabled/disabled-Union (Direct Trust bleibt strukturell unverändert), und Code,
+// der `config.siteId` oder `config.clientId` liest, muss nicht erst nach `authMode`
+// verzweigen, um auf ein vorhandenes Feld zuzugreifen.
 const enabledConfigFields = {
   enabled: z.literal(true),
   serverUrl: serverUrlSchema,
   siteContentUrl: siteContentUrlSchema.default(''),
-  clientId: nonEmptyConfigString,
-  secretId: nonEmptyConfigString,
-  secretEnv: secretEnvSchema,
+  clientId: z.string().max(500).default(''),
+  secretId: z.string().max(500).default(''),
+  secretEnv: z.union([secretEnvSchema, z.literal('')]).default(''),
   usernameClaim: nonEmptyConfigString,
+  /** Nur für `oauth2-trust` zwingend (Site-LUID); bei `connected-app` unbenutzt. */
+  siteId: z.union([siteIdSchema, z.literal('')]).default(''),
   revision: z.string().uuid(),
   apiVersion: apiVersionSchema,
-  authMode: z.literal('connected-app'),
+  authMode: authModeSchema.default('connected-app'),
 } as const;
 
 const disabledConfigFields = {
@@ -51,15 +62,36 @@ const disabledConfigFields = {
   secretId: z.string().max(500).default(''),
   secretEnv: z.union([secretEnvSchema, z.literal('')]).default(''),
   usernameClaim: z.string().max(500).default(''),
+  siteId: z.union([siteIdSchema, z.literal('')]).default(''),
   revision: z.string().uuid(),
   apiVersion: apiVersionSchema.default(TABLEAU_REST_API_VERSION),
-  authMode: z.literal('connected-app').default('connected-app'),
+  authMode: authModeSchema.default('connected-app'),
 } as const;
+
+/**
+ * Je `authMode` zwingende Felder, sobald `enabled: true` — Direct Trust unverändert
+ * (clientId/secretId/secretEnv), OAuth 2.0 Trust verlangt stattdessen eine gültige
+ * Site-LUID; die jeweils andere Gruppe bleibt leer und wird ignoriert.
+ */
+function checkEnabledAuthMode(config: { enabled: boolean; authMode: string; clientId: string; secretId: string; secretEnv: string; siteId: string }, ctx: z.RefinementCtx): void {
+  if (!config.enabled) return;
+  if (config.authMode === 'oauth2-trust') {
+    if (!siteIdSchema.safeParse(config.siteId).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['siteId'], message: 'siteId must be the Tableau site LUID (UUID) when authMode is oauth2-trust' });
+    }
+    return;
+  }
+  if (config.clientId.trim().length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['clientId'], message: 'clientId is required when authMode is connected-app' });
+  if (config.secretId.trim().length === 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['secretId'], message: 'secretId is required when authMode is connected-app' });
+  if (!secretEnvSchema.safeParse(config.secretEnv).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['secretEnv'], message: 'secretEnv is required when authMode is connected-app' });
+  }
+}
 
 export const tableauConfigSchema = z.discriminatedUnion('enabled', [
   z.object(enabledConfigFields).strict(),
   z.object(disabledConfigFields).strict(),
-]);
+]).superRefine(checkEnabledAuthMode);
 export type TableauConfig = z.infer<typeof tableauConfigSchema>;
 
 const tableauConfigCompleteInputSchema = z.object(enabledConfigFields).omit({ revision: true }).strict();
@@ -69,7 +101,7 @@ const tableauConfigDisabledInputSchema = z.object(disabledConfigFields).omit({ r
 export const tableauConfigInputSchema = z.discriminatedUnion('enabled', [
   tableauConfigCompleteInputSchema.extend({ enabled: z.literal(true) }),
   tableauConfigDisabledInputSchema,
-]);
+]).superRefine(checkEnabledAuthMode);
 
 export type TableauConfigInput = z.infer<typeof tableauConfigInputSchema>;
 

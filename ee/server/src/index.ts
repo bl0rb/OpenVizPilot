@@ -14,6 +14,8 @@ export * from './mcp/service';
 export * from './mcp/routes';
 export * from './mcp/store';
 export * from './mcp/admin-ui';
+export * from './tableau-server/eas';
+export * from './tableau-server/eas-routes';
 export * from './tableau-server/store';
 export * from './tableau-server/service';
 export * from './tableau-server/routes';

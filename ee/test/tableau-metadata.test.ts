@@ -12,6 +12,7 @@ const config: TableauConfig = {
   secretId: 'secret-id',
   secretEnv: 'OVP_TABLEAU_SECRET',
   usernameClaim: 'tableau_username',
+  siteId: '',
   revision: '11111111-1111-4111-8111-111111111111',
   apiVersion: '3.23',
   authMode: 'connected-app',

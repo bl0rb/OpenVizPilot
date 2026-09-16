@@ -31,7 +31,9 @@ Die **Tableau Server Integration** mit Feature-Schlüssel `tableauServer` ist f�
 ab **2024.2 einschließlich** vorgesehen. Phasen 1–3 sind implementiert: Konfiguration und
 persönlicher Sign-in, REST-basierte Workbook-/View-Suche sowie Metadata-API mit Feldsuche/-detail;
 die Live-Abnahme gegen eine reale Tableau-Installation steht noch aus. Sie setzt OIDC mit `sso` und eine
-Connected App voraus. `/api/features` zeigt die Lizenzfreigabe; die Integration bleibt bis zur
+Connected App voraus — unterstützt werden beide Tableau-Trust-Arten: Direct Trust (Client-ID/Secret) und
+OAuth 2.0 Trust (die Middleware tritt dabei selbst als External Authorization Server auf, ohne Shared Secret
+aus Tableau). `/api/features` zeigt die Lizenzfreigabe; die Integration bleibt bis zur
 Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md),
 [Roadmap](tableau-server-integration.md) und [Threat Model](tableau-server-phase-0.md).
 

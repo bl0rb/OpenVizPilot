@@ -8,18 +8,53 @@ Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschl
 - Enterprise-Lizenz mit `tableauServer` und `sso`.
 - Funktionierende OIDC-Anmeldung. Der konfigurierte Claim muss exakt dem Tableau-Username entsprechen: `email`, `preferred_username`, `upn` oder ein benutzerdefinierter Claim.
 - Der gewählte Claim muss vom IdP administrativ kontrolliert und für die Zielgruppe stabil gepflegt werden. OpenVizPilot verändert weder Domain noch Groß-/Kleinschreibung und verwendet keine Ersatzidentität.
-- Tableau Connected App mit Direct Trust, Client-ID, Secret-ID und Secret-Wert. Der JWT-Scope bleibt ausschließlich `tableau:content:read`.
+- Tableau Connected App — entweder **Direct Trust** (Client-ID, Secret-ID, Secret-Wert) oder **OAuth 2.0 Trust**
+  (Issuer-URL, JWKS; das Schlüsselpaar erzeugt die Middleware selbst). Der JWT-Scope bleibt in beiden Fällen
+  ausschließlich `tableau:content:read`.
+- Bei OAuth 2.0 Trust muss die Middleware unter einer festen HTTPS-Public-URL erreichbar sein, und Tableau muss die
+  daraus abgeleitete Issuer-URL (`<Issuer URL>/.well-known/openid-configuration`) sowie die JWKS-URL per HTTPS
+  erreichen können (Firewall/Proxy entsprechend freigeben).
 - Für Metadata API auf Tableau Server muss ein Server-Admin den Metadata-Service aktivieren: `tsm maintenance metadata-services enable`. Die Aktivierung erzeugt bzw. ersetzt den Metadata-Index und kann Dienste neu starten. Data Management/Catalog ist für den vollständigen externen Asset-Kontext relevant; ohne diese Lizenz gelten zusätzliche Sichtbarkeitsgrenzen.
 - Erreichbarer Tableau-Server mit vertrauenswürdiger TLS-Kette. Die Server-URL muss eine HTTPS-Origin ohne Pfad, Query, Credentials oder Fragment sein.
 
 ## Einrichtung
 
+Beide Trust-Arten setzen eine funktionierende Single-Sign-On-Anmeldung (OIDC) und eine Enterprise-Lizenz mit `sso`
+und `tableauServer` voraus; der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau
+Cloud der E-Mail-Adresse). In `/admin` unter **Tableau Server** zunächst im Feld **Authentifizierung** den
+gewünschten Modus wählen.
+
+### Direct Trust
+
 1. Secret-Wert als Deployment-Umgebungsvariable mit `OVP_TABLEAU_`-Präfix bereitstellen, zum Beispiel `OVP_TABLEAU_CONNECTED_APP_SECRET`. In Kubernetes kann die Variable aus einem vorhandenen Secret kommen. Nach einer Änderung alle Replicas neu starten.
-2. In `/admin` **Tableau Server** öffnen. Server-URL als Origin eintragen, etwa `https://tableau.example.com`. Für die Default-Site bleibt die Site-Inhalt-URL leer.
-3. Client-ID, Secret-ID und den Namen der Secret-Umgebungsvariable eintragen. Der Secret-Wert wird nie über die Admin-API gesendet.
-4. Username-Claim auswählen. Werte werden exakt verwendet; es gibt keinen Domain-, Großschreibungs- oder Identitäts-Fallback.
-5. Integration aktivieren und speichern. **Konfiguration prüfen** validiert gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
-6. Nach dem Speichern den Button **Verbindung als Nutzer prüfen** verwenden. Der Button ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und OIDC-Bereitschaft aktiv.
+2. Authentifizierung auf **Connected App – Direct Trust** stellen. Server-URL als Origin eintragen, etwa `https://tableau.example.com`. Für die Default-Site bleibt die Site-Inhalt-URL leer.
+3. In Tableau: Settings → Connected Apps → New Connected App → Direct Trust. Name, Access level und Domain allowlist (Public URL der Middleware) setzen, Enable connected app aktivieren.
+4. Client-ID, Secret-ID und den Namen der Secret-Umgebungsvariable eintragen. Der Secret-Wert wird nie über die Admin-API gesendet.
+5. Username-Claim auswählen. Werte werden exakt verwendet; es gibt keinen Domain-, Großschreibungs- oder Identitäts-Fallback.
+6. Integration aktivieren und speichern. **Konfiguration prüfen** validiert gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
+7. Nach dem Speichern den Button **Verbindung als Nutzer prüfen** verwenden. Der Button ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und OIDC-Bereitschaft aktiv.
+
+### OAuth 2.0 Trust
+
+OpenVizPilot tritt dabei selbst als External Authorization Server (EAS) auf: Es besitzt ein eigenes RSA-2048-
+Schlüsselpaar, veröffentlicht OIDC-Discovery und JWKS unter einer Issuer-URL und stellt für jeden verifizierten
+OIDC-Nutzer ein kurzlebiges RS256-JWT aus. Es gibt kein aus Tableau stammendes Shared Secret; der Schlüssel bleibt
+unter eigener Kontrolle. Der private Schlüssel verlässt Datenbank und Prozess nie — weder über die Admin-API noch
+in Logs.
+
+1. Authentifizierung auf **Connected App – OAuth 2.0 Trust** stellen und ohne weitere Angaben speichern — auch im
+   deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den EAS-Schlüssel; der Abschnitt zeigt danach die
+   schreibgeschützte **Issuer URL**, **JWKS-URL** und **Key-ID** an.
+2. Issuer URL über den Kopieren-Button übernehmen.
+3. In Tableau: Settings → Connected Apps → New Connected App → OAuth 2.0 Trust. Name vergeben, Issuer URL
+   einfügen, Enable connected app aktivieren. Tableau zeigt danach die **Site ID** (Site-LUID) an.
+4. Site ID hier als Site-ID eintragen, Server-URL (und ggf. Site-Inhalt-URL) sowie Username-Claim eintragen,
+   Integration aktivieren, speichern.
+5. **Konfiguration prüfen** ausführen (kontaktiert Tableau nicht).
+6. **Verbindung als Nutzer prüfen** ausführen.
+
+Ändert sich die Public URL der Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau nachgezogen
+werden. Vorausgesetzt: Tableau Server ab 2024.2 einschließlich bzw. Tableau Cloud.
 
 ## Was der persönliche Test macht
 

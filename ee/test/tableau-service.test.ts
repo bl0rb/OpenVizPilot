@@ -10,7 +10,7 @@ import { TableauError } from '../server/src/tableau-server/errors';
 const input = {
   enabled: true, serverUrl: 'https://tableau.example.com', siteContentUrl: 'sales',
   clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST_SECRET',
-  usernameClaim: 'upn', apiVersion: '3.23' as const, authMode: 'connected-app' as const,
+  usernameClaim: 'upn', siteId: '', apiVersion: '3.23' as const, authMode: 'connected-app' as const,
 };
 const user = { issuer: 'https://idp.example.com', sub: 'oidc-user', expiresAt: Date.now() + 3600_000, claims: { upn: 'TableauUser' } };
 const cleanups: Array<() => void> = [];
@@ -20,7 +20,7 @@ async function fixture() {
   vi.stubEnv('OVP_TABLEAU_TEST_SECRET', 'sentinel-tableau-secret');
   const db = openSqliteDatabase(':memory:');
   const store = createSqliteTableauStore(db);
-  let access: TableauAccess = { licensed: true, oidcReady: true, issuer: user.issuer, identityRevision: 'oidc-v1' };
+  let access: TableauAccess = { licensed: true, oidcReady: true, issuer: user.issuer, identityRevision: 'oidc-v1', publicUrl: 'https://ovp.example.com' };
   let readGate: Promise<void> | null = null;
   const clients: Array<{ signIn: ReturnType<typeof vi.fn>; clear: ReturnType<typeof vi.fn>; clearUser: ReturnType<typeof vi.fn>; prune: ReturnType<typeof vi.fn>; read: ReturnType<typeof vi.fn> }> = [];
   const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };

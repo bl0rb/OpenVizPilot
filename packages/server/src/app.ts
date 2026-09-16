@@ -14,6 +14,8 @@ import {
   createMcpRoute,
   TableauService,
   createTableauRoute,
+  createTableauEasRoute,
+  EAS_PATH,
 } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -85,6 +87,8 @@ export function createApp(config: AppConfig): {
       oidcReady: state.mode === 'oidc' && Boolean(state.oidc) && !state.blockedReason,
       issuer: state.oidcSettings?.issuer ?? null,
       identityRevision: createHash('sha256').update(JSON.stringify([state.mode, state.oidcSettings])).digest('hex'),
+      // Grundlage der EAS-Issuer-URL im oauth2-trust-Modus — dieselbe Public URL wie für die SSO-Redirect-URI.
+      publicUrl: state.publicUrl,
     };
   }, logger, () => backend.store.getUsageSalt()) : null;
 
@@ -156,6 +160,12 @@ export function createApp(config: AppConfig): {
   if (config.allowedOrigins.length > 0) {
     app.use('/api/*', cors({ origin: config.allowedOrigins }));
   }
+
+  // Öffentliche OIDC-Discovery/JWKS für den Tableau-EAS-Modus (OAuth 2.0 Trust) —
+  // Tableau ruft beide URLs unangemeldet auf, siehe eas.ts/eas-routes.ts. Liegt
+  // außerhalb von /api/* und damit vor bzw. unabhängig von der API-Auth unten;
+  // 404, solange der Modus nicht aktiv ist oder kein Schlüssel existiert.
+  app.route(EAS_PATH, createTableauEasRoute(tableau?.store ?? null, async () => (await authState.get()).publicUrl));
 
   // Zugriffsschutz für /api/* — Modus zur Laufzeit aus authState:
   // - token: Shared-Token gegen Missbrauch als offener LLM-Proxy (API_AUTH_TOKEN)

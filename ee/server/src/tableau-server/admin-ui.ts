@@ -18,6 +18,18 @@ export const tableauAdminStyles = `
   #tableau-server-admin .tableau-server-connection-result ul { margin: 0.35rem 0 0; padding-left: 1.25rem; }
   #tableau-server-admin .tableau-server-connection-result .ok { color: var(--success, #18794e); }
   #tableau-server-admin .tableau-server-connection-result .error { color: var(--danger, #b42318); }
+  #tableau-server-admin .tableau-server-mode-fields { display: contents; }
+  #tableau-server-admin .tableau-server-mode-fields > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
+  #tableau-server-admin .tableau-server-mode-fields > label > input, #tableau-server-admin .tableau-server-mode-fields > label > select { width: 100%; min-width: 0; }
+  #tableau-server-admin .field-hint { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+  #tableau-server-admin .tableau-server-inline-field { display: flex; gap: 0.4rem; }
+  #tableau-server-admin .tableau-server-inline-field input { flex: 1; min-width: 0; }
+  #tableau-server-admin input[readonly] { background: var(--bg); color: var(--text-muted); }
+  #tableau-server-admin details { border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin-top: 0.75rem; }
+  #tableau-server-admin details summary { cursor: pointer; font-weight: 600; }
+  #tableau-server-admin details ol { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+  #tableau-server-admin details li { margin: 0.3rem 0; }
+  #tableau-server-admin details .hint { margin: 0.5rem 0 0; }
 `;
 
 export const tableauAdminSection = `
@@ -39,21 +51,34 @@ export const tableauAdminSection = `
               <input id="tableau-server-enabled" type="checkbox" />
               <span>Tableau Server-Integration aktiviert</span>
             </label>
+            <label for="tableau-server-auth-mode">Authentifizierung
+              <select id="tableau-server-auth-mode">
+                <option value="connected-app">Connected App – Direct Trust (Client-ID, Secret)</option>
+                <option value="oauth2-trust">Connected App – OAuth 2.0 Trust (Issuer-URL, JWKS)</option>
+              </select>
+            </label>
             <label for="tableau-server-url">Server-URL
               <input id="tableau-server-url" type="url" autocomplete="off" placeholder="https://tableau.example.com" />
+              <span class="field-hint">HTTPS-Origin ohne Pfad, z. B. https://tableau.example.com</span>
             </label>
             <label for="tableau-server-site">Site-Inhalt-URL
               <input id="tableau-server-site" type="text" autocomplete="off" placeholder="site-content-url" />
+              <span class="field-hint">contentUrl der Site; leer = Default-Site</span>
             </label>
-            <label for="tableau-server-client-id">Client-ID
-              <input id="tableau-server-client-id" type="text" autocomplete="off" />
-            </label>
-            <label for="tableau-server-secret-id">Secret-ID
-              <input id="tableau-server-secret-id" type="text" autocomplete="off" />
-            </label>
-            <label for="tableau-server-secret-env">Secret-Env-Referenz
-              <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" />
-            </label>
+            <div id="tableau-server-connected-app-fields" class="tableau-server-mode-fields">
+              <label for="tableau-server-client-id">Client-ID
+                <input id="tableau-server-client-id" type="text" autocomplete="off" />
+                <span class="field-hint">aus Tableau: Connected App → Client ID</span>
+              </label>
+              <label for="tableau-server-secret-id">Secret-ID
+                <input id="tableau-server-secret-id" type="text" autocomplete="off" />
+                <span class="field-hint">Secret ID des erzeugten Secrets</span>
+              </label>
+              <label for="tableau-server-secret-env">Secret-Env-Referenz
+                <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" />
+                <span class="field-hint">Name der Umgebungsvariable mit dem Secret value, Präfix OVP_TABLEAU_; der Wert wird nie hier eingegeben</span>
+              </label>
+            </div>
             <label for="tableau-server-username-claim">Username-Claim
               <select id="tableau-server-username-claim">
                 <option value="email">email</option>
@@ -65,9 +90,58 @@ export const tableauAdminSection = `
             <label id="tableau-server-custom-claim-field" class="tableau-server-custom" for="tableau-server-custom-claim">Benutzerdefinierter Username-Claim
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
-            <div class="form-field"><span>Authentifizierung</span><span class="tableau-server-auth">Connected App (JWT)</span></div>
+            <div id="tableau-server-oauth2-fields" class="tableau-server-mode-fields">
+              <label for="tableau-server-eas-issuer">Issuer URL
+                <span class="tableau-server-inline-field">
+                  <input id="tableau-server-eas-issuer" type="text" readonly />
+                  <button id="tableau-server-eas-issuer-copy" type="button" disabled>Kopieren</button>
+                </span>
+                <span class="field-hint">In Tableau bei „New Connected App → OAuth 2.0 Trust" als Issuer URL eintragen</span>
+              </label>
+              <label for="tableau-server-eas-jwks">JWKS-URL
+                <input id="tableau-server-eas-jwks" type="text" readonly />
+              </label>
+              <label for="tableau-server-eas-kid">Key-ID
+                <input id="tableau-server-eas-kid" type="text" readonly />
+              </label>
+              <label for="tableau-server-site-id">Site-ID
+                <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
+                <span class="field-hint">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt</span>
+              </label>
+              <p id="tableau-server-eas-warning" class="hint error" role="status" hidden>
+                Für OAuth 2.0 Trust muss die Middleware unter einer HTTPS-Public-URL erreichbar sein. Im Abschnitt
+                <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> eintragen.
+              </p>
+            </div>
             <div class="form-field"><span>Tableau-Mindestversion</span><span class="tableau-server-auth">${TABLEAU_MIN_SERVER_VERSION} (REST API ${TABLEAU_REST_API_VERSION})</span></div>
           </div>
+          <details id="tableau-server-setup-connected-app">
+            <summary>Einrichtung Schritt für Schritt (Direct Trust)</summary>
+            <ol>
+              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>. Der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau Cloud: der E-Mail-Adresse).</li>
+              <li>In Tableau: <em>Settings → Connected Apps → New Connected App → Direct Trust</em>. Name vergeben, Access level und Domain allowlist setzen (die Public URL dieser Middleware eintragen), <em>Enable connected app</em> aktivieren.</li>
+              <li><em>Client ID</em> kopieren.</li>
+              <li><em>Generate New Secret</em> klicken — Tableau zeigt <em>Secret ID</em> und <em>Secret Value</em> an.</li>
+              <li>Secret Value als Umgebungsvariable mit Präfix <code>OVP_TABLEAU_</code> bereitstellen; Secret-ID hier eintragen.</li>
+              <li>Server-URL, Site-Inhalt-URL, Client-ID, Secret-ID, Secret-Env-Referenz und Username-Claim oben eintragen, Integration aktivieren, speichern.</li>
+              <li><strong>Konfiguration prüfen</strong> ausführen.</li>
+              <li><strong>Verbindung als Nutzer prüfen</strong> ausführen.</li>
+            </ol>
+          </details>
+          <details id="tableau-server-setup-oauth2-trust">
+            <summary>Einrichtung Schritt für Schritt (OAuth 2.0 Trust)</summary>
+            <ol>
+              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>. Der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau Cloud: der E-Mail-Adresse).</li>
+              <li>Diesen Modus hier zuerst speichern — auch im deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den EAS-Schlüssel.</li>
+              <li>Issuer URL oben kopieren.</li>
+              <li>In Tableau: <em>Settings → Connected Apps → New Connected App → OAuth 2.0 Trust</em>. Name vergeben, Issuer URL einfügen, <em>Enable connected app</em> aktivieren.</li>
+              <li>Die von Tableau angezeigte <em>Site ID</em> kopieren.</li>
+              <li>Site-ID oben eintragen, speichern.</li>
+              <li><strong>Konfiguration prüfen</strong> ausführen.</li>
+              <li><strong>Verbindung als Nutzer prüfen</strong> ausführen.</li>
+            </ol>
+            <p class="hint">Tableau muss die Issuer URL (<code>/.well-known/openid-configuration</code>) und die JWKS-URL per HTTPS erreichen können (Firewall/Proxy prüfen); vorausgesetzt: Tableau Server ab 2024.2 bzw. Tableau Cloud. Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau nachgezogen werden.</p>
+          </details>
           <div class="form-actions tableau-server-actions">
             <button id="tableau-server-save" class="primary" type="button">Speichern</button>
             <button id="tableau-server-check" type="button">Konfiguration prüfen</button>
@@ -83,7 +157,7 @@ export const tableauAdminSection = `
 `;
 
 export const tableauAdminScript = String.raw`
-  var tableauServerState = { config: null, revision: null, secretConfigured: false, licensed: false, oidcReady: false };
+  var tableauServerState = { config: null, revision: null, secretConfigured: false, licensed: false, oidcReady: false, eas: null };
   var tableauServerDirty = false;
   var tableauServerLoaded = false;
   var tableauServerTest = null;
@@ -92,14 +166,46 @@ export const tableauAdminScript = String.raw`
   var tableauServerControls = document.getElementById('tableau-server-controls');
   var tableauServerFields = {
     enabled: document.getElementById('tableau-server-enabled'),
+    authMode: document.getElementById('tableau-server-auth-mode'),
     serverUrl: document.getElementById('tableau-server-url'),
     siteContentUrl: document.getElementById('tableau-server-site'),
     clientId: document.getElementById('tableau-server-client-id'),
     secretId: document.getElementById('tableau-server-secret-id'),
     secretEnv: document.getElementById('tableau-server-secret-env'),
     usernameClaim: document.getElementById('tableau-server-username-claim'),
-    customClaim: document.getElementById('tableau-server-custom-claim')
+    customClaim: document.getElementById('tableau-server-custom-claim'),
+    siteId: document.getElementById('tableau-server-site-id')
   };
+
+  function tableauServerUpdateModeVisibility() {
+    var oauth2 = tableauServerFields.authMode.value === 'oauth2-trust';
+    document.getElementById('tableau-server-connected-app-fields').hidden = oauth2;
+    document.getElementById('tableau-server-oauth2-fields').hidden = !oauth2;
+    document.getElementById('tableau-server-setup-connected-app').hidden = oauth2;
+    document.getElementById('tableau-server-setup-oauth2-trust').hidden = !oauth2;
+  }
+
+  function tableauServerRenderEas() {
+    var eas = tableauServerState.eas;
+    var pending = 'Wird beim ersten Speichern in diesem Modus erzeugt.';
+    document.getElementById('tableau-server-eas-issuer').value = eas ? eas.issuerUrl : pending;
+    document.getElementById('tableau-server-eas-jwks').value = eas ? eas.jwksUrl : pending;
+    document.getElementById('tableau-server-eas-kid').value = eas ? eas.kid : pending;
+    document.getElementById('tableau-server-eas-issuer-copy').disabled = !eas;
+    document.getElementById('tableau-server-eas-warning').hidden = !(eas && eas.publicUrlOk === false);
+  }
+
+  function tableauServerCopyFallback(text) {
+    var input = document.getElementById('tableau-server-eas-issuer');
+    var previousValue = input.value;
+    input.removeAttribute('readonly');
+    input.value = text;
+    input.select();
+    try { document.execCommand('copy'); } catch (error) { /* best effort */ }
+    input.value = previousValue;
+    input.setAttribute('readonly', 'readonly');
+    input.blur();
+  }
 
   function tableauServerMessage(message, kind) {
     showBanner(tableauServerBanner, message || '', kind || '');
@@ -301,32 +407,38 @@ export const tableauAdminScript = String.raw`
     var claim = tableauServerFields.usernameClaim.value === 'custom'
       ? tableauServerFields.customClaim.value.trim()
       : tableauServerFields.usernameClaim.value;
+    var mode = tableauServerFields.authMode.value;
     return {
       enabled: tableauServerFields.enabled.checked,
       serverUrl: tableauServerFields.serverUrl.value.trim(),
       siteContentUrl: tableauServerFields.siteContentUrl.value.trim(),
-      clientId: tableauServerFields.clientId.value.trim(),
-      secretId: tableauServerFields.secretId.value.trim(),
-      secretEnv: tableauServerFields.secretEnv.value.trim(),
+      clientId: mode === 'oauth2-trust' ? '' : tableauServerFields.clientId.value.trim(),
+      secretId: mode === 'oauth2-trust' ? '' : tableauServerFields.secretId.value.trim(),
+      secretEnv: mode === 'oauth2-trust' ? '' : tableauServerFields.secretEnv.value.trim(),
+      siteId: mode === 'oauth2-trust' ? tableauServerFields.siteId.value.trim() : '',
       usernameClaim: claim,
       apiVersion: '${TABLEAU_REST_API_VERSION}',
-      authMode: 'connected-app'
+      authMode: mode
     };
   }
 
   function renderTableauServer() {
     var config = tableauServerState.config;
     tableauServerFields.enabled.checked = Boolean(config && config.enabled);
+    tableauServerFields.authMode.value = config && config.authMode === 'oauth2-trust' ? 'oauth2-trust' : 'connected-app';
     tableauServerFields.serverUrl.value = config ? config.serverUrl || '' : '';
     tableauServerFields.siteContentUrl.value = config ? config.siteContentUrl || '' : '';
     tableauServerFields.clientId.value = config ? config.clientId || '' : '';
     tableauServerFields.secretId.value = config ? config.secretId || '' : '';
     tableauServerFields.secretEnv.value = config ? config.secretEnv || '' : '';
+    tableauServerFields.siteId.value = config ? config.siteId || '' : '';
     var claim = config ? config.usernameClaim || 'email' : 'email';
     var knownClaim = ['email', 'preferred_username', 'upn'].indexOf(claim) >= 0;
     tableauServerFields.usernameClaim.value = knownClaim ? claim : 'custom';
     tableauServerFields.customClaim.value = knownClaim ? '' : claim;
     document.getElementById('tableau-server-custom-claim-field').hidden = knownClaim;
+    tableauServerUpdateModeVisibility();
+    tableauServerRenderEas();
     tableauServerSetText('tableau-server-license-status', 'Lizenz: ' + (tableauServerState.licensed ? 'vorhanden' : 'nicht vorhanden'));
     tableauServerSetText('tableau-server-oidc-status', 'OIDC: ' + (tableauServerState.oidcReady ? 'bereit' : 'nicht bereit'));
     tableauServerSetText('tableau-server-secret-status', 'Secret: ' + (tableauServerState.secretConfigured ? 'konfiguriert' : 'nicht konfiguriert'));
@@ -366,10 +478,28 @@ export const tableauAdminScript = String.raw`
 
   Object.keys(tableauServerFields).forEach(function (key) {
     var field = tableauServerFields[key];
-    field.addEventListener(key === 'enabled' || key === 'usernameClaim' ? 'change' : 'input', tableauServerChanged);
+    field.addEventListener(key === 'enabled' || key === 'usernameClaim' || key === 'authMode' ? 'change' : 'input', tableauServerChanged);
   });
   tableauServerFields.usernameClaim.addEventListener('change', function () {
     document.getElementById('tableau-server-custom-claim-field').hidden = tableauServerFields.usernameClaim.value !== 'custom';
+  });
+  tableauServerFields.authMode.addEventListener('change', tableauServerUpdateModeVisibility);
+  tableauServerUpdateModeVisibility();
+  document.getElementById('tableau-server-eas-issuer-copy').addEventListener('click', function () {
+    var eas = tableauServerState.eas;
+    if (!eas) return;
+    var button = document.getElementById('tableau-server-eas-issuer-copy');
+    var revert = function () { button.textContent = 'Kopieren'; };
+    var done = function () { button.textContent = 'Kopiert!'; setTimeout(revert, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(eas.issuerUrl).then(done).catch(function () {
+        tableauServerCopyFallback(eas.issuerUrl);
+        done();
+      });
+    } else {
+      tableauServerCopyFallback(eas.issuerUrl);
+      done();
+    }
   });
   document.getElementById('tableau-server-reload').addEventListener('click', function () { loadTableauServer(false); });
   document.getElementById('tableau-server-save').addEventListener('click', function () {

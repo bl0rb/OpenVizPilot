@@ -13,6 +13,7 @@ const config: TableauConfig = {
   secretId: 'secret-id',
   secretEnv: 'OVP_TABLEAU_SECRET',
   usernameClaim: 'tableau_username',
+  siteId: '',
   revision: '11111111-1111-4111-8111-111111111111',
   apiVersion: '3.23',
   authMode: 'connected-app',
@@ -39,7 +40,7 @@ describe('Tableau Phase 1 primitives', () => {
     expect(tableauConfigSchema.parse({ ...config, apiVersion: '3.27' })).toEqual(config);
     expect(() => tableauConfigSchema.parse({ ...config, apiVersion: '3.22' })).toThrow();
     expect(tableauConfigInputSchema.parse({ enabled: false })).toEqual({
-      enabled: false, serverUrl: '', siteContentUrl: '', clientId: '', secretId: '', secretEnv: '', usernameClaim: '', apiVersion: '3.23', authMode: 'connected-app',
+      enabled: false, serverUrl: '', siteContentUrl: '', clientId: '', secretId: '', secretEnv: '', usernameClaim: '', siteId: '', apiVersion: '3.23', authMode: 'connected-app',
     });
     expect(tableauConfigSchema.parse({ enabled: false, revision: config.revision })).toMatchObject({ enabled: false, serverUrl: '', secretEnv: '' });
     expect(() => tableauConfigInputSchema.parse({ enabled: true, serverUrl: config.serverUrl })).toThrow();

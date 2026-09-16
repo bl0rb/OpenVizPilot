@@ -6,7 +6,7 @@ import type { TableauReadResource, TableauSignInUser } from '../server/src/table
 
 const config = {
   enabled: true, serverUrl: 'https://tableau.example.test', siteContentUrl: 'sales',
-  clientId: 'client', secretId: 'secret', secretEnv: 'OVP_TABLEAU_TEST', usernameClaim: 'upn',
+  clientId: 'client', secretId: 'secret', secretEnv: 'OVP_TABLEAU_TEST', usernameClaim: 'upn', siteId: '',
   revision: '11111111-1111-4111-8111-111111111111', apiVersion: '3.23', authMode: 'connected-app',
 } satisfies TableauConfig;
 const user: TableauSignInUser = { issuer: 'https://idp.example.test', sub: 'user', expiresAt: Date.now() + 3600_000, claims: { upn: 'alice' } };

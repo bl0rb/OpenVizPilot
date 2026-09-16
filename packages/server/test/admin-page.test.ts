@@ -46,7 +46,10 @@ describe('admin presentation', () => {
   });
 
   it('keeps every navigation destination unique and available in the mobile selector', () => {
-    const targets = [...adminPageHtml.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
+    // Nur die Navigation zählt — Hilfetexte im Inhalt dürfen zusätzlich auf
+    // Abschnitte verweisen (z. B. „SSO im Abschnitt Anmeldung einrichten“).
+    const nav = adminPageHtml.match(/<nav aria-label="Administration">[\s\S]*?<\/nav>/)?.[0] ?? '';
+    const targets = [...nav.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
     expect(targets).toHaveLength(9);
     expect(new Set(targets).size).toBe(9);
     for (const target of targets) {

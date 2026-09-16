@@ -60,20 +60,6 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain('aria-label="Administrationsbereich"');
   });
 
-  it('shows a first-run checklist whose jump links all resolve to existing sections', () => {
-    const match = adminPageHtml.match(/<div id="setup-checklist"[\s\S]*?<\/div>/);
-    expect(match).not.toBeNull();
-    const block = match![0]!;
-    expect(block).toContain('Ersteinrichtung in dieser Reihenfolge');
-    const items = [...block.matchAll(/<li>/g)];
-    expect(items.length).toBeGreaterThanOrEqual(10);
-    const targets = [...block.matchAll(/href="#([a-zA-Z-]+)"/g)].map(match => match[1]);
-    expect(targets.length).toBeGreaterThan(0);
-    for (const target of targets) {
-      expect(adminPageHtml).toContain(`id="${target}"`);
-    }
-  });
-
   it('allows the embedded font only on admin, without opening external font origins', async () => {
     const instance = createApp({ ...loadEnv({ LITELLM_BASE_URL: 'http://localhost:9', LITELLM_API_KEY: 'test', DEFAULT_MODEL: 'test', ADMIN_TOKEN: 'test-admin', MEMORY_ENABLED: 'false' }), telemetryEndpoint: '' });
     try {
@@ -121,5 +107,39 @@ describe('admin page inline script', () => {
     expect(adminPageHtml).toContain('name.textContent = u.displayName || u.email || u.subject || u.id;');
     expect(adminPageHtml).toContain('email.textContent = u.email || \'—\';');
     expect(adminPageHtml).toContain('return loadUsers().then(loadUserAccess)');
+  });
+});
+
+/**
+ * Feld-Erklärungen leben im wiederverwendbaren ?-Symbol statt in Absätzen
+ * (siehe Betreiber-Vorgabe: „nur Hover und Anleitungen, wenn es für Buttons
+ * oder Felder erforderlich ist"). Diese Tests halten das durch.
+ */
+describe('help icons', () => {
+  it('gives every .help-icon a working aria-describedby into an existing role="tooltip" element', () => {
+    const icons = [...adminPageHtml.matchAll(/<button[^>]*class="help-icon"[^>]*>/g)].map(m => m[0]);
+    expect(icons.length).toBeGreaterThan(0);
+    for (const tag of icons) {
+      expect(tag).toMatch(/aria-label="Erklärung zu [^"]+"/);
+      const id = tag.match(/aria-describedby="([^"]+)"/)?.[1];
+      expect(id, tag).toBeTruthy();
+      const tooltip = new RegExp(`role="tooltip"[^>]*id="${id}"|id="${id}"[^>]*role="tooltip"`);
+      expect(adminPageHtml, `no role="tooltip" element for #${id}`).toMatch(tooltip);
+    }
+  });
+
+  it('keeps every <p class="hint"> short — long explanations belong in a ?-icon', () => {
+    const paragraphs = [...adminPageHtml.matchAll(/<p\b[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/p>/g)]
+      .filter(([, classes]) => (classes ?? '').split(/\s+/).includes('hint'));
+    expect(paragraphs.length).toBeGreaterThan(0);
+    for (const [, , inner] of paragraphs) {
+      const text = (inner ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      expect(text.length, text).toBeLessThanOrEqual(200);
+    }
+  });
+
+  it('no longer ships the removed first-run checklist', () => {
+    expect(adminPageHtml).not.toContain('Ersteinrichtung in dieser Reihenfolge');
+    expect(adminPageHtml).not.toContain('id="setup-checklist"');
   });
 });

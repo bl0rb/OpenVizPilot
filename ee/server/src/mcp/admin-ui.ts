@@ -23,7 +23,7 @@ export const mcpAdminSection = `
         <h2 id="mcp-heading">MCP &amp; Sites <small>Enterprise</small></h2>
         <button id="mcp-reload" type="button">Aktualisieren</button>
       </div>
-      <p class="hint">Bindet externe, nur lesende MCP-Tools an bestimmte Dashboards an (z. B. Websuche als Zusatzquelle im Chat) — braucht eine Enterprise-Lizenz mit Feature „mcp“. Eine „Site“ bündelt Dashboards und Anwender; ein MCP-Server wird anschließend einer oder mehreren Sites zugewiesen. Ohne registrierte Dashboards oder aktive Benutzer lassen sich Sites nicht sinnvoll befüllen.</p>
+      <p class="hint">Bindet externe, nur lesende MCP-Tools an bestimmte Dashboards an — braucht eine Enterprise-Lizenz mit Feature „mcp“.</p>
       <p id="mcp-banner" class="banner" role="status" aria-live="polite"></p>
       <fieldset id="mcp-controls" disabled>
         <h3>Sites</h3>

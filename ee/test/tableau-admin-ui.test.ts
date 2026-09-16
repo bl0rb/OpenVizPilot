@@ -55,11 +55,12 @@ describe('Tableau admin OAuth 2.0 Trust (EAS) UI', () => {
 
   it('shows Tableau-labeled Direct Trust fields with their help text', () => {
     expect(tableauAdminSection).toContain('id="tableau-server-connected-app-fields"');
-    expect(tableauAdminSection).toContain('HTTPS-Origin ohne Pfad, z. B. https://tableau.example.com');
-    expect(tableauAdminSection).toContain('contentUrl der Site; leer = Default-Site');
-    expect(tableauAdminSection).toContain('aus Tableau: Connected App → Client ID');
+    expect(tableauAdminSection).toContain('HTTPS-Origin ohne Pfad, z. B.');
+    expect(tableauAdminSection).toContain('Site (Content-URL)');
+    expect(tableauAdminSection).toContain('Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.');
+    expect(tableauAdminSection).toContain('Aus Tableau: Connected App → Client ID');
     expect(tableauAdminSection).toContain('Secret ID des erzeugten Secrets');
-    expect(tableauAdminSection).toContain('Präfix OVP_TABLEAU_; der Wert wird nie hier eingegeben');
+    expect(tableauAdminSection).toContain('der Wert wird nie hier eingegeben');
   });
 
   it('shows read-only Issuer URL/JWKS-URL/Key-ID with a copy button, plus an editable Site-ID', () => {

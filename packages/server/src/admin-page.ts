@@ -134,6 +134,13 @@ export const adminPageHtml = `<!doctype html>
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   dialog input { min-height: 44px; }
+  .help { position: relative; display: inline-flex; vertical-align: middle; margin-left: 0.3rem; }
+  .help-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 1; cursor: help; }
+  .help-icon:hover, .help-icon:focus-visible, .help-icon[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 6px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; }
+  .help-icon:hover + .help-tip, .help-icon:focus-visible + .help-tip, .help-icon[aria-expanded="true"] + .help-tip { display: block; }
+  .help-left .help-tip { left: auto; right: 0; }
+  .help-tip code { font-size: 11px; }
   .hint { color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0 1rem; }
   .banner { border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 1rem; font-size: 0.9rem; display: none; }
   .banner.error { display: block; background: var(--danger-bg); color: var(--danger); }
@@ -289,40 +296,22 @@ export const adminPageHtml = `<!doctype html>
     <div class="workspace">
       <header class="workspace-heading"><p id="view-group">Arbeitsbereich</p><h1 id="view-title" tabindex="-1">MCP &amp; Sites</h1></header>
 
-      <div id="setup-checklist" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1.5rem 0;">
-        <h2>Ersteinrichtung in dieser Reihenfolge</h2>
-        <ol class="hint" style="margin: 0; padding-left: 1.25rem;">
-          <li>Datenbank (Memory-Store) bereitstellen – Grundlage für Admin-Login im Passwort-Modus, <a href="#users-admin">Benutzerkonten</a>, <a href="#user-access-section">Benutzerzugriff</a>, <a href="#commands-admin">Slash-Befehle</a>, <a href="#playbooks-admin">Standardanalysen</a> und <a href="#usage-admin">Nutzungsstatistik</a>.</li>
-          <li>Admin-Konto einrichten (Ersteinrichtung <code>/setup</code>) bzw. mit <code>ADMIN_TOKEN</code> anmelden.</li>
-          <li><a href="#auth-admin">Enterprise-Lizenzschlüssel</a> eintragen, falls SSO, MCP, Tableau Server oder Dashboard-Aktionen genutzt werden sollen.</li>
-          <li><a href="#auth-admin">Anmeldemodus</a> wählen: „Benutzerkonten“ (braucht mindestens ein aktives Konto) oder „Single Sign-On“ (braucht Lizenz-Feature <code>sso</code>, öffentliche URL und OIDC-Zugangsdaten).</li>
-          <li>Bei „Benutzerkonten“: Konten unter <a href="#users-admin">Benutzerkonten</a> anlegen – der Server verweigert den Moduswechsel sonst mit Fehlermeldung.</li>
-          <li>Jede Person unter Benutzerkonten → <a href="#user-access-section">Benutzerzugriff</a> für AI-Chat und/oder Tableau API freigeben; ohne diesen Schritt bleibt der Zugriff gesperrt, auch nach erfolgreichem Login (SSO-Identitäten erscheinen dort erst nach der ersten Anmeldung).</li>
-          <li><a href="#extension-admin">Extension-URL</a> eintragen, .trex-Manifest herunterladen und in Tableau bzw. der Server-Safelist eintragen.</li>
-          <li>Dashboard einmal im Bearbeitungsmodus öffnen und das Workbook speichern, damit es als registriertes Dashboard erscheint (Voraussetzung für <a href="#playbooks-admin">Standardanalysen</a> und <a href="#mcp-admin">MCP-Sites</a>).</li>
-          <li>Optional: globale <a href="#commands-admin">Slash-Befehle</a> anpassen oder <a href="#playbooks-admin">Standardanalysen je Dashboard</a> hinterlegen.</li>
-          <li>Optional, mit Lizenz-Feature <code>mcp</code>: <a href="#mcp-admin">MCP-Server anbinden und Sites</a> (Dashboards + Benutzer) zuordnen.</li>
-          <li>Optional: <a href="#models-admin">Modellkatalog</a> mit Anzeigenamen pflegen.</li>
-          <li><a href="#usage-admin">Nutzung</a> regelmäßig prüfen, um Adoption und offenen Freigabebedarf zu erkennen.</li>
-        </ol>
-      </div>
-
     ${mcpAdminSection}
     ${tableauAdminSection}
 
     <section class="card" id="commands-admin" hidden>
       <h2>Slash-Befehle</h2>
-      <p class="hint">Eigene „/name“-Befehle, die Anwender im Chat eintippen, um ein festes Prompt-Template zu starten (z. B. „/vergleich Umsatz DACH“). Der Arg-Hinweis erscheint als Platzhaltertext hinter dem Befehlsnamen; {{args}} im Template wird durch den eingegebenen Text ersetzt. Gilt dashboardübergreifend — für einzelne Dashboards siehe „Dashboard-Analysen“.</p>
+      <p class="hint">Eigene „/name“-Befehle, die Anwender im Chat eintippen, um ein festes Prompt-Template zu starten (z. B. <code>/vergleich Umsatz DACH</code>).</p>
       <p id="commands-source" class="hint"></p>
       <p id="commands-banner" class="banner"></p>
       <div style="overflow-x: auto;">
         <table id="commands-table">
           <thead>
             <tr>
-              <th class="col-name">Name</th>
+              <th class="col-name">Name<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Name" aria-describedby="help-cmd-name" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-name" class="help-tip">Gilt dashboardübergreifend; für einzelne Dashboards siehe „Dashboard-Analysen“.</span></span></th>
               <th class="col-desc">Beschreibung</th>
-              <th class="col-hint">Arg-Hinweis</th>
-              <th>Template</th>
+              <th class="col-hint">Arg-Hinweis<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Arg-Hinweis" aria-describedby="help-cmd-arghint" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></span></th>
+              <th>Template<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Template" aria-describedby="help-cmd-template" aria-expanded="false">?</button><span role="tooltip" id="help-cmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -338,21 +327,11 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="auth-admin" hidden>
       <h2>Anmeldung, Single Sign-On &amp; Lizenz</h2>
-      <p class="hint">
-        Wer die Extension (und damit die Middleware) nutzen darf. <strong>Benutzerkonten</strong> (Open Core):
-        Anwender melden sich in der Extension mit Konten aus dem Bereich „Benutzerkonten“ an.
-        <strong>Single Sign-On</strong> (Enterprise): Anmeldung mit dem Firmenkonto über Microsoft Entra ID oder
-        Keycloak — braucht einen gültigen Lizenzschlüssel. Einstellungen hier überschreiben die Env-Defaults
-        (AUTH_MODE, OIDC_*, OVP_LICENSE) sofort für alle Replicas.
-        Im Modus „Offen“ gibt es keine Anwenderidentität — Chat und Tableau API bleiben dann für alle
-        gesperrt, auch mit Häkchen unter Benutzerzugriff. Empfohlene Reihenfolge: zuerst Modus
-        „Benutzerkonten“ oder „Single Sign-On“ speichern, danach jede Person unter Benutzerkonten →
-        Benutzerzugriff freigeben.
-      </p>
+      <p class="hint">Wer die Extension nutzen darf — Benutzerkonten (Core) oder Single Sign-On (Enterprise).</p>
       <p id="auth-source" class="hint"></p>
       <p id="auth-banner" class="banner"></p>
       <div class="form-grid">
-        <label>Anmeldemodus
+        <label>Anmeldemodus<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Anmeldemodus" aria-describedby="help-auth-mode" aria-expanded="false">?</button><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter Benutzerzugriff. Benutzerkonten: Anmeldung mit Konten aus „Benutzerkonten“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span></span>
           <select id="auth-mode">
             <option value="none">Offen (kein Login — Chat &amp; Tableau API bleiben gesperrt)</option>
             <option value="local">Benutzerkonten (Core-Edition)</option>
@@ -365,7 +344,7 @@ export const adminPageHtml = `<!doctype html>
       </div>
       <div id="oidc-fields">
         <div class="form-grid">
-          <label>Identity-Provider
+          <label>Identity-Provider<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Identity-Provider" aria-describedby="help-oidc-provider" aria-expanded="false">?</button><span role="tooltip" id="help-oidc-provider" class="help-tip">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL); Einrichtung siehe docs/enterprise.md.</span></span>
             <select id="oidc-provider">
               <option value="entra">Microsoft Entra ID</option>
               <option value="keycloak">Keycloak</option>
@@ -387,13 +366,11 @@ export const adminPageHtml = `<!doctype html>
             <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" />
           </label>
         </div>
-        <p class="hint">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL) — siehe docs/enterprise.md für die Einrichtung in Entra bzw. Keycloak.</p>
       </div>
       <fieldset class="form-section"><legend>Enterprise-Lizenz</legend>
-      <label class="form-field">Lizenzschlüssel
+      <label class="form-field">Lizenzschlüssel<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Lizenzschlüssel" aria-describedby="help-license-token" aria-expanded="false">?</button><span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span></span>
         <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false"></textarea>
       </label>
-      <p class="hint">Vom Lizenz-Aussteller erhaltener Token im Format „&lt;Payload&gt;.&lt;Signatur&gt;“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</p>
       <p id="license-summary" class="hint">Lade …</p>
       <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
         <strong>Lizenz-Heartbeat</strong>
@@ -416,12 +393,7 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="users-admin" hidden>
       <h2>Benutzerkonten (Core-Edition)</h2>
-      <p class="hint">
-        Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“. Passwörter werden nur als
-        Hash gespeichert; Sperren beendet laufende Sitzungen sofort.
-        Ein neu angelegtes Konto kann sich zwar anmelden, erhält aber erst nach Freigabe unter
-        „Benutzerzugriff“ weiter unten Zugriff auf Chat oder Tableau API.
-      </p>
+      <p class="hint">Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“.</p>
       <p id="users-banner" class="banner"></p>
       <div style="overflow-x: auto;">
         <table id="users-table">
@@ -429,7 +401,7 @@ export const adminPageHtml = `<!doctype html>
             <tr>
               <th>Benutzername</th>
               <th>Anzeigename</th>
-              <th>Status</th>
+              <th>Status<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Status" aria-describedby="help-users-status" aria-expanded="false">?</button><span role="tooltip" id="help-users-status" class="help-tip">Sperren beendet laufende Sitzungen sofort.</span></span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -437,11 +409,11 @@ export const adminPageHtml = `<!doctype html>
         </table>
       </div>
       <form id="create-user-form">
-      <fieldset class="form-section"><legend>Benutzer anlegen</legend>
+      <fieldset class="form-section"><legend>Benutzer anlegen<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Benutzer anlegen" aria-describedby="help-users-create" aria-expanded="false">?</button><span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Benutzerzugriff“ Zugriff auf Chat oder Tableau API.</span></span></legend>
       <div class="form-grid">
         <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
         <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
-        <label for="new-password">Passwort (mindestens 10 Zeichen)<input type="password" id="new-password" autocomplete="new-password" minlength="10" required /></label>
+        <label for="new-password">Passwort (mindestens 10 Zeichen)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Passwort" aria-describedby="help-users-password" aria-expanded="false">?</button><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span></span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required /></label>
       </div>
       <div class="form-actions">
         <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
@@ -450,15 +422,14 @@ export const adminPageHtml = `<!doctype html>
       </form>
 
       <fieldset class="form-section" id="user-access-section">
-        <legend>Benutzerzugriff</legend>
-        <p class="hint">Lokale Konten erscheinen automatisch; eine SSO-Identität erscheint erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren. „AI-Chat“ schaltet die Chat-Nutzung frei, „Tableau API“ den Zugriff auf Tableau-Server-Inhalte aus dem Chat; ohne Häkchen weist die Extension die jeweilige Anfrage ab, auch nach erfolgreicher Anmeldung.</p>
+        <legend>Benutzerzugriff<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Benutzerzugriff" aria-describedby="help-access-legend" aria-expanded="false">?</button><span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></span></legend>
         <p id="user-access-banner" class="banner" role="status"></p>
         <div class="form-actions">
           <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
         </div>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
-            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access">AI-Chat</th><th class="col-access">Tableau API</th><th class="col-save"></th></tr></thead>
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access">AI-Chat<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu AI-Chat" aria-describedby="help-access-ai" aria-expanded="false">?</button><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></span></th><th class="col-access">Tableau API<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Tableau API" aria-describedby="help-access-tableau" aria-expanded="false">?</button><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></span></th><th class="col-save"></th></tr></thead>
             <tbody id="user-access-body"></tbody>
           </table>
         </div>
@@ -467,30 +438,26 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="playbooks-admin" hidden>
       <h2>Standardanalysen pro Dashboard</h2>
-      <p class="hint">
-        Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard. Die Extension lädt das Playbook
-        für das geöffnete Dashboard: Starter erscheinen vor den generischen Vorschlägen, Dashboard-Befehle
-        überlagern gleichnamige globale. Eingebundene Dashboards erscheinen nach dem ersten angemeldeten Start automatisch – auch ohne Chatfragen. Die Zuordnung wird im Workbook gespeichert.
-      </p>
+      <p class="hint">Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard.</p>
       <p id="playbooks-banner" class="banner"></p>
       <div class="row" style="margin-bottom: 0.75rem;">
-        <label for="playbook-key">Dashboard:</label>
+        <label for="playbook-key">Dashboard:<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Dashboard" aria-describedby="help-playbook-key" aria-expanded="false">?</button><span role="tooltip" id="help-playbook-key" class="help-tip">Eingebundene Dashboards erscheinen automatisch nach dem ersten angemeldeten Start — auch ohne Chatfragen; die Zuordnung wird im Workbook gespeichert.</span></span></label>
         <select id="playbook-key" style="flex: 1 1 260px;"><option value="">Dashboard auswählen …</option></select>
         <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
       <p id="playbook-status" class="hint"></p>
       <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten (erst nach Dashboard-Auswahl oben verfügbar)</legend>
-      <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)</label>
+      <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Starter-Fragen" aria-describedby="help-playbook-starters" aria-expanded="false">?</button><span role="tooltip" id="help-playbook-starters" class="help-tip">Erscheinen im Chat vor den generischen Vorschlägen, z. B. <code>Wie hat sich der Umsatz im letzten Quartal entwickelt?</code></span></span></label>
       <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?"></textarea>
       <p class="hint" style="margin-top: 0.75rem;">Slash-Befehle nur für dieses Dashboard</p>
       <div style="overflow-x: auto;">
         <table id="playbook-commands-table">
           <thead>
             <tr>
-              <th class="col-name">Name</th>
+              <th class="col-name">Name<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Name" aria-describedby="help-pcmd-name" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-name" class="help-tip">Überlagert einen gleichnamigen globalen Slash-Befehl nur auf diesem Dashboard.</span></span></th>
               <th class="col-desc">Beschreibung</th>
-              <th class="col-hint">Arg-Hinweis</th>
-              <th>Template</th>
+              <th class="col-hint">Arg-Hinweis<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Arg-Hinweis" aria-describedby="help-pcmd-arghint" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-arghint" class="help-tip">Erscheint als Platzhaltertext hinter dem Befehlsnamen, z. B. <code>Region, Zeitraum</code>.</span></span></th>
+              <th>Template<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Template" aria-describedby="help-pcmd-template" aria-expanded="false">?</button><span role="tooltip" id="help-pcmd-template" class="help-tip"><code>{{args}}</code> im Template wird durch den vom Anwender eingegebenen Text ersetzt.</span></span></th>
               <th class="col-del"></th>
             </tr>
           </thead>
@@ -507,18 +474,14 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="models-admin" hidden>
       <h2>Modelle in der Extension</h2>
-      <p class="hint">
-        Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt
-        der technischen Modell-ID. Ohne gespeicherte Liste zeigt die Extension alle Modelle, die der
-        LLM-Endpunkt meldet (ggf. gefiltert über MODEL_ALLOWLIST).
-      </p>
+      <p class="hint">Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt der technischen Modell-ID.</p>
       <p id="models-source" class="hint"></p>
       <p id="models-banner" class="banner"></p>
       <div style="overflow-x: auto;">
         <table id="models-table">
           <thead>
             <tr>
-              <th style="width: 45%;">Modell-ID (am Endpunkt)</th>
+              <th style="width: 45%;">Modell-ID (am Endpunkt)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Modell-ID" aria-describedby="help-models-id" aria-expanded="false">?</button><span role="tooltip" id="help-models-id" class="help-tip">Ohne gespeicherte Liste zeigt die Extension alle vom Endpunkt gemeldeten Modelle (ggf. gefiltert über <code>MODEL_ALLOWLIST</code>).</span></span></th>
               <th>Anzeigename in der Extension</th>
               <th class="col-del"></th>
             </tr>
@@ -537,18 +500,13 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="extension-admin" hidden>
       <h2>Extension für Tableau</h2>
-      <p class="hint">
-        Lädt das Manifest (.trex) mit der eingetragenen Extension-URL herunter — die Adresse, unter der
-        diese Middleware die Extension ausliefert (HTTPS-Pflicht auf Tableau Server; die Extension
-        verbindet sich dann automatisch mit demselben Host). Anschließend die URL in die
-        Server-Safelist eintragen und das Manifest im Dashboard auswählen.
-      </p>
+      <p class="hint">Lädt das Manifest (.trex) mit der eingetragenen Extension-URL herunter.</p>
       <p id="trex-banner" class="banner"></p>
-      <label class="form-field" for="trex-url">Öffentliche Extension-URL
+      <label class="form-field" for="trex-url">Öffentliche Extension-URL<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Öffentliche Extension-URL" aria-describedby="help-trex-url" aria-expanded="false">?</button><span role="tooltip" id="help-trex-url" class="help-tip">Die Adresse, unter der diese Middleware die Extension ausliefert — HTTPS-Pflicht auf Tableau Server; die Extension verbindet sich dann automatisch mit demselben Host.</span></span>
         <input type="url" id="trex-url" placeholder="https://chat.example.com/" autocomplete="off" spellcheck="false" />
       </label>
       <div class="form-actions">
-        <button class="primary" id="trex-download">Manifest (.trex) herunterladen</button>
+        <button class="primary" id="trex-download" title="Danach die URL in der Server-Safelist eintragen und das Manifest im Dashboard auswählen.">Manifest (.trex) herunterladen</button>
       </div>
     </section>
 
@@ -566,19 +524,14 @@ export const adminPageHtml = `<!doctype html>
       </div>
       <p id="stats-banner" class="banner"></p>
       <h3 class="stats-heading">Dashboards</h3>
-      <p class="hint">
-        Fragen je Dashboard und je Anwender. Anwender werden ausschließlich als nicht umkehrbare
-        Pseudonyme gezählt — keine Namen, keine Tableau-IDs, keine Inhalte. Kennzahlen je Anwender
-        erscheinen erst ab 3 Anwendern (darunter „&lt; 3“), damit sich einzelne Personen nicht über
-        die Zähler erraten lassen.
-      </p>
+      <p class="hint">Fragen je Dashboard und je Anwender.</p>
       <div style="overflow-x: auto;">
         <table id="dashboard-stats">
           <thead>
             <tr>
               <th>Dashboard</th>
               <th class="num">Fragen</th>
-              <th class="num">Anwender</th>
+              <th class="num">Anwender<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Anwender" aria-describedby="help-usage-users" aria-expanded="false">?</button><span role="tooltip" id="help-usage-users" class="help-tip">Nicht umkehrbare Pseudonyme — keine Namen, IDs oder Inhalte. Kennzahlen je Anwender erscheinen erst ab 3 Anwendern (darunter <code>&lt; 3</code>).</span></span></th>
               <th class="num">Ø Fragen/Anwender</th>
               <th class="num">max. je Anwender</th>
             </tr>
@@ -625,6 +578,45 @@ export const adminPageHtml = `<!doctype html>
     button.title = label;
     button.setAttribute('aria-label', label);
   }
+
+  // ---------- Hilfe-Symbole (?) ----------
+  // Reines CSS zeigt den Tooltip bei :hover/:focus-visible; hier kommt nur
+  // der Klick/Touch-Umschalter dazu (aria-expanded, Escape, Klick außerhalb)
+  // und die Rechtsrand-Heuristik für Tooltips, die sonst abgeschnitten würden.
+  function helpCloseAll() {
+    Array.prototype.forEach.call(document.querySelectorAll('.help-icon[aria-expanded="true"]'), function (icon) {
+      icon.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function helpPosition(icon) {
+    var wrap = icon.closest('.help');
+    if (!wrap) return;
+    wrap.classList.remove('help-left');
+    var tip = wrap.querySelector('.help-tip');
+    if (tip && tip.getBoundingClientRect().right > document.documentElement.clientWidth) wrap.classList.add('help-left');
+  }
+  document.addEventListener('mouseover', function (event) {
+    var icon = event.target.closest && event.target.closest('.help-icon');
+    if (icon) helpPosition(icon);
+  });
+  document.addEventListener('focusin', function (event) {
+    var icon = event.target.closest && event.target.closest('.help-icon');
+    if (icon) helpPosition(icon);
+  });
+  document.addEventListener('click', function (event) {
+    var icon = event.target.closest && event.target.closest('.help-icon');
+    if (icon) {
+      event.stopPropagation();
+      var wasOpen = icon.getAttribute('aria-expanded') === 'true';
+      helpCloseAll();
+      if (!wasOpen) { icon.setAttribute('aria-expanded', 'true'); helpPosition(icon); }
+      return;
+    }
+    if (!(event.target.closest && event.target.closest('.help-tip'))) helpCloseAll();
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') helpCloseAll();
+  });
 
   function getToken() {
     try {

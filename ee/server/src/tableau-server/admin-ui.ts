@@ -21,7 +21,6 @@ export const tableauAdminStyles = `
   #tableau-server-admin .tableau-server-mode-fields { display: contents; }
   #tableau-server-admin .tableau-server-mode-fields > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
   #tableau-server-admin .tableau-server-mode-fields > label > input, #tableau-server-admin .tableau-server-mode-fields > label > select { width: 100%; min-width: 0; }
-  #tableau-server-admin .field-hint { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
   #tableau-server-admin .tableau-server-inline-field { display: flex; gap: 0.4rem; }
   #tableau-server-admin .tableau-server-inline-field input { flex: 1; min-width: 0; }
   #tableau-server-admin input[readonly] { background: var(--bg); color: var(--text-muted); }
@@ -57,29 +56,24 @@ export const tableauAdminSection = `
                 <option value="oauth2-trust">Connected App – OAuth 2.0 Trust (Issuer-URL, JWKS)</option>
               </select>
             </label>
-            <label for="tableau-server-url">Server-URL
+            <label for="tableau-server-url">Server-URL<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Server-URL" aria-describedby="help-tableau-url" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-url" class="help-tip">HTTPS-Origin ohne Pfad, z. B. <code>https://tableau.example.com</code>.</span></span>
               <input id="tableau-server-url" type="url" autocomplete="off" placeholder="https://tableau.example.com" />
-              <span class="field-hint">HTTPS-Origin ohne Pfad, z. B. https://tableau.example.com</span>
             </label>
-            <label for="tableau-server-site">Site-Inhalt-URL
+            <label for="tableau-server-site">Site (Content-URL)<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Site (Content-URL)" aria-describedby="help-tableau-site" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-site" class="help-tip">Der Site-Kürzel aus der Tableau-Adresse: <code>https://tableau.example.com/#/site/vertrieb/…</code> → <code>vertrieb</code>. Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.</span></span>
               <input id="tableau-server-site" type="text" autocomplete="off" placeholder="site-content-url" />
-              <span class="field-hint">contentUrl der Site; leer = Default-Site</span>
             </label>
             <div id="tableau-server-connected-app-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-client-id">Client-ID
+              <label for="tableau-server-client-id">Client-ID<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Client-ID" aria-describedby="help-tableau-client-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-client-id" class="help-tip">Aus Tableau: Connected App → Client ID.</span></span>
                 <input id="tableau-server-client-id" type="text" autocomplete="off" />
-                <span class="field-hint">aus Tableau: Connected App → Client ID</span>
               </label>
-              <label for="tableau-server-secret-id">Secret-ID
+              <label for="tableau-server-secret-id">Secret-ID<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Secret-ID" aria-describedby="help-tableau-secret-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-secret-id" class="help-tip">Secret ID des erzeugten Secrets.</span></span>
                 <input id="tableau-server-secret-id" type="text" autocomplete="off" />
-                <span class="field-hint">Secret ID des erzeugten Secrets</span>
               </label>
-              <label for="tableau-server-secret-env">Secret-Env-Referenz
+              <label for="tableau-server-secret-env">Secret-Env-Referenz<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Secret-Env-Referenz" aria-describedby="help-tableau-secret-env" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-secret-env" class="help-tip">Name der Umgebungsvariable mit dem Secret value, Präfix <code>OVP_TABLEAU_</code>; der Wert wird nie hier eingegeben.</span></span>
                 <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" />
-                <span class="field-hint">Name der Umgebungsvariable mit dem Secret value, Präfix OVP_TABLEAU_; der Wert wird nie hier eingegeben</span>
               </label>
             </div>
-            <label for="tableau-server-username-claim">Username-Claim
+            <label for="tableau-server-username-claim">Username-Claim<span class="help"><button type="button" class="help-icon" aria-label="Erklärung zu Username-Claim" aria-describedby="help-tableau-username-claim" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-username-claim" class="help-tip">Muss dem Tableau-Benutzernamen entsprechen (Tableau Cloud: der E-Mail-Adresse).</span></span>
               <select id="tableau-server-username-claim">
                 <option value="email">email</option>
                 <option value="preferred_username">preferred_username</option>
@@ -91,12 +85,11 @@ export const tableauAdminSection = `
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
             <div id="tableau-server-oauth2-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-eas-issuer">Issuer URL
+              <label for="tableau-server-eas-issuer">Issuer URL<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Issuer URL" aria-describedby="help-tableau-issuer" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span></span>
                 <span class="tableau-server-inline-field">
                   <input id="tableau-server-eas-issuer" type="text" readonly />
                   <button id="tableau-server-eas-issuer-copy" type="button" disabled>Kopieren</button>
                 </span>
-                <span class="field-hint">In Tableau bei „New Connected App → OAuth 2.0 Trust" als Issuer URL eintragen</span>
               </label>
               <label for="tableau-server-eas-jwks">JWKS-URL
                 <input id="tableau-server-eas-jwks" type="text" readonly />
@@ -104,9 +97,8 @@ export const tableauAdminSection = `
               <label for="tableau-server-eas-kid">Key-ID
                 <input id="tableau-server-eas-kid" type="text" readonly />
               </label>
-              <label for="tableau-server-site-id">Site-ID
+              <label for="tableau-server-site-id">Site-ID<span class="help help-left"><button type="button" class="help-icon" aria-label="Erklärung zu Site-ID" aria-describedby="help-tableau-site-id" aria-expanded="false">?</button><span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span></span>
                 <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
-                <span class="field-hint">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt</span>
               </label>
               <p id="tableau-server-eas-warning" class="hint error" role="status" hidden>
                 Für OAuth 2.0 Trust muss die Middleware unter einer HTTPS-Public-URL erreichbar sein. Im Abschnitt
@@ -118,12 +110,12 @@ export const tableauAdminSection = `
           <details id="tableau-server-setup-connected-app">
             <summary>Einrichtung Schritt für Schritt (Direct Trust)</summary>
             <ol>
-              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>. Der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau Cloud: der E-Mail-Adresse).</li>
+              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>.</li>
               <li>In Tableau: <em>Settings → Connected Apps → New Connected App → Direct Trust</em>. Name vergeben, Access level und Domain allowlist setzen (die Public URL dieser Middleware eintragen), <em>Enable connected app</em> aktivieren.</li>
               <li><em>Client ID</em> kopieren.</li>
               <li><em>Generate New Secret</em> klicken — Tableau zeigt <em>Secret ID</em> und <em>Secret Value</em> an.</li>
               <li>Secret Value als Umgebungsvariable mit Präfix <code>OVP_TABLEAU_</code> bereitstellen; Secret-ID hier eintragen.</li>
-              <li>Server-URL, Site-Inhalt-URL, Client-ID, Secret-ID, Secret-Env-Referenz und Username-Claim oben eintragen, Integration aktivieren, speichern.</li>
+              <li>Server-URL, Site (Content-URL), Client-ID, Secret-ID, Secret-Env-Referenz und Username-Claim oben eintragen, Integration aktivieren, speichern.</li>
               <li><strong>Konfiguration prüfen</strong> ausführen.</li>
               <li><strong>Verbindung als Nutzer prüfen</strong> ausführen.</li>
             </ol>
@@ -131,7 +123,7 @@ export const tableauAdminSection = `
           <details id="tableau-server-setup-oauth2-trust">
             <summary>Einrichtung Schritt für Schritt (OAuth 2.0 Trust)</summary>
             <ol>
-              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>. Der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau Cloud: der E-Mail-Adresse).</li>
+              <li>Voraussetzung: Single Sign-On (OIDC) im Abschnitt <a href="#auth-admin">Anmeldung, Single Sign-On &amp; Lizenz</a> einrichten; Lizenz mit den Merkmalen <code>sso</code> und <code>tableauServer</code>.</li>
               <li>Diesen Modus hier zuerst speichern — auch im deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den EAS-Schlüssel.</li>
               <li>Issuer URL oben kopieren.</li>
               <li>In Tableau: <em>Settings → Connected Apps → New Connected App → OAuth 2.0 Trust</em>. Name vergeben, Issuer URL einfügen, <em>Enable connected app</em> aktivieren.</li>
@@ -140,7 +132,6 @@ export const tableauAdminSection = `
               <li><strong>Konfiguration prüfen</strong> ausführen.</li>
               <li><strong>Verbindung als Nutzer prüfen</strong> ausführen.</li>
             </ol>
-            <p class="hint">Tableau muss die Issuer URL (<code>/.well-known/openid-configuration</code>) und die JWKS-URL per HTTPS erreichen können (Firewall/Proxy prüfen); vorausgesetzt: Tableau Server ab 2024.2 bzw. Tableau Cloud. Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau nachgezogen werden.</p>
           </details>
           <div class="form-actions tableau-server-actions">
             <button id="tableau-server-save" class="primary" type="button">Speichern</button>

@@ -289,11 +289,30 @@ export const adminPageHtml = `<!doctype html>
     <div class="workspace">
       <header class="workspace-heading"><p id="view-group">Arbeitsbereich</p><h1 id="view-title" tabindex="-1">MCP &amp; Sites</h1></header>
 
+      <div id="setup-checklist" style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1.5rem 0;">
+        <h2>Ersteinrichtung in dieser Reihenfolge</h2>
+        <ol class="hint" style="margin: 0; padding-left: 1.25rem;">
+          <li>Datenbank (Memory-Store) bereitstellen – Grundlage für Admin-Login im Passwort-Modus, <a href="#users-admin">Benutzerkonten</a>, <a href="#user-access-section">Benutzerzugriff</a>, <a href="#commands-admin">Slash-Befehle</a>, <a href="#playbooks-admin">Standardanalysen</a> und <a href="#usage-admin">Nutzungsstatistik</a>.</li>
+          <li>Admin-Konto einrichten (Ersteinrichtung <code>/setup</code>) bzw. mit <code>ADMIN_TOKEN</code> anmelden.</li>
+          <li><a href="#auth-admin">Enterprise-Lizenzschlüssel</a> eintragen, falls SSO, MCP, Tableau Server oder Dashboard-Aktionen genutzt werden sollen.</li>
+          <li><a href="#auth-admin">Anmeldemodus</a> wählen: „Benutzerkonten“ (braucht mindestens ein aktives Konto) oder „Single Sign-On“ (braucht Lizenz-Feature <code>sso</code>, öffentliche URL und OIDC-Zugangsdaten).</li>
+          <li>Bei „Benutzerkonten“: Konten unter <a href="#users-admin">Benutzerkonten</a> anlegen – der Server verweigert den Moduswechsel sonst mit Fehlermeldung.</li>
+          <li>Jede Person unter Benutzerkonten → <a href="#user-access-section">Benutzerzugriff</a> für AI-Chat und/oder Tableau API freigeben; ohne diesen Schritt bleibt der Zugriff gesperrt, auch nach erfolgreichem Login (SSO-Identitäten erscheinen dort erst nach der ersten Anmeldung).</li>
+          <li><a href="#extension-admin">Extension-URL</a> eintragen, .trex-Manifest herunterladen und in Tableau bzw. der Server-Safelist eintragen.</li>
+          <li>Dashboard einmal im Bearbeitungsmodus öffnen und das Workbook speichern, damit es als registriertes Dashboard erscheint (Voraussetzung für <a href="#playbooks-admin">Standardanalysen</a> und <a href="#mcp-admin">MCP-Sites</a>).</li>
+          <li>Optional: globale <a href="#commands-admin">Slash-Befehle</a> anpassen oder <a href="#playbooks-admin">Standardanalysen je Dashboard</a> hinterlegen.</li>
+          <li>Optional, mit Lizenz-Feature <code>mcp</code>: <a href="#mcp-admin">MCP-Server anbinden und Sites</a> (Dashboards + Benutzer) zuordnen.</li>
+          <li>Optional: <a href="#models-admin">Modellkatalog</a> mit Anzeigenamen pflegen.</li>
+          <li><a href="#usage-admin">Nutzung</a> regelmäßig prüfen, um Adoption und offenen Freigabebedarf zu erkennen.</li>
+        </ol>
+      </div>
+
     ${mcpAdminSection}
     ${tableauAdminSection}
 
     <section class="card" id="commands-admin" hidden>
       <h2>Slash-Befehle</h2>
+      <p class="hint">Eigene „/name“-Befehle, die Anwender im Chat eintippen, um ein festes Prompt-Template zu starten (z. B. „/vergleich Umsatz DACH“). Der Arg-Hinweis erscheint als Platzhaltertext hinter dem Befehlsnamen; {{args}} im Template wird durch den eingegebenen Text ersetzt. Gilt dashboardübergreifend — für einzelne Dashboards siehe „Dashboard-Analysen“.</p>
       <p id="commands-source" class="hint"></p>
       <p id="commands-banner" class="banner"></p>
       <div style="overflow-x: auto;">
@@ -325,13 +344,17 @@ export const adminPageHtml = `<!doctype html>
         <strong>Single Sign-On</strong> (Enterprise): Anmeldung mit dem Firmenkonto über Microsoft Entra ID oder
         Keycloak — braucht einen gültigen Lizenzschlüssel. Einstellungen hier überschreiben die Env-Defaults
         (AUTH_MODE, OIDC_*, OVP_LICENSE) sofort für alle Replicas.
+        Im Modus „Offen“ gibt es keine Anwenderidentität — Chat und Tableau API bleiben dann für alle
+        gesperrt, auch mit Häkchen unter Benutzerzugriff. Empfohlene Reihenfolge: zuerst Modus
+        „Benutzerkonten“ oder „Single Sign-On“ speichern, danach jede Person unter Benutzerkonten →
+        Benutzerzugriff freigeben.
       </p>
       <p id="auth-source" class="hint"></p>
       <p id="auth-banner" class="banner"></p>
       <div class="form-grid">
         <label>Anmeldemodus
           <select id="auth-mode">
-            <option value="none">Offen (nur Netzwerkschutz)</option>
+            <option value="none">Offen (kein Login — Chat &amp; Tableau API bleiben gesperrt)</option>
             <option value="local">Benutzerkonten (Core-Edition)</option>
             <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
           </select>
@@ -370,6 +393,7 @@ export const adminPageHtml = `<!doctype html>
       <label class="form-field">Lizenzschlüssel
         <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false"></textarea>
       </label>
+      <p class="hint">Vom Lizenz-Aussteller erhaltener Token im Format „&lt;Payload&gt;.&lt;Signatur&gt;“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</p>
       <p id="license-summary" class="hint">Lade …</p>
       <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
         <strong>Lizenz-Heartbeat</strong>
@@ -395,6 +419,8 @@ export const adminPageHtml = `<!doctype html>
       <p class="hint">
         Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“. Passwörter werden nur als
         Hash gespeichert; Sperren beendet laufende Sitzungen sofort.
+        Ein neu angelegtes Konto kann sich zwar anmelden, erhält aber erst nach Freigabe unter
+        „Benutzerzugriff“ weiter unten Zugriff auf Chat oder Tableau API.
       </p>
       <p id="users-banner" class="banner"></p>
       <div style="overflow-x: auto;">
@@ -425,7 +451,7 @@ export const adminPageHtml = `<!doctype html>
 
       <fieldset class="form-section" id="user-access-section">
         <legend>Benutzerzugriff</legend>
-        <p class="hint">Lokale und SSO-Identitäten werden getrennt geführt. Neue SSO-Identitäten erscheinen nach dem Aktualisieren.</p>
+        <p class="hint">Lokale Konten erscheinen automatisch; eine SSO-Identität erscheint erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren. „AI-Chat“ schaltet die Chat-Nutzung frei, „Tableau API“ den Zugriff auf Tableau-Server-Inhalte aus dem Chat; ohne Häkchen weist die Extension die jeweilige Anfrage ab, auch nach erfolgreicher Anmeldung.</p>
         <p id="user-access-banner" class="banner" role="status"></p>
         <div class="form-actions">
           <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
@@ -453,7 +479,7 @@ export const adminPageHtml = `<!doctype html>
         <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
       <p id="playbook-status" class="hint"></p>
-      <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten</legend>
+      <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten (erst nach Dashboard-Auswahl oben verfügbar)</legend>
       <label for="playbook-starters" class="hint" style="display: block;">Starter-Fragen (eine je Zeile, max. 5)</label>
       <textarea id="playbook-starters" rows="4" placeholder="z. B. Wie hat sich der Umsatz im letzten Quartal entwickelt?"></textarea>
       <p class="hint" style="margin-top: 0.75rem;">Slash-Befehle nur für dieses Dashboard</p>

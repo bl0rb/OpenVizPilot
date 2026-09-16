@@ -60,6 +60,20 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain('aria-label="Administrationsbereich"');
   });
 
+  it('shows a first-run checklist whose jump links all resolve to existing sections', () => {
+    const match = adminPageHtml.match(/<div id="setup-checklist"[\s\S]*?<\/div>/);
+    expect(match).not.toBeNull();
+    const block = match![0]!;
+    expect(block).toContain('Ersteinrichtung in dieser Reihenfolge');
+    const items = [...block.matchAll(/<li>/g)];
+    expect(items.length).toBeGreaterThanOrEqual(10);
+    const targets = [...block.matchAll(/href="#([a-zA-Z-]+)"/g)].map(match => match[1]);
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
+      expect(adminPageHtml).toContain(`id="${target}"`);
+    }
+  });
+
   it('allows the embedded font only on admin, without opening external font origins', async () => {
     const instance = createApp({ ...loadEnv({ LITELLM_BASE_URL: 'http://localhost:9', LITELLM_API_KEY: 'test', DEFAULT_MODEL: 'test', ADMIN_TOKEN: 'test-admin', MEMORY_ENABLED: 'false' }), telemetryEndpoint: '' });
     try {

@@ -23,6 +23,7 @@ export const mcpAdminSection = `
         <h2 id="mcp-heading">MCP &amp; Sites <small>Enterprise</small></h2>
         <button id="mcp-reload" type="button">Aktualisieren</button>
       </div>
+      <p class="hint">Bindet externe, nur lesende MCP-Tools an bestimmte Dashboards an (z. B. Websuche als Zusatzquelle im Chat) — braucht eine Enterprise-Lizenz mit Feature „mcp“. Eine „Site“ bündelt Dashboards und Anwender; ein MCP-Server wird anschließend einer oder mehreren Sites zugewiesen. Ohne registrierte Dashboards oder aktive Benutzer lassen sich Sites nicht sinnvoll befüllen.</p>
       <p id="mcp-banner" class="banner" role="status" aria-live="polite"></p>
       <fieldset id="mcp-controls" disabled>
         <h3>Sites</h3>
@@ -180,7 +181,7 @@ export const mcpAdminScript = String.raw`
       var extraFields = mcpElement('div', '', entry);
       extraFields.className = 'mcp-fields';
       var knownUsers = mcpState.users.map(function (user) { return user.id; });
-      mcpField(extraFields, 'Weitere Identitäten (eine pro Zeile, z. B. oidc:subject)', site.members.filter(function (member) { return knownUsers.indexOf(member) < 0; }).join('\n'), function (value) {
+      mcpField(extraFields, 'Weitere Identitäten (eine pro Zeile, Format oidc:<Subject> — Subject-Wert nach der ersten SSO-Anmeldung unter Benutzerkonten → Benutzerzugriff ablesen)', site.members.filter(function (member) { return knownUsers.indexOf(member) < 0; }).join('\n'), function (value) {
         site.members = site.members.filter(function (member) { return knownUsers.indexOf(member) >= 0; }).concat(value.split(/\r?\n/).map(function (item) { return item.trim(); }).filter(Boolean));
       }, true);
       var remove = mcpElement('button', 'Site entfernen', entry);

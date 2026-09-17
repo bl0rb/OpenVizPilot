@@ -56,24 +56,24 @@ export const tableauAdminSection = `
                 <option value="oauth2-trust">Connected App – OAuth 2.0 Trust (Issuer-URL, JWKS)</option>
               </select>
             </label>
-            <label for="tableau-server-url" class="has-help">Server-URL<span role="tooltip" id="help-tableau-url" class="help-tip">HTTPS-Origin ohne Pfad, z. B. <code>https://tableau.example.com</code>.</span>
+            <label for="tableau-server-url" class="has-help"><span class="help-term">Server-URL</span><span role="tooltip" id="help-tableau-url" class="help-tip">HTTPS-Origin ohne Pfad, z. B. <code>https://tableau.example.com</code>.</span>
               <input id="tableau-server-url" type="url" autocomplete="off" placeholder="https://tableau.example.com" aria-describedby="help-tableau-url" />
             </label>
-            <label for="tableau-server-site" class="has-help">Site (Content-URL)<span role="tooltip" id="help-tableau-site" class="help-tip">Der Site-Kürzel aus der Tableau-Adresse: <code>https://tableau.example.com/#/site/vertrieb/…</code> → <code>vertrieb</code>. Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.</span>
+            <label for="tableau-server-site" class="has-help"><span class="help-term">Site (Content-URL)</span><span role="tooltip" id="help-tableau-site" class="help-tip">Der Site-Kürzel aus der Tableau-Adresse: <code>https://tableau.example.com/#/site/vertrieb/…</code> → <code>vertrieb</code>. Tableau Server: für die Standard-Site leer lassen. Tableau Cloud: immer erforderlich.</span>
               <input id="tableau-server-site" type="text" autocomplete="off" placeholder="site-content-url" aria-describedby="help-tableau-site" />
             </label>
             <div id="tableau-server-connected-app-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-client-id" class="has-help">Client-ID<span role="tooltip" id="help-tableau-client-id" class="help-tip">Aus Tableau: Connected App → Client ID.</span>
+              <label for="tableau-server-client-id" class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-tableau-client-id" class="help-tip">Aus Tableau: Connected App → Client ID.</span>
                 <input id="tableau-server-client-id" type="text" autocomplete="off" aria-describedby="help-tableau-client-id" />
               </label>
-              <label for="tableau-server-secret-id" class="has-help">Secret-ID<span role="tooltip" id="help-tableau-secret-id" class="help-tip">Secret ID des erzeugten Secrets.</span>
+              <label for="tableau-server-secret-id" class="has-help"><span class="help-term">Secret-ID</span><span role="tooltip" id="help-tableau-secret-id" class="help-tip">Secret ID des erzeugten Secrets.</span>
                 <input id="tableau-server-secret-id" type="text" autocomplete="off" aria-describedby="help-tableau-secret-id" />
               </label>
-              <label for="tableau-server-secret-env" class="has-help help-left">Secret-Env-Referenz<span role="tooltip" id="help-tableau-secret-env" class="help-tip">Name der Umgebungsvariable mit dem Secret value, Präfix <code>OVP_TABLEAU_</code>; der Wert wird nie hier eingegeben.</span>
+              <label for="tableau-server-secret-env" class="has-help help-left"><span class="help-term">Secret-Env-Referenz</span><span role="tooltip" id="help-tableau-secret-env" class="help-tip">Name der Umgebungsvariable mit dem Secret value, Präfix <code>OVP_TABLEAU_</code>; der Wert wird nie hier eingegeben.</span>
                 <input id="tableau-server-secret-env" type="text" autocomplete="off" placeholder="OVP_TABLEAU_CONNECTED_APP_SECRET" aria-describedby="help-tableau-secret-env" />
               </label>
             </div>
-            <label for="tableau-server-username-claim" class="has-help">Username-Claim<span role="tooltip" id="help-tableau-username-claim" class="help-tip">Muss dem Tableau-Benutzernamen entsprechen (Tableau Cloud: der E-Mail-Adresse).</span>
+            <label for="tableau-server-username-claim" class="has-help"><span class="help-term">Username-Claim</span><span role="tooltip" id="help-tableau-username-claim" class="help-tip">Muss dem Tableau-Benutzernamen entsprechen (Tableau Cloud: der E-Mail-Adresse).</span>
               <select id="tableau-server-username-claim" aria-describedby="help-tableau-username-claim">
                 <option value="email">email</option>
                 <option value="preferred_username">preferred_username</option>
@@ -85,7 +85,7 @@ export const tableauAdminSection = `
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
             <div id="tableau-server-oauth2-fields" class="tableau-server-mode-fields">
-              <label for="tableau-server-eas-issuer" class="has-help help-left">Issuer URL<span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span>
+              <label for="tableau-server-eas-issuer" class="has-help help-left"><span class="help-term">Issuer URL</span><span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span>
                 <span class="tableau-server-inline-field">
                   <input id="tableau-server-eas-issuer" type="text" readonly aria-describedby="help-tableau-issuer" />
                   <button id="tableau-server-eas-issuer-copy" type="button" disabled>Kopieren</button>
@@ -97,7 +97,7 @@ export const tableauAdminSection = `
               <label for="tableau-server-eas-kid">Key-ID
                 <input id="tableau-server-eas-kid" type="text" readonly />
               </label>
-              <label for="tableau-server-site-id" class="has-help help-left">Site-ID<span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span>
+              <label for="tableau-server-site-id" class="has-help help-left"><span class="help-term">Site-ID</span><span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span>
                 <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" aria-describedby="help-tableau-site-id" />
               </label>
               <p id="tableau-server-eas-warning" class="hint error" role="status" hidden>

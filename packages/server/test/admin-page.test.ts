@@ -122,8 +122,10 @@ describe('help tooltips', () => {
     expect(adminPageHtml).not.toContain('help-icon');
     const tooltips = [...adminPageHtml.matchAll(/<span[^>]*\brole="tooltip"[^>]*\bid="([^"]+)"[^>]*>/g)];
     expect(tooltips.length).toBeGreaterThan(0);
-    const anchored = adminPageHtml.match(/<\w+[^>]*\bclass="[^"]*\bhas-help\b[^"]*"[^>]*>[^<]*<span[^>]*\brole="tooltip"/g) ?? [];
-    expect(anchored.length, 'every role="tooltip" must be the direct child of a .has-help element').toBe(tooltips.length);
+    // Auslöser ist nur der unterstrichene Begriff (.help-term), nicht das Feld — sonst
+    // ploppt beim Überfahren des Formulars an jedem Eingabefeld ein Tooltip auf.
+    const anchored = adminPageHtml.match(/<\w+[^>]*\bclass="[^"]*\bhas-help\b[^"]*"[^>]*><span class="help-term">[^<]+<\/span><span[^>]*\brole="tooltip"/g) ?? [];
+    expect(anchored.length, 'every role="tooltip" must follow a .help-term inside a .has-help element').toBe(tooltips.length);
   });
 
   it('keeps every <p class="hint"> short — long explanations belong in a ?-icon', () => {

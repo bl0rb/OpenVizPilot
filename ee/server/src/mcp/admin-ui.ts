@@ -8,12 +8,12 @@ export const mcpAdminStyles = `
   #mcp-admin .mcp-fields label { display: grid; gap: 0.2rem; min-width: 0; }
   #mcp-admin input[type=text], #mcp-admin textarea { width: 100%; min-width: 0; }
   #mcp-admin .mcp-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0.25rem 1rem; margin: 0.5rem 0 1rem; max-height: 260px; overflow: auto; overscroll-behavior: contain; }
-  #mcp-admin .mcp-choices label { display: flex; align-items: baseline; gap: 0.5rem; overflow-wrap: anywhere; min-width: 0; padding: 0.5rem 0.25rem; cursor: pointer; }
+  #mcp-admin .mcp-choices label { display: flex; align-items: flex-start; gap: 0.5rem; overflow-wrap: anywhere; min-width: 0; padding: 0.5rem 0.25rem; cursor: pointer; }
   #mcp-admin .mcp-choices label:hover { background: var(--bg); }
   #mcp-admin .mcp-choice-description { display: block; color: var(--text-muted); font-size: 12px; font-weight: 400; }
   #mcp-admin .mcp-filter { display: grid; gap: 0.25rem; max-width: 420px; margin-top: 0.5rem; font-size: 12px; }
   #mcp-admin .mcp-selection-count { font-size: 12px; color: var(--text-muted); margin-left: 0.5rem; }
-  #mcp-admin .mcp-choices input { flex-shrink: 0; }
+  #mcp-admin .mcp-choices input { flex-shrink: 0; margin-top: 1px; }
   #mcp-admin .mcp-empty { color: var(--text-muted); margin: 0.5rem 0; }
   #mcp-admin input[aria-invalid="true"], #mcp-admin fieldset[aria-invalid="true"] { border-color: var(--danger); }
   #mcp-admin .mcp-summary { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.75rem; }
@@ -278,7 +278,7 @@ export const mcpAdminScript = String.raw`
       }, false, 'mcp-server-token-' + server.id);
       var enabledLabel = mcpElement('label', '', entry);
       var enabled = mcpElement('input', '', enabledLabel);
-      enabled.type = 'checkbox'; enabled.checked = server.enabled;
+      enabled.type = 'checkbox'; enabled.setAttribute('role', 'switch'); enabled.checked = server.enabled;
       mcpElement('span', ' Aktiviert', enabledLabel);
       enabled.addEventListener('change', function () { server.enabled = enabled.checked; mcpChanged(); });
       var toolsRoot = mcpElement('div', '', entry);

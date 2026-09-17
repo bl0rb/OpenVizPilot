@@ -106,7 +106,17 @@ export const adminPageHtml = `<!doctype html>
   :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   /* Der Seitentitel wird beim Bereichswechsel nur für Screenreader fokussiert — kein Rahmen. */
   #view-title:focus { outline: none; }
-  input[type="checkbox"] { accent-color: var(--accent); }
+  /* Kontrollkästchen, Schalter und Auswahllisten im Stil der Oberfläche statt der Browser-Standards. */
+  input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex-shrink: 0; width: 18px; height: 18px; margin: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); cursor: pointer; vertical-align: middle; position: relative; transition: background 0.15s, border-color 0.15s; }
+  input[type="checkbox"]:hover { border-color: var(--accent); }
+  input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+  input[type="checkbox"]:checked::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 12px no-repeat; }
+  input[type="checkbox"][role="switch"] { width: 36px; height: 20px; border-radius: 999px; background: var(--border); }
+  input[type="checkbox"][role="switch"]::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(13 15 22 / 25%); transition: transform 0.15s; }
+  input[type="checkbox"][role="switch"]:checked::before { transform: translateX(16px); }
+  input[type="checkbox"][role="switch"]:checked::after { content: none; }
+  input[type="checkbox"]:disabled { opacity: 0.5; cursor: not-allowed; }
+  select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 14px; }
   button.danger { color: var(--danger); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; }
@@ -1064,6 +1074,7 @@ export const adminPageHtml = `<!doctype html>
       aiLabel.className = 'user-access-checkbox';
       var aiInput = document.createElement('input');
       aiInput.type = 'checkbox';
+      aiInput.setAttribute('role', 'switch');
       aiInput.checked = u.ai === true;
       aiInput.setAttribute('aria-label', 'AI-Chat für ' + (u.displayName || u.email || u.id));
       aiLabel.appendChild(aiInput);
@@ -1074,6 +1085,7 @@ export const adminPageHtml = `<!doctype html>
       tableauLabel.className = 'user-access-checkbox';
       var tableauInput = document.createElement('input');
       tableauInput.type = 'checkbox';
+      tableauInput.setAttribute('role', 'switch');
       tableauInput.checked = u.tableauApi === true;
       tableauInput.setAttribute('aria-label', 'Tableau API für ' + (u.displayName || u.email || u.id));
       tableauLabel.appendChild(tableauInput);

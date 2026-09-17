@@ -9,12 +9,7 @@ export const tableauAdminStyles = `
   #tableau-server-admin .tableau-server-status strong { color: var(--text); font-weight: 600; }
   #tableau-server-admin .tableau-server-auth { display: flex; align-items: center; min-height: 38px; font-weight: 400; padding: 0.4rem 0.55rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); }
   #tableau-server-admin .tableau-server-toggle { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.55rem; cursor: pointer; }
-  /* Als Schalter statt Checkbox — passt zum Rest der Oberfläche. */
-  #tableau-server-admin .tableau-server-toggle input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 36px; height: 20px; margin: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--border); position: relative; cursor: pointer; transition: background 0.15s; }
-  #tableau-server-admin .tableau-server-toggle input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(13 15 22 / 25%); transition: transform 0.15s; }
-  #tableau-server-admin .tableau-server-toggle input:checked { background: var(--accent); border-color: var(--accent); }
-  #tableau-server-admin .tableau-server-toggle input:checked::before { transform: translateX(16px); }
-  #tableau-server-admin .tableau-server-toggle input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  #tableau-server-admin .tableau-server-toggle input { flex: 0 0 auto; }
   #tableau-server-admin .tableau-server-toggle span { flex: 1; }
   #tableau-server-admin .tableau-server-custom { margin-top: -0.25rem; }
   #tableau-server-admin .tableau-server-actions { align-items: center; }

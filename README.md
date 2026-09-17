@@ -27,7 +27,7 @@ For dashboard users
 - Personal context: an author-managed glossary for everyone; with an Enterprise license also user memory (name/preferences, visible and deletable by the user) and saved queries — answer-focus onboarding plus up to 5 standard questions per dashboard.
 - Slash commands: German and English prompt playbooks (for example `/summary` and `/compare`) with a picker menu in the chat.
 
-For administrators (`/admin` — the first visitor sets the admin password on first access, in a PaddleDoc-style flow; a static `ADMIN_TOKEN` also works)
+For administrators (`/admin` — the first visitor sets the admin password on first access, in a PaddleDoc-style flow; a static `ADMIN_TOKEN` also works; that initial admin can grant the **Admin** role to user accounts or SSO identities, which then sign in to `/admin` with their own account but cannot grant the role themselves)
 
 - Extension manifest download: enter the public HTTPS URL, get the ready-made `openvizpilot.trex`; the extension then talks to the origin it was loaded from, and nothing else has to be configured.
 - Model catalog: look up the models your endpoint offers and map them to friendly display names shown in the extension; the catalog is enforced on the chat endpoint.

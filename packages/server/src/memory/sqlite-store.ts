@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessIdentity } from './store';
+import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
 
 /**
  * SQLite-Backend über das Node-Builtin `node:sqlite` — für die lokale
@@ -125,6 +125,7 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       email TEXT NOT NULL DEFAULT '',
       ai INTEGER NOT NULL DEFAULT 0,
       tableau_api INTEGER NOT NULL DEFAULT 0,
+      admin INTEGER NOT NULL DEFAULT 0,
       UNIQUE (provider, issuer, subject)
     );
     CREATE TABLE IF NOT EXISTS user_sessions (
@@ -139,6 +140,11 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  // Kein Migrations-Framework: Spalte `admin` bei älteren Datenbanken idempotent nachziehen.
+  const accessColumns = db.prepare('PRAGMA table_info(user_access)').all() as Array<{ name: string }>;
+  if (!accessColumns.some((column) => column.name === 'admin')) {
+    db.exec('ALTER TABLE user_access ADD COLUMN admin INTEGER NOT NULL DEFAULT 0');
+  }
   const localUsers = db.prepare('SELECT username, display_name FROM users').all() as Array<{ username: string; display_name: string }>;
   for (const user of localUsers) {
     const identity: UserAccessIdentity = { provider: 'local', issuer: '', subject: user.username, displayName: user.display_name, email: '' };
@@ -454,24 +460,25 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email`
       ).run(id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
       const row = rows[0]!;
-      return { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 };
+      return { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 };
     },
 
     async getUserAccess(id: string): Promise<UserAccess | null> {
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
       const row = rows[0];
-      return row ? { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 } : null;
+      return row ? { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 } : null;
     },
 
     async listUserAccess(): Promise<UserAccess[]> {
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access ORDER BY id').all() as Array<Record<string, string | number>>;
-      return rows.map((row) => ({ id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1 }));
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access ORDER BY id').all() as Array<Record<string, string | number>>;
+      return rows.map((row) => ({ id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 }));
     },
 
-    async setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean> {
-      return Number(db.prepare('UPDATE user_access SET ai = ?, tableau_api = ? WHERE id = ?').run(grants.ai ? 1 : 0, grants.tableauApi ? 1 : 0, id).changes) === 1;
+    async setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean> {
+      return Number(db.prepare('UPDATE user_access SET ai = ?, tableau_api = ?, admin = COALESCE(?, admin) WHERE id = ?')
+        .run(grants.ai ? 1 : 0, grants.tableauApi ? 1 : 0, grants.admin === undefined ? null : grants.admin ? 1 : 0, id).changes) === 1;
     },
 
     async registerFailedUserLogin(username: string, nowMs: number, windowMs: number): Promise<number> {

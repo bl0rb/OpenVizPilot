@@ -170,6 +170,20 @@ describe('OIDC auth flow', () => {
       method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false }),
     })).status).toBe(200);
 
+    // Delegierter Admin per ID-Token: erst 403 not_admin, nach Vergabe durch den Token-Admin 'delegated'.
+    const notAdmin = await app.request('/api/admin/me', { headers: auth });
+    expect(notAdmin.status).toBe(403);
+    expect(((await notAdmin.json()) as { code: string }).code).toBe('not_admin');
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false, admin: true }),
+    })).status).toBe(200);
+    expect(await (await app.request('/api/admin/me', { headers: auth })).json()).toMatchObject({ role: 'delegated', provider: 'oidc' });
+    expect((await app.request('/api/admin/user-access', { headers: auth })).status).toBe(200);
+    expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
+      method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ ai: true, tableauApi: false, admin: false }),
+    })).status).toBe(403);
+    expect((await app.request('/api/admin/me', { headers: { authorization: 'Bearer kaputt' } })).status).toBe(401);
+
     // … und die Nutzer-ID kommt aus dem Token, nicht aus dem client-asserted Header.
     const memAsOther = await app.request('/api/memory/prefs', {
       method: 'PUT',

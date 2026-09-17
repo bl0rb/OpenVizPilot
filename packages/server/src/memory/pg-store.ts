@@ -11,7 +11,7 @@ import {
 import { Pool } from 'pg';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessIdentity } from './store';
+import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
 
 /**
  * Postgres-Backend der Middleware-Datenbank — Produktionspfad auf EKS:
@@ -46,6 +46,7 @@ type UserAccessRow = {
   email: string;
   ai: boolean;
   tableau_api: boolean;
+  admin: boolean;
 };
 
 function toUserAccess(row: UserAccessRow): UserAccess {
@@ -58,6 +59,7 @@ function toUserAccess(row: UserAccessRow): UserAccess {
     email: row.email,
     ai: Boolean(row.ai),
     tableauApi: Boolean(row.tableau_api),
+    admin: Boolean(row.admin),
   };
 }
 
@@ -132,8 +134,10 @@ const SCHEMA_SQL = `
     email TEXT NOT NULL DEFAULT '',
     ai BOOLEAN NOT NULL DEFAULT false,
     tableau_api BOOLEAN NOT NULL DEFAULT false,
+    admin BOOLEAN NOT NULL DEFAULT false,
     UNIQUE (provider, issuer, subject)
   );
+  ALTER TABLE user_access ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT false;
   CREATE TABLE IF NOT EXISTS user_sessions (
     token_hash TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -566,25 +570,25 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
          ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email`,
         [id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email],
       );
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = $1', [id]);
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = $1', [id]);
       return toUserAccess(result.rows[0] as UserAccessRow);
     },
 
     async getUserAccess(id: string): Promise<UserAccess | null> {
       await ensureSchema();
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access WHERE id = $1', [id]);
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = $1', [id]);
       return result.rows[0] ? toUserAccess(result.rows[0] as UserAccessRow) : null;
     },
 
     async listUserAccess(): Promise<UserAccess[]> {
       await ensureSchema();
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api FROM user_access ORDER BY id');
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access ORDER BY id');
       return (result.rows as UserAccessRow[]).map(toUserAccess);
     },
 
-    async setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean> {
+    async setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean> {
       await ensureSchema();
-      const result = await pool.query('UPDATE user_access SET ai = $1, tableau_api = $2 WHERE id = $3', [grants.ai, grants.tableauApi, id]);
+      const result = await pool.query('UPDATE user_access SET ai = $1, tableau_api = $2, admin = COALESCE($3::boolean, admin) WHERE id = $4', [grants.ai, grants.tableauApi, grants.admin ?? null, id]);
       return (result.rowCount ?? 0) === 1;
     },
 

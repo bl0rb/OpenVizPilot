@@ -7,6 +7,7 @@ import { encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '
 import { startMockOidc, type MockOidc } from '../../../ee/test/mock-oidc-server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
+import { userAccessId } from '../src/memory/store';
 import { testLicenseEnv } from './license-helper';
 
 /**
@@ -98,10 +99,13 @@ describe('local user login (open core)', () => {
     expect((await app.request('/api/models', { headers: auth })).status).toBe(403);
     const accessList = await (await app.request('/api/admin/user-access', { headers: admin })).json() as { users: Array<{ id: string; ai: boolean; tableauApi: boolean }> };
     expect(accessList.users[0]).toMatchObject({ ai: false, tableauApi: false });
-    expect((await app.request('/api/admin/user-access', { headers: auth })).status).toBe(401);
+    // Gültiges Benutzer-Token ohne Admin-Rolle: 403 not_admin (kein 401 — das Konto ist bekannt, nur nicht Admin).
+    const notAdmin = await app.request('/api/admin/user-access', { headers: auth });
+    expect(notAdmin.status).toBe(403);
+    expect(((await notAdmin.json()) as { code: string }).code).toBe('not_admin');
     expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
       method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ ai: true, tableauApi: true }),
-    })).status).toBe(401);
+    })).status).toBe(403);
     expect((await app.request(`/api/admin/user-access/${accessList.users[0]!.id}`, {
       method: 'PUT', headers: admin, body: JSON.stringify({ ai: true, tableauApi: false, role: 'admin' }),
     })).status).toBe(400);
@@ -128,6 +132,48 @@ describe('local user login (open core)', () => {
     // Logout beendet die Sitzung serverseitig.
     expect((await app.request('/api/auth/logout', { method: 'POST', headers: auth })).status).toBe(200);
     expect((await app.request('/api/commands', { headers: auth })).status).toBe(401);
+  });
+
+  it('lets a user with the admin role administer, while only the initial admin grants or revokes the role', async () => {
+    const instance = createApp(localConfig());
+    const { app } = instance;
+    const idOf = (username: string) => userAccessId({ provider: 'local', issuer: '', subject: username });
+    await app.request('/api/admin/users', { method: 'POST', headers: admin, body: JSON.stringify({ username: 'anna', displayName: 'Anna Beispiel', password: 'sehr-geheimes-passwort' }) });
+    await app.request('/api/admin/users', { method: 'POST', headers: admin, body: JSON.stringify({ username: 'bob', displayName: 'Bob', password: 'sehr-geheimes-passwort' }) });
+    const session = (await (await login(app, 'anna', 'sehr-geheimes-passwort')).json()) as { token: string };
+    const asAnna = { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' };
+    const put = (headers: Record<string, string>, id: string, body: unknown) =>
+      app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+
+    expect((await app.request('/api/admin/me', { headers: asAnna })).status).toBe(403);
+    // Token-Admin (initial) vergibt die Rolle.
+    expect((await put(admin, idOf('anna'), { ai: false, tableauApi: false, admin: true })).status).toBe(200);
+    const me = await app.request('/api/admin/me', { headers: asAnna });
+    expect(me.status).toBe(200);
+    expect(await me.json()).toEqual({ role: 'delegated', name: 'Anna Beispiel', provider: 'local' });
+    expect((await app.request('/api/admin/commands', { headers: asAnna })).status).toBe(200);
+    const list = (await (await app.request('/api/admin/user-access', { headers: asAnna })).json()) as { users: Array<{ id: string; admin: boolean }> };
+    expect(list.users.find((u) => u.id === idOf('anna'))?.admin).toBe(true);
+
+    // Delegierter Admin: Freigaben ja, Admin-Rolle nein — weder vergeben noch (sich selbst) entziehen.
+    const grant = await put(asAnna, idOf('bob'), { ai: true, tableauApi: false, admin: true });
+    expect(grant.status).toBe(403);
+    expect(((await grant.json()) as { code: string }).code).toBe('initial_admin_required');
+    expect((await put(asAnna, idOf('anna'), { ai: false, tableauApi: false, admin: false })).status).toBe(403);
+    expect((await put(asAnna, idOf('bob'), { ai: true, tableauApi: false, admin: false })).status).toBe(200);
+    expect((await put(asAnna, idOf('bob'), { ai: true, tableauApi: true })).status).toBe(200);
+    expect(await instance.memoryStore!.getUserAccess(idOf('bob'))).toMatchObject({ ai: true, tableauApi: true, admin: false });
+    expect(await instance.memoryStore!.getUserAccess(idOf('anna'))).toMatchObject({ admin: true });
+
+    // Gesperrtes Konto kommt nicht durch, auch mit noch vorhandener Sitzung.
+    await instance.memoryStore!.setUserDisabled('anna', true);
+    expect((await app.request('/api/admin/me', { headers: asAnna })).status).toBe(401);
+    await instance.memoryStore!.setUserDisabled('anna', false);
+    expect((await app.request('/api/admin/me', { headers: asAnna })).status).toBe(200);
+    // Rolle entzogen: 403 not_admin, das Token selbst bleibt für die API gültig.
+    expect((await put(admin, idOf('anna'), { ai: false, tableauApi: false, admin: false })).status).toBe(200);
+    expect((await app.request('/api/admin/me', { headers: asAnna })).status).toBe(403);
+    expect((await app.request('/api/session', { headers: asAnna })).status).toBe(200);
   });
 
   it('locks an account after repeated failures, and disabling/password reset ends sessions', async () => {

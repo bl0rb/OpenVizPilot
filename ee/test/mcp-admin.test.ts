@@ -55,7 +55,10 @@ describe('Enterprise MCP administration', () => {
   it('requires admin authentication and persists site-scoped configuration', async () => {
     await withApp(true, async ({ app }) => {
       expect((await app.request('/api/admin/mcp')).status).toBe(401);
-      expect((await app.request('/api/admin/mcp', { headers: { authorization: 'Bearer user-session' } })).status).toBe(401);
+      // Gültiges Benutzer-Token ohne Admin-Rolle: erkannt, aber nicht berechtigt (403 not_admin).
+      const nonAdmin = await app.request('/api/admin/mcp', { headers: { authorization: 'Bearer user-session' } });
+      expect(nonAdmin.status).toBe(403);
+      expect((await nonAdmin.json() as { code: string }).code).toBe('not_admin');
       const initial = await (await app.request('/api/admin/mcp', { headers: adminHeaders })).json();
       expect(initial).toMatchObject({ revision: 0, settings: { servers: [], sites: [] }, users: [{ id: 'local:alice' }] });
       const update = () => app.request('/api/admin/mcp', { method: 'PUT', headers: adminHeaders, body: JSON.stringify({ settings, revision: 0 }) });

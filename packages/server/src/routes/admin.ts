@@ -26,7 +26,9 @@ import {
   createMcpAdminRoute,
   type McpStore,
   createTableauAdminRoute,
+  OidcError,
   type TableauService,
+  type VerifiedUser,
 } from '@openvizpilot/ee/server';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
@@ -47,6 +49,7 @@ import type { AuthStateProvider } from '../auth-state';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
 import type { MemoryStore } from '../memory/store';
+import { resolveUserAccess } from '../user-access';
 
 /**
  * Admin-API: zentrale Verwaltung der Slash-Befehle, Manifest-Download und
@@ -66,6 +69,11 @@ import type { MemoryStore } from '../memory/store';
  *
  * Ohne ADMIN_TOKEN UND ohne Store ist die gesamte Route deaktiviert (404) —
  * die Admin-Funktionalität existiert dann faktisch nicht.
+ *
+ * Rollen: Token bzw. Admin-Konto sind der **initiale Admin**. Zusätzlich (in
+ * beiden Betriebsarten) kommt ein Benutzer-Token (lokale Sitzung bzw.
+ * OIDC-ID-Token) durch, dessen Access-Record `admin: true` trägt — der
+ * **delegierte Admin**. Nur der initiale Admin vergibt/entzieht die Rolle.
  *
  * DATENSCHUTZ: GET /stats liefert ausschließlich aggregierte Zähler
  * (Tag · Metrik · Key → Anzahl) — niemals Frage-/Antwort-Inhalte oder
@@ -140,6 +148,14 @@ export function aggregateDashboardUsage(
     .sort((a, b) => b.questions - a.questions);
 }
 
+export interface AdminPrincipal {
+  role: 'initial' | 'delegated';
+  name: string;
+  provider: 'token' | 'admin' | 'local' | 'oidc';
+}
+
+export type AdminEnv = { Variables: { adminPrincipal: AdminPrincipal } };
+
 function bearerToken(header: string | undefined): string | null {
   if (!header?.startsWith('Bearer ')) return null;
   const token = header.slice('Bearer '.length).trim();
@@ -156,9 +172,36 @@ export function createAdminRoute(
   telemetryStore: TelemetryStore | null = null,
   mcpStore: McpStore | null = null,
   tableau: TableauService | null = null,
-): Hono {
-  const app = new Hono();
+): Hono<AdminEnv> {
+  const app = new Hono<AdminEnv>();
   const tokenMode = Boolean(config.adminToken);
+
+  /**
+   * Delegierter Admin: Benutzer-Token je nach aktivem Anmeldemodus auflösen
+   * (lokale Sitzung bzw. verifiziertes OIDC-ID-Token) und den Access-Record
+   * prüfen. null = kein gültiges Benutzer-Token bzw. gesperrtes Konto (401);
+   * 'not_admin' = gültiges Konto ohne Admin-Rolle (403).
+   */
+  const resolveDelegatedAdmin = async (token: string): Promise<AdminPrincipal | 'not_admin' | null> => {
+    if (!memoryStore) return null;
+    const state = await authState.get();
+    let identity: { oidc?: VerifiedUser; username?: string } | null = null;
+    if (state.mode === 'local') {
+      const username = await memoryStore.getUserSession(hashSessionToken(token), Date.now());
+      if (username) identity = { username };
+    } else if (state.mode === 'oidc' && state.oidc && !state.blockedReason) {
+      try {
+        identity = { oidc: await state.oidc.verifyIdToken(token) };
+      } catch (err) {
+        if (err instanceof OidcError && err.kind === 'config') throw err;
+      }
+    }
+    if (!identity) return null;
+    const record = await resolveUserAccess(memoryStore, identity);
+    if (!record) return null;
+    if (!record.admin) return 'not_admin';
+    return { role: 'delegated', name: record.displayName || record.email || record.subject, provider: record.provider };
+  };
 
   // Weder statisches Token noch Store für den Passwort-Modus: alles 404.
   app.use('*', async (c, next) => {
@@ -268,29 +311,44 @@ export function createAdminRoute(
   // ---- Auth-Middleware für alle übrigen Admin-Endpunkte ----
 
   app.use('*', async (c, next) => {
-    if (tokenMode) {
-      const header = c.req.header('authorization') ?? '';
-      if (!safeEqual(header, `Bearer ${config.adminToken}`)) {
-        return c.json({ error: 'Nicht autorisiert' }, 401);
-      }
+    const header = c.req.header('authorization') ?? '';
+    if (tokenMode && safeEqual(header, `Bearer ${config.adminToken}`)) {
+      c.set('adminPrincipal', { role: 'initial', name: 'Admin-Token', provider: 'token' });
       await next();
       return;
     }
-    const token = bearerToken(c.req.header('authorization'));
+    const token = bearerToken(header);
     if (!token) {
       return c.json({ error: 'Nicht autorisiert' }, 401);
     }
     try {
-      const valid = await memoryStore!.hasAdminSession(hashSessionToken(token), Date.now());
-      if (!valid) {
-        return c.json({ error: 'Nicht autorisiert' }, 401);
+      if (!tokenMode && await memoryStore!.hasAdminSession(hashSessionToken(token), Date.now())) {
+        c.set('adminPrincipal', { role: 'initial', name: 'Admin-Konto', provider: 'admin' });
+        await next();
+        return;
+      }
+      const delegated = await resolveDelegatedAdmin(token);
+      if (delegated === 'not_admin') {
+        return c.json({ error: 'Dieses Konto hat keine Admin-Rolle', code: 'not_admin' }, 403);
+      }
+      if (delegated) {
+        c.set('adminPrincipal', delegated);
+        await next();
+        return;
       }
     } catch (err) {
+      if (err instanceof OidcError) {
+        logger.error('admin oidc verification unavailable', { name: err.name });
+        return c.json({ error: 'Identity-Provider nicht erreichbar' }, 503);
+      }
       logger.error('admin session check failed', { name: err instanceof Error ? err.name : 'unknown' });
       return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
     }
-    await next();
+    return c.json({ error: 'Nicht autorisiert' }, 401);
   });
+
+  /** Wer gerade angemeldet ist — die Seite blendet danach den Admin-Schalter ein/aus. */
+  app.get('/me', (c) => c.json(c.get('adminPrincipal')));
 
   app.post('/logout', async (c) => {
     const token = bearerToken(c.req.header('authorization'));
@@ -595,16 +653,27 @@ export function createAdminRoute(
     }
   });
 
-  app.put('/user-access/:id', zValidator('json', z.object({ ai: z.boolean(), tableauApi: z.boolean() }).strict(), (result, c) => {
+  app.put('/user-access/:id', zValidator('json', z.object({ ai: z.boolean(), tableauApi: z.boolean(), admin: z.boolean().optional() }).strict(), (result, c) => {
     if (!result.success) return c.json({ error: 'Ungültige Freigaben' }, 400);
   }), async (c) => {
     if (!memoryStore) return c.json({ error: 'Freigaben benötigen einen Memory-Store' }, 503);
     const id = c.req.param('id');
     if (!/^[a-f0-9]{64}$/.test(id)) return c.json({ error: 'Ungültige Benutzer-ID' }, 400);
     try {
-      const grants = c.req.valid('json');
-      if (!await memoryStore.setUserAccess(id, grants)) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
-      logger.info('user access updated', { id, ...grants });
+      const { admin, ...grants } = c.req.valid('json');
+      const initial = c.get('adminPrincipal').role === 'initial';
+      if (admin !== undefined && !initial) {
+        // Delegierte Admins dürfen die Rolle weder vergeben noch entziehen —
+        // ein unverändert mitgesendetes `admin` ist in Ordnung.
+        const current = await memoryStore.getUserAccess(id);
+        if (!current) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
+        if (current.admin !== admin) {
+          return c.json({ error: 'Die Admin-Rolle kann nur der initiale Admin (Token bzw. Admin-Konto) vergeben', code: 'initial_admin_required' }, 403);
+        }
+      }
+      const update = initial && admin !== undefined ? { ...grants, admin } : grants;
+      if (!await memoryStore.setUserAccess(id, update)) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
+      logger.info('user access updated', { id, ...update });
       return c.json({ ok: true });
     } catch {
       return c.json({ error: 'Freigaben konnten nicht gespeichert werden' }, 503);

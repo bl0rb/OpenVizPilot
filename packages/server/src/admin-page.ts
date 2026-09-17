@@ -133,7 +133,7 @@ export const adminPageHtml = `<!doctype html>
   #models-table { min-width: 520px; }
   #users-table { min-width: 520px; }
   #users-table .col-del { width: 144px; white-space: nowrap; }
-  #user-access-table { min-width: 760px; }
+  #user-access-table { min-width: 860px; }
   #user-access-table .col-access { width: 110px; text-align: center; }
   #user-access-table .col-save { width: 90px; white-space: nowrap; }
   .user-access-table-wrapper { max-width: 100%; overflow-x: auto; }
@@ -182,6 +182,7 @@ export const adminPageHtml = `<!doctype html>
   .brand img { width: 34px; height: 34px; }
   .brand-origin { font-size: 12px; font-weight: 400; color: #a1a8c0; border-left: 1px solid #343847; padding-left: 1rem; }
   .masthead-label { font-size: 12px; color: #a1a8c0; }
+  #admin-identity::before { content: '·'; margin: 0 0.4rem; }
   .admin-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 72px); }
   .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 2rem 1rem 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; }
   .sidebar nav { position: sticky; top: 1.5rem; }
@@ -221,6 +222,8 @@ export const adminPageHtml = `<!doctype html>
   #gate label { display: block; margin: 1rem 0 0.4rem; font-size: 13px; font-weight: 500; }
   #gate form .primary { margin-top: 1.5rem; }
   #gate .gate-caption { color: var(--text-muted); font-size: 12px; margin: 0 0 0.5rem; }
+  #gate .gate-divider { margin: 1.75rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
+  #gate #gate-sso .primary { margin-top: 1rem; }
   @media (max-width: 900px) {
     .admin-shell { grid-template-columns: 210px minmax(0, 1fr); }
     .workspace { padding: 1.75rem 1.5rem 3rem; }
@@ -249,7 +252,7 @@ export const adminPageHtml = `<!doctype html>
 <body>
 <header class="masthead">
   <div class="brand"><img src="data:image/svg+xml,${encodeURIComponent(adminLogo)}" width="34" height="34" alt="" /><span>OpenVizPilot</span><span class="brand-origin">WerkWorks</span></div>
-  <span class="masthead-label">Administration</span>
+  <span class="masthead-label">Administration<span id="admin-identity" hidden></span></span>
 </header>
 <main>
   <div id="gate">
@@ -281,6 +284,22 @@ export const adminPageHtml = `<!doctype html>
       <input type="password" id="login-password" autocomplete="current-password" required maxlength="200" />
       <button class="primary" id="login-submit" type="submit">Anmelden</button>
     </form>
+
+    <div id="gate-user" hidden>
+      <p class="gate-divider">Mit Benutzerkonto anmelden</p>
+      <form id="gate-user-login" hidden>
+        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzerzugriff“).</p>
+        <label for="user-login-name">Benutzername</label>
+        <input type="text" id="user-login-name" autocomplete="username" required maxlength="100" />
+        <label for="user-login-password">Passwort</label>
+        <input type="password" id="user-login-password" autocomplete="current-password" required maxlength="200" />
+        <button class="primary" id="user-login-submit" type="submit">Mit Benutzerkonto anmelden</button>
+      </form>
+      <div id="gate-sso" hidden>
+        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzerzugriff“).</p>
+        <button class="primary" id="sso-submit" type="button">Mit Single Sign-On anmelden</button>
+      </div>
+    </div>
 
     <p id="gate-error" class="banner error" role="alert"></p>
     <div class="row"><button id="gate-retry" hidden>Erneut versuchen</button></div>
@@ -446,7 +465,7 @@ export const adminPageHtml = `<!doctype html>
         </div>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
-            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-save"></th></tr></thead>
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span></th><th class="col-save"></th></tr></thead>
             <tbody id="user-access-body"></tbody>
           </table>
         </div>
@@ -687,7 +706,7 @@ export const adminPageHtml = `<!doctype html>
 
   /** Fragt den Auth-Modus ab und blendet das passende Gate-Formular ein. */
   function initGate() {
-    ['gate-token', 'gate-setup', 'gate-login', 'gate-retry'].forEach(function (id) {
+    ['gate-token', 'gate-setup', 'gate-login', 'gate-retry', 'gate-user', 'gate-user-login', 'gate-sso'].forEach(function (id) {
       document.getElementById(id).hidden = true;
     });
     fetch('/api/admin/auth-status')
@@ -704,6 +723,7 @@ export const adminPageHtml = `<!doctype html>
           result.data.mode === 'setup' ? 'gate-setup' : 'gate-login';
         document.getElementById('gate-title').textContent = result.data.mode === 'setup' ? 'Admin-Konto einrichten' : 'Admin-Anmeldung';
         document.getElementById(id).hidden = false;
+        if (result.data.mode !== 'setup') initUserGate();
       })
       .catch(function () {
         showBanner(gateError, 'Server nicht erreichbar.', 'error');
@@ -711,11 +731,45 @@ export const adminPageHtml = `<!doctype html>
       });
   }
 
+  /** Angemeldeter Admin ({ role: 'initial' | 'delegated', name, provider }) — steuert den Admin-Schalter. */
+  var adminMe = null;
+
+  function loadMe() {
+    return adminFetch('/me')
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (me) {
+        adminMe = me;
+        var identity = document.getElementById('admin-identity');
+        identity.hidden = !me;
+        identity.textContent = me ? 'Angemeldet als ' + me.name + (me.role === 'delegated' ? ' (delegierter Admin)' : '') : '';
+      });
+  }
+
+  /** Zweiter Weg ins Admin: Benutzerkonto mit Admin-Rolle — Formular (lokal) oder SSO-Button (OIDC), je nach Anmeldemodus. */
+  var ssoConfig = null;
+  function initUserGate() {
+    fetch('/api/auth/config')
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) return;
+        if (result.data.mode === 'local') {
+          document.getElementById('gate-user').hidden = false;
+          document.getElementById('gate-user-login').hidden = false;
+        } else if (result.data.mode === 'oidc' && result.data.authorizationEndpoint && result.data.redirectUri) {
+          ssoConfig = result.data;
+          document.getElementById('gate-user').hidden = false;
+          document.getElementById('gate-sso').hidden = false;
+        }
+      })
+      .catch(function () { /* ohne Benutzer-Anmeldung bleibt der Token-/Passwort-Weg */ });
+  }
+
   function showApp() {
     gate.style.display = 'none';
     app.style.display = 'block';
     selectAdminView(false);
-    loadAll();
+    // Erst die Rolle, dann die Bereiche — nach 401/403 steht bereits das Gate.
+    loadMe().then(loadAll, function (error) { if (error.message !== 'unauthorized') loadAll(); });
   }
 
   function loadAll() {
@@ -760,6 +814,17 @@ export const adminPageHtml = `<!doctype html>
         clearToken();
         showGate('Token ungültig oder abgelaufen — bitte erneut eingeben.');
         throw new Error('unauthorized');
+      }
+      if (res.status === 403) {
+        // Benutzerkonto ohne (oder mit inzwischen entzogener) Admin-Rolle.
+        return res.clone().json().catch(function () { return {}; }).then(function (data) {
+          if (data && data.code === 'not_admin') {
+            clearToken();
+            showGate('Dieses Konto hat keine Admin-Rolle.');
+            throw new Error('unauthorized');
+          }
+          return res;
+        });
       }
       return res;
     });
@@ -1046,7 +1111,7 @@ export const adminPageHtml = `<!doctype html>
     if (users.length === 0) {
       var empty = document.createElement('tr');
       var emptyCell = document.createElement('td');
-      emptyCell.colSpan = 6;
+      emptyCell.colSpan = 7;
       emptyCell.className = 'hint';
       emptyCell.textContent = 'Keine Identitäten gefunden.';
       empty.appendChild(emptyCell);
@@ -1090,6 +1155,20 @@ export const adminPageHtml = `<!doctype html>
       tableauInput.setAttribute('aria-label', 'Tableau API für ' + (u.displayName || u.email || u.id));
       tableauLabel.appendChild(tableauInput);
       tableau.appendChild(tableauLabel);
+      var adminCell = document.createElement('td');
+      adminCell.className = 'col-access';
+      var adminLabel = document.createElement('label');
+      adminLabel.className = 'user-access-checkbox';
+      var adminInput = document.createElement('input');
+      adminInput.type = 'checkbox';
+      adminInput.setAttribute('role', 'switch');
+      adminInput.checked = u.admin === true;
+      // Nur der initiale Admin vergibt die Rolle — delegierte Admins sehen den Schalter nur lesend.
+      var canGrantAdmin = Boolean(adminMe && adminMe.role === 'initial');
+      adminInput.disabled = !canGrantAdmin;
+      adminInput.setAttribute('aria-label', 'Admin für ' + (u.displayName || u.email || u.id));
+      adminLabel.appendChild(adminInput);
+      adminCell.appendChild(adminLabel);
       status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
       var actions = document.createElement('td');
       actions.className = 'col-save';
@@ -1100,7 +1179,8 @@ export const adminPageHtml = `<!doctype html>
         save.disabled = true;
         aiInput.disabled = true;
         tableauInput.disabled = true;
-        adminFetch('/user-access/' + encodeURIComponent(u.id), jsonRequest('PUT', { ai: aiInput.checked, tableauApi: tableauInput.checked }))
+        adminInput.disabled = true;
+        adminFetch('/user-access/' + encodeURIComponent(u.id), jsonRequest('PUT', { ai: aiInput.checked, tableauApi: tableauInput.checked, admin: adminInput.checked }))
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (result) {
             if (!result.ok) throw new Error(errorText(result.data, 'Zugriff konnte nicht gespeichert werden.'));
@@ -1108,7 +1188,7 @@ export const adminPageHtml = `<!doctype html>
             status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
           })
           .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriff konnte nicht gespeichert werden.', 'error'); })
-          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; });
+          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; adminInput.disabled = !canGrantAdmin; });
       });
       actions.appendChild(save);
       tr.appendChild(identity);
@@ -1116,6 +1196,7 @@ export const adminPageHtml = `<!doctype html>
       tr.appendChild(status);
       tr.appendChild(ai);
       tr.appendChild(tableau);
+      tr.appendChild(adminCell);
       tr.appendChild(actions);
       userAccessBody.appendChild(tr);
     });
@@ -1733,7 +1814,7 @@ export const adminPageHtml = `<!doctype html>
 
   function enterApp(token) {
     setToken(token);
-    ['setup-password', 'setup-confirm', 'login-password', 'token-input'].forEach(function (id) { document.getElementById(id).value = ''; });
+    ['setup-password', 'setup-confirm', 'login-password', 'token-input', 'user-login-name', 'user-login-password'].forEach(function (id) { document.getElementById(id).value = ''; });
     showBanner(gateError, '', 'error');
     showApp();
   }
@@ -1808,8 +1889,116 @@ export const adminPageHtml = `<!doctype html>
       .finally(function () { button.disabled = false; button.textContent = 'Anmelden'; });
   });
 
+  // ---------- Gate: Benutzerkonto mit Admin-Rolle (lokal / SSO) ----------
+
+  /** Benutzer-Token gegen /me prüfen — ohne Admin-Rolle bleibt das Token draußen (lokale Sitzung wird beendet). */
+  function enterAsUser(token, provider) {
+    return fetch('/api/admin/me', { headers: { authorization: 'Bearer ' + token } })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (data) { return { res: res, data: data }; }); })
+      .then(function (result) {
+        if (result.res.ok) { enterApp(token); return; }
+        if (provider === 'local') {
+          fetch('/api/auth/logout', { method: 'POST', headers: { authorization: 'Bearer ' + token } }).catch(function () { /* Sitzung läuft sonst ab */ });
+        }
+        showBanner(gateError, result.data.code === 'not_admin' ? 'Dieses Konto hat keine Admin-Rolle.' : (result.data.error || 'Anmeldung fehlgeschlagen.'), 'error');
+      });
+  }
+
+  document.getElementById('gate-user-login').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var button = document.getElementById('user-login-submit');
+    if (button.disabled) return;
+    var username = document.getElementById('user-login-name').value.trim();
+    var password = document.getElementById('user-login-password').value;
+    if (!username || !password) return;
+    button.disabled = true;
+    fetch('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: username, password: password }) })
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (result) {
+        if (!result.res.ok) {
+          showBanner(gateError, result.data.error || 'Anmeldung fehlgeschlagen.', 'error');
+          return;
+        }
+        return enterAsUser(result.data.token, 'local');
+      })
+      .catch(function () { showBanner(gateError, 'Server nicht erreichbar.', 'error'); })
+      .finally(function () { button.disabled = false; });
+  });
+
+  // PKCE (S256) im Browser, Popup auf den Authorization-Endpoint, Rückkehr über
+  // /auth/callback (postMessage an den Opener), Code-Tausch über den BFF —
+  // dasselbe Muster wie der Extension-Login (ee/extension/src/oidc-login.ts).
+  function base64url(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).split('+').join('-').split('/').join('_').replace(/=+$/, '');
+  }
+  function randomString(bytes) {
+    var buf = new Uint8Array(bytes);
+    crypto.getRandomValues(buf);
+    return base64url(buf);
+  }
+  document.getElementById('sso-submit').addEventListener('click', function () {
+    var button = document.getElementById('sso-submit');
+    if (button.disabled || !ssoConfig) return;
+    if (!window.crypto || !crypto.subtle) {
+      showBanner(gateError, 'Single Sign-On braucht einen sicheren Kontext (HTTPS).', 'error');
+      return;
+    }
+    var verifier = randomString(48);
+    var state = randomString(24);
+    var expectedOrigin = new URL(ssoConfig.redirectUri).origin;
+    button.disabled = true;
+    showBanner(gateError, '', 'error');
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (digest) {
+      var url = new URL(ssoConfig.authorizationEndpoint);
+      url.searchParams.set('response_type', 'code');
+      url.searchParams.set('client_id', ssoConfig.clientId);
+      url.searchParams.set('redirect_uri', ssoConfig.redirectUri);
+      url.searchParams.set('scope', ssoConfig.scopes || 'openid profile email');
+      url.searchParams.set('state', state);
+      url.searchParams.set('code_challenge', base64url(new Uint8Array(digest)));
+      url.searchParams.set('code_challenge_method', 'S256');
+      if (ssoConfig.provider === 'entra') url.searchParams.set('prompt', 'select_account');
+      var popup = window.open(url.toString(), 'openvizpilot-admin-login', 'popup,width=520,height=680');
+      if (!popup) throw new Error('Das Anmeldefenster wurde blockiert — bitte Popups für diese Seite erlauben.');
+      return new Promise(function (resolve, reject) {
+        var closedPoll = null;
+        var timeout = null;
+        function cleanup() { window.removeEventListener('message', onMessage); clearInterval(closedPoll); clearTimeout(timeout); }
+        function onMessage(event) {
+          if (event.origin !== expectedOrigin) return;
+          var data = event.data;
+          if (!data || data.type !== 'openvizpilot-oidc' || data.state !== state) return;
+          cleanup();
+          if (data.error || !data.code) reject(new Error(data.error === 'access_denied' ? 'Anmeldung abgebrochen.' : 'Anmeldung fehlgeschlagen.'));
+          else resolve(data.code);
+        }
+        window.addEventListener('message', onMessage);
+        closedPoll = setInterval(function () { if (popup.closed) { cleanup(); reject(new Error('Das Anmeldefenster wurde geschlossen.')); } }, 500);
+        timeout = setTimeout(function () { cleanup(); reject(new Error('Zeitüberschreitung bei der Anmeldung.')); }, 5 * 60 * 1000);
+      });
+    }).then(function (code) {
+      return fetch('/api/auth/exchange', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: code, codeVerifier: verifier, redirectUri: ssoConfig.redirectUri }),
+      }).then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); });
+    }).then(function (result) {
+      if (!result.res.ok) throw new Error(result.data.error || 'Anmeldung fehlgeschlagen.');
+      return enterAsUser(result.data.token, 'oidc');
+    }).catch(function (error) { showBanner(gateError, error.message || 'Anmeldung fehlgeschlagen.', 'error'); })
+      .finally(function () { button.disabled = false; });
+  });
+
   document.getElementById('logout').addEventListener('click', function () {
-    adminFetch('/logout', { method: 'POST' }).catch(function () { /* Session ist ohnehin weg */ });
+    // Delegierter Admin mit lokaler Sitzung: Sitzung serverseitig beenden; sonst Admin-Session.
+    if (adminMe && adminMe.role === 'delegated') {
+      if (adminMe.provider === 'local') fetch('/api/auth/logout', { method: 'POST', headers: { authorization: 'Bearer ' + getToken() } }).catch(function () { /* Sitzung läuft sonst ab */ });
+    } else {
+      adminFetch('/logout', { method: 'POST' }).catch(function () { /* Session ist ohnehin weg */ });
+    }
+    adminMe = null;
     clearToken();
     showGate();
   });

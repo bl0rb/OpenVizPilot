@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from '../src/admin-auth';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
 import { createSqliteMemoryStore, openSqliteDatabase } from '../src/memory/sqlite-store';
+import { userAccessId } from '../src/memory/store';
 import { createLogger } from '../src/logger';
 
 /**
@@ -176,6 +177,27 @@ describe('first-run admin setup (password mode)', () => {
     expect(loginRes.status).toBe(200);
     const { token: token2 } = (await loginRes.json()) as { token: string };
     expect((await app.request('/api/admin/commands', { headers: { authorization: `Bearer ${token2}` } })).status).toBe(200);
+  });
+
+  it('admits delegated admins by user session next to the admin account (password mode)', async () => {
+    const { app } = createApp(passwordModeConfig({ authMode: 'local' }));
+    const setup = (await (await app.request('/api/admin/setup', json({ password: GOOD_PASSWORD }))).json()) as { token: string };
+    const initial = { authorization: `Bearer ${setup.token}`, 'content-type': 'application/json' };
+    expect(await (await app.request('/api/admin/me', { headers: initial })).json()).toEqual({ role: 'initial', name: 'Admin-Konto', provider: 'admin' });
+
+    await app.request('/api/admin/users', { method: 'POST', headers: initial, body: JSON.stringify({ username: 'anna', displayName: 'Anna', password: 'sehr-geheimes-passwort' }) });
+    const login = await app.request('/api/auth/login', json({ username: 'anna', password: 'sehr-geheimes-passwort' }));
+    const user = { authorization: `Bearer ${((await login.json()) as { token: string }).token}` };
+    const me = await app.request('/api/admin/me', { headers: user });
+    expect(me.status).toBe(403);
+    expect(((await me.json()) as { code: string }).code).toBe('not_admin');
+
+    const id = userAccessId({ provider: 'local', issuer: '', subject: 'anna' });
+    expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: initial, body: JSON.stringify({ ai: false, tableauApi: false, admin: true }) })).status).toBe(200);
+    expect(await (await app.request('/api/admin/me', { headers: user })).json()).toEqual({ role: 'delegated', name: 'Anna', provider: 'local' });
+    expect((await app.request('/api/admin/commands', { headers: user })).status).toBe(200);
+    // Ungültiges Token bleibt 401 — auch im Passwort-Modus.
+    expect((await app.request('/api/admin/commands', { headers: { authorization: 'Bearer falsch' } })).status).toBe(401);
   });
 
   it('locks the account after repeated failures and unlocks after the window', async () => {

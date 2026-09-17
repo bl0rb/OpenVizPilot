@@ -38,6 +38,24 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain('id="gate-error" class="banner error" role="alert"');
   });
 
+  it('offers a user-account login (local form or SSO popup) next to token/password', () => {
+    expect(adminPageHtml).toContain('<div id="gate-user" hidden>');
+    expect(adminPageHtml).toContain('<form id="gate-user-login" hidden>');
+    for (const id of ['user-login-name', 'user-login-password']) {
+      expect(adminPageHtml).toContain(`for="${id}"`);
+      expect(adminPageHtml).toMatch(new RegExp(`id="${id}"[^>]*required`));
+    }
+    expect(adminPageHtml).toContain('<button class="primary" id="sso-submit" type="button">Mit Single Sign-On anmelden</button>');
+    expect(adminPageHtml).toContain("fetch('/api/auth/config')");
+    expect(adminPageHtml).toContain("fetch('/api/auth/login'");
+    expect(adminPageHtml).toContain("fetch('/api/auth/exchange'");
+    expect(adminPageHtml).toContain("crypto.subtle.digest('SHA-256'");
+    expect(adminPageHtml).toContain("url.searchParams.set('code_challenge_method', 'S256');");
+    expect(adminPageHtml).toContain("data.type !== 'openvizpilot-oidc'");
+    expect(adminPageHtml).toContain("fetch('/api/admin/me', { headers: { authorization: 'Bearer ' + token } })");
+    expect(adminPageHtml).toContain("'Dieses Konto hat keine Admin-Rolle.'");
+  });
+
   it('uses the documented product logo in the admin header', () => {
     const source = adminPageHtml.match(/<div class="brand"><img src="data:image\/svg\+xml,([^"]+)"/);
     expect(source).not.toBeNull();
@@ -100,13 +118,24 @@ describe('admin page inline script', () => {
     expect(adminPageHtml).toContain('id="user-access-refresh"');
     expect(adminPageHtml).toContain("adminFetch('/user-access')");
     expect(adminPageHtml).toContain("adminFetch('/user-access/' + encodeURIComponent(u.id)");
-    expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked }");
+    expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked, admin: adminInput.checked }");
     expect(adminPageHtml).toContain("'SSO · ' + (u.issuer || 'Issuer unbekannt') + ' · subject: '");
     expect(adminPageHtml).toContain("'Lokal · ' + (u.subject || u.id)");
     expect(adminPageHtml).toContain("status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend'");
     expect(adminPageHtml).toContain('name.textContent = u.displayName || u.email || u.subject || u.id;');
     expect(adminPageHtml).toContain('email.textContent = u.email || \'—\';');
     expect(adminPageHtml).toContain('return loadUsers().then(loadUserAccess)');
+  });
+
+  it('shows the admin role switch read-only for delegated admins and announces the signed-in admin', () => {
+    expect(adminPageHtml).toContain('<span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span>');
+    expect(adminPageHtml).toContain("var canGrantAdmin = Boolean(adminMe && adminMe.role === 'initial');");
+    expect(adminPageHtml).toContain('adminInput.disabled = !canGrantAdmin;');
+    expect(adminPageHtml).toContain("adminFetch('/me')");
+    expect(adminPageHtml).toContain('<span id="admin-identity" hidden></span>');
+    expect(adminPageHtml).toContain("'Angemeldet als ' + me.name");
+    expect(adminPageHtml).toContain("data.code === 'not_admin'");
+    expect(adminPageHtml).toContain("showGate('Dieses Konto hat keine Admin-Rolle.')");
   });
 });
 

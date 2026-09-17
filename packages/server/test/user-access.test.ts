@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AuthVariables } from '@openvizpilot/ee/server';
 import type { MemoryStore } from '../src/memory/store';
-import { requireUserAccess } from '../src/user-access';
+import { requireUserAccess, resolveUserAccess } from '../src/user-access';
 import { createLogger } from '../src/logger';
 
 function fixture(identity: 'local' | 'oidc' | 'none' = 'local') {
@@ -73,5 +73,22 @@ describe('per-user capability approvals', () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ code: 'approval_required', capability: 'ai' });
     expect(store.ensureUserAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveUserAccess (shared identity resolution)', () => {
+  it('maps local and SSO identities to their access record and rejects disabled local accounts', async () => {
+    const { store } = fixture();
+    const oidc = { issuer: 'https://idp.example', sub: 'anna', name: 'Anna', email: 'anna@example.test', claims: {}, expiresAt: Date.now() + 60_000 };
+    await resolveUserAccess(store as unknown as MemoryStore, { oidc });
+    expect(store.ensureUserAccess).toHaveBeenLastCalledWith({ provider: 'oidc', issuer: 'https://idp.example', subject: 'anna', displayName: 'Anna', email: 'anna@example.test' });
+    expect(store.getUserAuth).not.toHaveBeenCalled();
+    await resolveUserAccess(store as unknown as MemoryStore, { username: 'anna' });
+    expect(store.ensureUserAccess).toHaveBeenLastCalledWith({ provider: 'local', issuer: '', subject: 'anna', displayName: 'Anna', email: '' });
+    store.getUserAuth.mockResolvedValueOnce({ displayName: 'Anna', disabled: true });
+    expect(await resolveUserAccess(store as unknown as MemoryStore, { username: 'anna' })).toBeNull();
+    store.getUserAuth.mockResolvedValueOnce(null as never);
+    expect(await resolveUserAccess(store as unknown as MemoryStore, { username: 'niemand' })).toBeNull();
+    expect(store.ensureUserAccess).toHaveBeenCalledTimes(2);
   });
 });

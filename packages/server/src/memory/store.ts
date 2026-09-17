@@ -71,7 +71,12 @@ export interface UserAccess extends UserAccessIdentity {
   id: string;
   ai: boolean;
   tableauApi: boolean;
+  /** Delegierter Admin: darf /admin bedienen, aber die Admin-Rolle nicht vergeben. */
+  admin: boolean;
 }
+
+/** `admin` weglassen = unverändert lassen (delegierte Admins dürfen es nie setzen). */
+export type UserAccessGrants = { ai: boolean; tableauApi: boolean; admin?: boolean };
 
 export function userAccessId(identity: Pick<UserAccessIdentity, 'provider' | 'issuer' | 'subject'>): string {
   return createHash('sha256').update(JSON.stringify([identity.provider, identity.issuer, identity.subject])).digest('hex');
@@ -175,7 +180,7 @@ export interface MemoryStore {
   ensureUserAccess(identity: UserAccessIdentity): Promise<UserAccess>;
   getUserAccess(id: string): Promise<UserAccess | null>;
   listUserAccess(): Promise<UserAccess[]>;
-  setUserAccess(id: string, grants: { ai: boolean; tableauApi: boolean }): Promise<boolean>;
+  setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean>;
   // --- Admin-Einstellungen: Anmeldung/OIDC/Lizenz (überschreiben Env) ---
   getAuthSettings(): Promise<AuthSettings | null>;
   setAuthSettings(settings: AuthSettings | null): Promise<void>;

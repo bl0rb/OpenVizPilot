@@ -108,6 +108,14 @@ describe('/api/admin/*', () => {
     expect(withAdminToken.status).toBe(200);
   });
 
+  it('reports the static token as the initial admin', async () => {
+    const { app } = createApp(testConfig({ adminToken: 'geheim', memoryDbPath: tmpDbPath() }));
+    const res = await app.request('/api/admin/me', { headers: { authorization: 'Bearer geheim' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ role: 'initial', name: 'Admin-Token', provider: 'token' });
+    expect((await app.request('/api/admin/me')).status).toBe(401);
+  });
+
   it('503s without a configured memory store', async () => {
     const { app } = createApp(testConfig({ adminToken: 'geheim' }));
     const res = await app.request('/api/admin/commands', { headers: { authorization: 'Bearer geheim' } });

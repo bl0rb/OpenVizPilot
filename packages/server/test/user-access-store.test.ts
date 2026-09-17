@@ -41,9 +41,9 @@ describe('user access persistence', () => {
     const otherIssuer = { ...oidc, issuer: 'https://idp.example/two' };
 
     const migrated = await store.getUserAccess(userAccessId({ provider: 'local', issuer: '', subject: 'legacy' }));
-    expect(migrated).toMatchObject({ provider: 'local', subject: 'legacy', displayName: 'Legacy', ai: false, tableauApi: false });
+    expect(migrated).toMatchObject({ provider: 'local', subject: 'legacy', displayName: 'Legacy', ai: false, tableauApi: false, admin: false });
     const pending = await store.ensureUserAccess(local);
-    expect(pending).toMatchObject({ ...local, ai: false, tableauApi: false });
+    expect(pending).toMatchObject({ ...local, ai: false, tableauApi: false, admin: false });
     expect(await store.setUserAccess(pending.id, { ai: true, tableauApi: false })).toBe(true);
     expect(await store.ensureUserAccess({ ...local, displayName: 'Alice Updated', email: 'new@example.test' })).toMatchObject({
       id: pending.id,
@@ -51,7 +51,15 @@ describe('user access persistence', () => {
       email: 'new@example.test',
       ai: true,
       tableauApi: false,
+      admin: false,
     });
+    // Admin-Rolle: explizit setzen, ohne `admin` bleibt sie unverändert.
+    expect(await store.setUserAccess(pending.id, { ai: true, tableauApi: true, admin: true })).toBe(true);
+    expect(await store.getUserAccess(pending.id)).toMatchObject({ ai: true, tableauApi: true, admin: true });
+    expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false })).toBe(true);
+    expect(await store.getUserAccess(pending.id)).toMatchObject({ ai: false, tableauApi: false, admin: true });
+    expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false, admin: false })).toBe(true);
+    expect((await store.getUserAccess(pending.id))?.admin).toBe(false);
 
     expect((await store.ensureUserAccess(oidc)).id).not.toBe(pending.id);
     expect((await store.ensureUserAccess(otherIssuer)).id).not.toBe((await store.ensureUserAccess(oidc)).id);
@@ -68,5 +76,34 @@ describe('user access persistence', () => {
     await store.createUser('recreated', 'Recreated', 'hash');
     expect(await store.getUserAccess(recreated!.id)).toMatchObject({ ai: false, tableauApi: false });
     await store.close();
+  });
+
+  it('adds the admin column to a user_access table created before the role existed', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openvizpilot-access-'));
+    tmpDirs.push(dir);
+    const dbPath = path.join(dir, 'memory.db');
+    const db = openSqliteDatabase(dbPath);
+    db.exec(`CREATE TABLE user_access (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      issuer TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      display_name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      ai INTEGER NOT NULL DEFAULT 0,
+      tableau_api INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (provider, issuer, subject)
+    )`);
+    const id = userAccessId({ provider: 'oidc', issuer: 'https://idp.example', subject: 'old' });
+    db.prepare('INSERT INTO user_access (id, provider, issuer, subject, ai) VALUES (?, ?, ?, ?, 1)').run(id, 'oidc', 'https://idp.example', 'old');
+    const store = createSqliteMemoryStore(db, logger);
+    expect(await store.getUserAccess(id)).toMatchObject({ ai: true, admin: false });
+    expect(await store.setUserAccess(id, { ai: true, tableauApi: false, admin: true })).toBe(true);
+    expect((await store.getUserAccess(id))?.admin).toBe(true);
+    await store.close();
+    // Zweiter Start auf derselben Datei: die Nachziehung ist idempotent.
+    const reopened = createSqliteMemoryStore(openSqliteDatabase(dbPath), logger);
+    expect((await reopened.getUserAccess(id))?.admin).toBe(true);
+    await reopened.close();
   });
 });

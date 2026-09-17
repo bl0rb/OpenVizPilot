@@ -1,9 +1,31 @@
-import type { AuthVariables } from '@openvizpilot/ee/server';
+import type { AuthVariables, VerifiedUser } from '@openvizpilot/ee/server';
 import type { MiddlewareHandler } from 'hono';
 import type { Logger } from './logger';
-import type { MemoryStore } from './memory/store';
+import type { MemoryStore, UserAccess } from './memory/store';
 
 const pathWithin = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
+
+/**
+ * Löst die verifizierte Identität (OIDC-ID-Token bzw. lokale Sitzung) in ihren
+ * Access-Record auf — gemeinsamer Weg für die API-Freigaben und den
+ * Admin-Zugang delegierter Admins. null = lokales Konto unbekannt oder
+ * gesperrt (darf nie durch). Store-Fehler werden durchgereicht.
+ */
+export async function resolveUserAccess(
+  store: MemoryStore,
+  identity: { oidc?: VerifiedUser; username?: string },
+): Promise<UserAccess | null> {
+  const { oidc, username } = identity;
+  const local = oidc ? null : await store.getUserAuth(username!);
+  if (!oidc && (!local || local.disabled)) return null;
+  return store.ensureUserAccess(oidc ? {
+    provider: 'oidc', issuer: oidc.issuer, subject: oidc.sub,
+    displayName: oidc.name ?? '', email: oidc.email ?? '',
+  } : {
+    provider: 'local', issuer: '', subject: username!,
+    displayName: local!.displayName, email: '',
+  });
+}
 
 /** Authentication identifies the user; only persisted admin grants authorize usage. */
 export function requireUserAccess(store: MemoryStore | null, logger: Logger): MiddlewareHandler<AuthVariables> {
@@ -15,15 +37,8 @@ export function requireUserAccess(store: MemoryStore | null, logger: Logger): Mi
     try {
       if (oidc || username) {
         if (!store) throw new Error('User access store unavailable');
-        const local = oidc ? null : await store.getUserAuth(username!);
-        if (!oidc && (!local || local.disabled)) return c.json({ error: 'Anmeldung erforderlich', code: 'auth_required' }, 401);
-        const record = await store.ensureUserAccess(oidc ? {
-          provider: 'oidc', issuer: oidc.issuer, subject: oidc.sub,
-          displayName: oidc.name ?? '', email: oidc.email ?? '',
-        } : {
-          provider: 'local', issuer: '', subject: username!,
-          displayName: local!.displayName, email: '',
-        });
+        const record = await resolveUserAccess(store, { oidc, username });
+        if (!record) return c.json({ error: 'Anmeldung erforderlich', code: 'auth_required' }, 401);
         access = { ai: record.ai, tableauApi: record.tableauApi };
       }
     } catch {

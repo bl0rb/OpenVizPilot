@@ -8,9 +8,12 @@ Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschl
 - Enterprise-Lizenz mit `tableauServer` und `sso`.
 - Funktionierende OIDC-Anmeldung. Der konfigurierte Claim muss exakt dem Tableau-Username entsprechen: `email`, `preferred_username`, `upn` oder ein benutzerdefinierter Claim.
 - Der gewählte Claim muss vom IdP administrativ kontrolliert und für die Zielgruppe stabil gepflegt werden. OpenVizPilot verändert weder Domain noch Groß-/Kleinschreibung und verwendet keine Ersatzidentität.
-- Tableau Connected App — entweder **Direct Trust** (Client-ID, Secret-ID, Secret-Wert) oder **OAuth 2.0 Trust**
-  (Issuer-URL, JWKS; das Schlüsselpaar erzeugt die Middleware selbst). Der JWT-Scope bleibt in beiden Fällen
-  ausschließlich `tableau:content:read`.
+- Je Tableau-**Site** eine eigene Tableau Connected App — entweder **Direct Trust** (Client-ID, Secret-ID,
+  Secret-Wert) oder **OAuth 2.0 Trust** (Issuer-URL, JWKS; das Schlüsselpaar erzeugt die Middleware selbst und
+  bedient alle Sites gemeinsam). Der JWT-Scope bleibt in beiden Fällen ausschließlich `tableau:content:read`.
+- Optional: `OVP_SECRET_KEY` (mindestens 32 Zeichen, z. B. `openssl rand -hex 32`), damit Direct-Trust-Secrets
+  verschlüsselt im Web gespeichert werden können, statt nur per Umgebungsvariable. Ohne diesen Schlüssel sind die
+  Secret-Felder in der Admin-UI deaktiviert und nur Env-Secret-Referenzen (`OVP_TABLEAU_...`) nutzbar.
 - Bei OAuth 2.0 Trust muss die Middleware unter einer festen HTTPS-Public-URL erreichbar sein, und Tableau muss die
   daraus abgeleitete Issuer-URL (`<Issuer URL>/.well-known/openid-configuration`) sowie die JWKS-URL per HTTPS
   erreichen können (Firewall/Proxy entsprechend freigeben).
@@ -20,41 +23,62 @@ Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschl
 ## Einrichtung
 
 Beide Trust-Arten setzen eine funktionierende Single-Sign-On-Anmeldung (OIDC) und eine Enterprise-Lizenz mit `sso`
-und `tableauServer` voraus; der gewählte Username-Claim muss dem Tableau-Benutzernamen entsprechen (auf Tableau
-Cloud der E-Mail-Adresse). In `/admin` unter **Tableau Server** zunächst im Feld **Authentifizierung** den
-gewünschten Modus wählen.
+und `tableauServer` voraus; der gewählte Username-Claim (global, gilt für alle Sites) muss dem Tableau-Benutzernamen
+entsprechen (auf Tableau Cloud der E-Mail-Adresse). Server-URL und Username-Claim gelten für den gesamten Tableau
+Server; jede **Site** darauf bekommt in `/admin` unter **Tableau Server → Sites** eine eigene Karte mit eigenem
+Auth-Modus, eigener Connected App und eigenem Secret.
 
-### Direct Trust
+### Direct Trust (je Site)
 
-1. Secret-Wert als Deployment-Umgebungsvariable mit `OVP_TABLEAU_`-Präfix bereitstellen, zum Beispiel `OVP_TABLEAU_CONNECTED_APP_SECRET`. In Kubernetes kann die Variable aus einem vorhandenen Secret kommen. Nach einer Änderung alle Replicas neu starten.
-2. Authentifizierung auf **Connected App – Direct Trust** stellen. Server-URL als Origin eintragen, etwa `https://tableau.example.com`. Für die Default-Site bleibt die Site-Inhalt-URL leer.
-3. In Tableau: Settings → Connected Apps → New Connected App → Direct Trust. Name, Access level und Domain allowlist (Public URL der Middleware) setzen, Enable connected app aktivieren.
-4. Client-ID, Secret-ID und den Namen der Secret-Umgebungsvariable eintragen. Der Secret-Wert wird nie über die Admin-API gesendet.
-5. Username-Claim auswählen. Werte werden exakt verwendet; es gibt keinen Domain-, Großschreibungs- oder Identitäts-Fallback.
-6. Integration aktivieren und speichern. **Konfiguration prüfen** validiert gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
-7. Nach dem Speichern den Button **Verbindung als Nutzer prüfen** verwenden. Der Button ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und OIDC-Bereitschaft aktiv.
+1. Site-Karte anlegen (**+ Site hinzufügen**), Name und Content-URL eintragen (leer = Default-Site; Tableau Cloud
+   verlangt immer einen Wert). Authentifizierung auf **Connected App – Direct Trust** stellen.
+2. In Tableau: Settings → Connected Apps → New Connected App → Direct Trust. Name, Access level und Domain
+   allowlist (Public URL der Middleware) setzen, Enable connected app aktivieren.
+3. Client-ID und Secret-ID in die Site-Karte eintragen.
+4. Secret Value entweder direkt in der Site-Karte über **Ersetzen** speichern (verschlüsselt im Web, braucht
+   `OVP_SECRET_KEY`) oder als Deployment-Umgebungsvariable mit `OVP_TABLEAU_`-Präfix bereitstellen, zum Beispiel
+   `OVP_TABLEAU_CONNECTED_APP_SECRET` (Env-Referenz-Feld in der Site-Karte eintragen; in Kubernetes kann die
+   Variable aus einem vorhandenen Secret kommen; nach einer Änderung alle Replicas neu starten). Der Secret-Wert
+   wird nie über die Admin-API gelesen oder zurückgegeben — nur `secretConfigured: 'db' | 'env' | false`.
+5. Server-URL (einmal, gilt für alle Sites) und Username-Claim (global) oben eintragen, Integration aktivieren,
+   speichern.
+6. **Konfiguration prüfen** validiert je Site die gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und
+   Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
+7. Nach dem Speichern den Button **Verbindung als Nutzer prüfen** der jeweiligen Site-Karte verwenden. Der Button
+   ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und
+   OIDC-Bereitschaft aktiv.
 
-### OAuth 2.0 Trust
+### OAuth 2.0 Trust (je Site, ein gemeinsamer Schlüssel)
 
 OpenVizPilot tritt dabei selbst als External Authorization Server (EAS) auf: Es besitzt ein eigenes RSA-2048-
 Schlüsselpaar, veröffentlicht OIDC-Discovery und JWKS unter einer Issuer-URL und stellt für jeden verifizierten
-OIDC-Nutzer ein kurzlebiges RS256-JWT aus. Es gibt kein aus Tableau stammendes Shared Secret; der Schlüssel bleibt
-unter eigener Kontrolle. Der private Schlüssel verlässt Datenbank und Prozess nie — weder über die Admin-API noch
-in Logs.
+OIDC-Nutzer ein kurzlebiges RS256-JWT aus. Dieses Schlüsselpaar ist **ein gemeinsames** für alle Sites im
+OAuth-2.0-Trust-Modus (Abschnitt „OAuth 2.0 Trust“, einmal, oberhalb der Sites-Liste) — es gibt kein aus Tableau
+stammendes Shared Secret; der Schlüssel bleibt unter eigener Kontrolle. Der private Schlüssel verlässt Datenbank
+und Prozess nie — weder über die Admin-API noch in Logs.
 
-1. Authentifizierung auf **Connected App – OAuth 2.0 Trust** stellen und ohne weitere Angaben speichern — auch im
-   deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den EAS-Schlüssel; der Abschnitt zeigt danach die
-   schreibgeschützte **Issuer URL**, **JWKS-URL** und **Key-ID** an.
+1. Für mindestens eine Site-Karte Authentifizierung auf **Connected App – OAuth 2.0 Trust** stellen und ohne
+   weitere Angaben speichern — auch im deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den
+   EAS-Schlüssel; der Abschnitt darüber zeigt danach die schreibgeschützte **Issuer URL**, **JWKS-URL** und
+   **Key-ID** an.
 2. Issuer URL über den Kopieren-Button übernehmen.
-3. In Tableau: Settings → Connected Apps → New Connected App → OAuth 2.0 Trust. Name vergeben, Issuer URL
+3. In Tableau je Site: Settings → Connected Apps → New Connected App → OAuth 2.0 Trust. Name vergeben, Issuer URL
    einfügen, Enable connected app aktivieren. Tableau zeigt danach die **Site ID** (Site-LUID) an.
-4. Site ID hier als Site-ID eintragen, Server-URL (und ggf. Site-Inhalt-URL) sowie Username-Claim eintragen,
+4. Site ID in die jeweilige Site-Karte eintragen, Server-URL (global) sowie Username-Claim (global) eintragen,
    Integration aktivieren, speichern.
-5. **Konfiguration prüfen** ausführen (kontaktiert Tableau nicht).
-6. **Verbindung als Nutzer prüfen** ausführen.
+5. **Konfiguration prüfen** je Site ausführen (kontaktiert Tableau nicht).
+6. **Verbindung als Nutzer prüfen** je Site ausführen.
 
-Ändert sich die Public URL der Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau nachgezogen
-werden. Vorausgesetzt: Tableau Server ab 2024.2 einschließlich bzw. Tableau Cloud.
+Ändert sich die Public URL der Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau je Site
+nachgezogen werden. Vorausgesetzt: Tableau Server ab 2024.2 einschließlich bzw. Tableau Cloud.
+
+### Dashboard-Zuordnung
+
+Mit nur einer Site ist keine Zuordnung nötig — Suche und Metadaten lösen dann automatisch die einzige konfigurierte
+Site auf. Mit mehreren Sites ordnet der Abschnitt **Dashboard-Zuordnung** jedes eingebundene Dashboard genau einer
+Site zu (Auswahl aus den bereits registrierten Dashboards). Fragt ein Anwender aus einem nicht zugeordneten
+Dashboard nach Tableau-Server-Inhalten, erscheint die Meldung „Dashboard ist keiner Tableau-Site zugeordnet — im
+Admin unter Tableau Server zuordnen.“ statt eines Suchergebnisses.
 
 ## Was der persönliche Test macht
 
@@ -99,7 +123,7 @@ Suchtreffer werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter überm
 ## Betrieb und Fehlerbehandlung
 
 - Konfigurationen werden mit Revision gespeichert. Bei HTTP 409 neu laden und Änderungen erneut anwenden.
-- Secret-Werte stehen weder in Settings, API-Antworten noch Logs. Logs enthalten nur Operationsstatus, pseudonyme Nutzerkennung, Dauer und Ergebniscode.
+- Secret-Werte stehen weder in Settings, API-Antworten noch Logs. Im Web gespeicherte Secrets liegen AES-256-GCM-verschlüsselt in der Datenbank (Schlüssel: SHA-256 von `OVP_SECRET_KEY`); ohne diese Umgebungsvariable sind die Secret-Felder deaktiviert und nur Env-Secret-Referenzen nutzbar. Logs enthalten nur Operationsstatus, pseudonyme Nutzerkennung, Dauer und Ergebniscode.
 - Tableau-Session-Credentials bleiben im Prozessspeicher und werden bei Ablauf, Konfigurationswechsel, Abschalten oder Logout best effort abgemeldet.
 - Sign-in-JWTs sind auf höchstens 60 Sekunden ausgelegt. Credentials-Tokens bleiben höchstens fünf Minuten im Prozessspeicher und nie länger als die OIDC-Identität gültig ist.
 - Der Hintergrundabgleich prüft aktive Verbindungen alle 30 Sekunden. Auf anderen Replicas kann ein Config-/Lizenzwechsel wegen des bestehenden Auth-State-Caches bis zu etwa 15 Sekunden später wirksam werden.

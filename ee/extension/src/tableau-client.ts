@@ -64,10 +64,23 @@ function boundedJson(value: unknown, toolName: string): string {
   return JSON.stringify(fallback);
 }
 
+/** Liest `code`/`error` aus einer Fehlerantwort, gibt aber nur für bekannte, unbedenkliche Codes die Server-Meldung weiter — sonst die generische Meldung (keine Upstream-Details an den Anwender/das Modell durchreichen). */
+async function tableauErrorMessage(response: Response): Promise<string> {
+  const fallback = 'Tableau-Suche derzeit nicht verfügbar.';
+  try {
+    const data = await response.json() as { error?: unknown; code?: unknown };
+    return data.code === 'site_unresolved' && typeof data.error === 'string' ? data.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function executeTableauTool(input: {
   call: ToolCall;
   baseUrl: string;
   apiToken?: string;
+  /** Ordnet die Abfrage einer Tableau-Site zu (Admin: Dashboard-Zuordnung); ohne Angabe genügt genau eine konfigurierte Site. */
+  dashboardKey?: string;
   signal?: AbortSignal;
 }): Promise<string> {
   const endpoint = ENDPOINTS.get(input.call.function.name);
@@ -80,10 +93,10 @@ export async function executeTableauTool(input: {
         'content-type': 'application/json',
         ...(input.apiToken ? { authorization: `Bearer ${input.apiToken}` } : {}),
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, dashboardKey: input.dashboardKey }),
       signal: input.signal,
     });
-    if (!response.ok) return JSON.stringify({ error: 'Tableau-Suche derzeit nicht verfügbar.' });
+    if (!response.ok) return JSON.stringify({ error: await tableauErrorMessage(response) });
     return boundedJson(await response.json(), input.call.function.name);
   } catch (error) {
     if (input.signal?.aborted) throw error;

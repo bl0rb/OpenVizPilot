@@ -131,7 +131,7 @@ export function createChatRoute(
       let tableauServerEnabled = false;
       if (tableau && c.get('userAccess')?.tableauApi) {
         try {
-          tableauServerEnabled = await tableau.available(oidcUser);
+          tableauServerEnabled = await tableau.available(oidcUser, req.dashboardKey);
         } catch {
           tableauServerEnabled = false;
         }

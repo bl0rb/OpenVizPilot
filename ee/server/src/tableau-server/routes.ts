@@ -3,11 +3,20 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AuthVariables } from '../auth-routes';
 import type { PersonalizationLogger } from '../personalization';
-import { resolveTableauSecret, tableauConfigInputSchema, TABLEAU_MIN_SERVER_VERSION, TABLEAU_REST_API_VERSION } from './config';
+import { isSecretKeyConfigured, SecretsError } from '../secrets';
+import {
+  encryptTableauSiteSecret,
+  resolveTableauSecret,
+  tableauServerConfigInputSchema,
+  TABLEAU_MIN_SERVER_VERSION,
+  TABLEAU_REST_API_VERSION,
+  type TableauServerConfig,
+  type TableauSite,
+} from './config';
 import { easIssuerUrl, generateEasKey } from './eas';
 import { TableauService, TableauServiceError } from './service';
 import { TableauError } from './errors';
-import { tableauSearchSchema } from './schema';
+import { tableauCheckSchema, tableauSearchSchema } from './schema';
 import { tableauMetadataSearchSchema, tableauMetadataFieldSchema } from './metadata-schema';
 
 const revisionSchema = z.object({ expectedRevision: z.string().uuid().nullable() }).strict();
@@ -17,6 +26,32 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 function isHttpsUrl(value: string | null): value is string {
   return typeof value === 'string' && value.startsWith('https://');
+}
+
+interface SiteView {
+  id: string;
+  name: string;
+  contentUrl: string;
+  authMode: TableauSite['authMode'];
+  clientId: string;
+  secretId: string;
+  secretEnv: string;
+  siteId: string;
+  secretConfigured: 'db' | 'env' | false;
+}
+
+function siteView(site: TableauSite): SiteView {
+  // Presence only (wie bisher): eine Env-Referenz zählt nur, wenn die Variable zur Laufzeit auch gesetzt
+  // ist — sonst meldet „Konfiguration prüfen“ fälschlich Erfolg. Ein DB-Secret bleibt sichtbar (Entfernen).
+  let secretConfigured: SiteView['secretConfigured'] = site.secret ? 'db' : false;
+  if (!site.secret) {
+    try { resolveTableauSecret(site); secretConfigured = 'env'; } catch { /* nicht gesetzt */ }
+  }
+  return {
+    id: site.id, name: site.name, contentUrl: site.contentUrl, authMode: site.authMode,
+    clientId: site.clientId, secretId: site.secretId, secretEnv: site.secretEnv, siteId: site.siteId,
+    secretConfigured,
+  };
 }
 
 export function createTableauAdminRoute(
@@ -36,11 +71,9 @@ export function createTableauAdminRoute(
   const view = async () => {
     const state = await service!.store.get();
     const access = await service!.access();
-    let secretConfigured = false;
-    if (state.config) {
-      try { secretConfigured = Boolean(resolveTableauSecret(state.config)); } catch { /* Presence only. */ }
-    }
-    // `eas` spiegelt nur öffentliche Angaben (Issuer-/JWKS-URL, kid) — nie `privateKeyPem`.
+    const sites = (state.config?.sites ?? []).map(siteView);
+    // `eas` spiegelt nur öffentliche Angaben (Issuer-/JWKS-URL, kid) — nie `privateKeyPem`. Ein
+    // gemeinsamer Schlüssel bedient alle Sites im oauth2-trust-Modus.
     let eas: { issuerUrl: string; jwksUrl: string; kid: string; publicUrlOk: boolean } | null = null;
     const easKey = await service!.store.getEasKey();
     if (easKey) {
@@ -49,34 +82,54 @@ export function createTableauAdminRoute(
       try { issuerUrl = access.publicUrl ? easIssuerUrl(access.publicUrl) : ''; } catch { issuerUrl = ''; }
       eas = { issuerUrl, jwksUrl: issuerUrl ? `${issuerUrl}/jwks.json` : '', kid: easKey.kid, publicUrlOk };
     }
-    return { ...state, secretConfigured, licensed: access.licensed, oidcReady: access.oidcReady, eas };
+    return {
+      config: state.config ? { ...state.config, sites } : null,
+      revision: state.revision,
+      licensed: access.licensed,
+      oidcReady: access.oidcReady,
+      eas,
+      secretKeyConfigured: isSecretKeyConfigured(),
+    };
   };
   app.get('/', async (c) => c.json(await view()));
   app.put('/', async (c) => {
-    const parsed = revisionSchema.extend({ config: tableauConfigInputSchema }).safeParse(await c.req.json().catch(() => null));
+    const parsed = revisionSchema.extend({ config: tableauServerConfigInputSchema }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: 'Ungültige Tableau-Konfiguration.', code: 'invalid_config' }, 400);
-    const { config, expectedRevision } = parsed.data;
+    const { config: input, expectedRevision } = parsed.data;
+    const previous = await service!.store.get();
+    const previousSites = new Map((previous.config?.sites ?? []).map((site) => [site.id, site] as const));
+    let sites: TableauSite[];
+    try {
+      sites = input.sites.map((site) => encryptTableauSiteSecret(site, previousSites.get(site.id)));
+    } catch (error) {
+      if (error instanceof SecretsError) {
+        return c.json({ error: 'OVP_SECRET_KEY ist nicht gesetzt — Secrets können nicht im Web gespeichert werden.', code: 'secret_key_missing' }, 400);
+      }
+      throw error;
+    }
+    const config: Omit<TableauServerConfig, 'revision'> = { ...input, sites };
     if (config.enabled) {
       const access = await service!.access();
       if (!access.licensed) return c.json({ error: 'Enterprise-Freigabe tableauServer und sso erforderlich.', code: 'license_required' }, 402);
       if (!access.oidcReady) return c.json({ error: 'OIDC-Anmeldung muss eingerichtet sein.', code: 'oidc_required' }, 403);
-      if (config.authMode === 'oauth2-trust') {
-        if (!isHttpsUrl(access.publicUrl)) {
-          return c.json({ error: 'OAuth 2.0 Trust benötigt eine HTTPS-Public-URL, sonst kann Tableau die Issuer-URL nicht erreichen.', code: 'public_url_required' }, 400);
-        }
-      } else {
-        try { resolveTableauSecret(config); }
-        catch { return c.json({ error: 'Secret-Referenz nicht verfügbar.', code: 'secret_unavailable' }, 400); }
+      if (config.sites.some((site) => site.authMode === 'oauth2-trust') && !isHttpsUrl(access.publicUrl)) {
+        return c.json({ error: 'OAuth 2.0 Trust benötigt eine HTTPS-Public-URL, sonst kann Tableau die Issuer-URL nicht erreichen.', code: 'public_url_required' }, 400);
+      }
+      for (const site of config.sites) {
+        if (site.authMode === 'oauth2-trust') continue;
+        try { resolveTableauSecret(site); }
+        catch { return c.json({ error: `Site "${site.name}": Secret oder Secret-Env-Referenz erforderlich.`, code: 'secret_missing', siteId: site.id }, 400); }
       }
     }
-    // Der EAS-Schlüssel entsteht beim ersten Speichern mit oauth2-trust — auch im deaktivierten
-    // Entwurf, damit die Issuer-URL schon vor der Aktivierung in Tableau eingetragen werden kann.
-    if (config.authMode === 'oauth2-trust' && !(await service!.store.getEasKey())) {
+    // Der EAS-Schlüssel entsteht beim ersten Speichern einer oauth2-trust-Site — auch im
+    // deaktivierten Entwurf, damit die Issuer-URL schon vor der Aktivierung in Tableau eingetragen
+    // werden kann. Ein gemeinsamer Schlüssel bedient alle Sites im oauth2-trust-Modus.
+    if (config.sites.some((site) => site.authMode === 'oauth2-trust') && !(await service!.store.getEasKey())) {
       await service!.store.saveEasKey(generateEasKey());
     }
     if (!(await service!.store.set(config, expectedRevision))) return c.json({ error: 'Konfiguration wurde geändert. Bitte neu laden.' }, 409);
     await service!.invalidate();
-    logger.info('tableau configuration updated', { requestId: randomUUID(), actor: 'admin', operation: 'configure', enabled: config.enabled });
+    logger.info('tableau configuration updated', { requestId: randomUUID(), actor: 'admin', operation: 'configure', enabled: config.enabled, sites: config.sites.length });
     return c.json(await view());
   });
   app.delete('/', async (c) => {
@@ -92,10 +145,16 @@ export function createTableauAdminRoute(
     if (!state.licensed) return c.json({ error: 'Enterprise-Freigabe tableauServer und sso erforderlich.' }, 402);
     if (!state.oidcReady) return c.json({ error: 'OIDC-Anmeldung muss eingerichtet sein.' }, 403);
     if (!state.config?.enabled) return c.json({ error: 'Aktive Konfiguration erforderlich.' }, 400);
-    if (state.config.authMode === 'oauth2-trust') {
+    const body = tableauCheckSchema.safeParse(await c.req.json().catch(() => ({})));
+    const requestedSiteId = body.success ? body.data.siteId : undefined;
+    const site = requestedSiteId
+      ? state.config.sites.find((candidate) => candidate.id === requestedSiteId)
+      : state.config.sites.length === 1 ? state.config.sites[0] : undefined;
+    if (!site) return c.json({ error: 'Site nicht gefunden oder mehrdeutig — bitte eine Site auswählen.', code: 'site_unresolved' }, 400);
+    if (site.authMode === 'oauth2-trust') {
       if (!state.eas) return c.json({ error: 'EAS-Schlüssel fehlt. Konfiguration erneut speichern.', code: 'eas_key_missing' }, 400);
       if (!state.eas.publicUrlOk) return c.json({ error: 'OAuth 2.0 Trust benötigt eine HTTPS-Public-URL.', code: 'public_url_required' }, 400);
-      if (!state.config.siteId) return c.json({ error: 'Site-ID (Site-LUID aus Tableau) erforderlich.', code: 'site_id_required' }, 400);
+      if (!site.siteId) return c.json({ error: 'Site-ID (Site-LUID aus Tableau) erforderlich.', code: 'site_id_required' }, 400);
       try {
         const response = await fetchImpl(`${state.eas.issuerUrl}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(5_000) });
         if (!response.ok) throw new Error('discovery document not reachable');
@@ -105,11 +164,11 @@ export function createTableauAdminRoute(
           code: 'eas_discovery_unreachable',
         }, 400);
       }
-      logger.info('tableau configuration check', { requestId: randomUUID(), actor: 'admin', operation: 'configuration_check', result: 'ok', authMode: 'oauth2-trust' });
+      logger.info('tableau configuration check', { requestId: randomUUID(), actor: 'admin', operation: 'configuration_check', result: 'ok', authMode: 'oauth2-trust', site: site.id });
       return c.json({ ok: true, stage: 'configuration', note: 'Erreichbarkeit nur aus Sicht der Middleware geprüft, nicht aus Sicht von Tableau.' });
     }
-    if (!state.secretConfigured) return c.json({ error: 'Aktive Konfiguration mit Secret-Referenz erforderlich.' }, 400);
-    logger.info('tableau configuration check', { requestId: randomUUID(), actor: 'admin', operation: 'configuration_check', result: 'ok' });
+    if (!site.secretConfigured) return c.json({ error: 'Aktive Konfiguration mit Secret-Referenz erforderlich.' }, 400);
+    logger.info('tableau configuration check', { requestId: randomUUID(), actor: 'admin', operation: 'configuration_check', result: 'ok', site: site.id });
     return c.json({ ok: true, stage: 'configuration' });
   });
   return app;
@@ -139,13 +198,21 @@ export function createTableauRoute(service: TableauService | null): Hono<AuthVar
           ? `Tableau Server unterstützt REST API ${TABLEAU_REST_API_VERSION} nicht; mindestens Tableau Server ${TABLEAU_MIN_SERVER_VERSION} erforderlich.`
           : error.code === 'TABLEAU_EAS_KEY_MISSING'
           ? 'EAS-Schlüssel fehlt. Tableau-Integration (OAuth 2.0 Trust) einmal erneut speichern, damit ein Schlüssel erzeugt wird.'
+          : error.code === 'TABLEAU_SITE_UNRESOLVED'
+          ? 'Dashboard ist keiner Tableau-Site zugeordnet — im Admin unter Tableau Server zuordnen.'
           : 'Tableau-Abfrage fehlgeschlagen. Konfiguration und Berechtigungen prüfen.';
-        return c.json({ error: message, code: error.code }, error.code === 'TABLEAU_CLAIM_INVALID' || error.status === 403 ? 403 : error.status === 429 ? 429 : 502);
+        const code = error.code === 'TABLEAU_SITE_UNRESOLVED' ? 'site_unresolved' : error.code;
+        const status = error.code === 'TABLEAU_SITE_UNRESOLVED' ? 400
+          : error.code === 'TABLEAU_CLAIM_INVALID' || error.status === 403 ? 403
+          : error.status === 429 ? 429 : 502;
+        return c.json({ error: message, code }, status);
       }
       return c.json({ error: 'Tableau-Abfrage derzeit nicht verfügbar.', code: 'tableau_request_failed' }, 502);
   });
   app.post('/check', async (c) => {
-    return c.json(await service!.connectionCheck(c.get('oidcUser')!, c.req.raw.signal));
+    const parsed = tableauCheckSchema.safeParse(await c.req.json().catch(() => ({})));
+    const selector = parsed.success ? { siteId: parsed.data.siteId, dashboardKey: parsed.data.dashboardKey } : {};
+    return c.json(await service!.connectionCheck(c.get('oidcUser')!, selector, c.req.raw.signal));
   });
   app.post('/search', async (c) => {
     const parsed = tableauSearchSchema.safeParse(await c.req.json().catch(() => null));

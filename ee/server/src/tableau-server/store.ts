@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { PgPoolLike, SqliteLike } from '../personalization-store';
-import { tableauConfigSchema, type TableauConfig } from './config';
+import { tableauServerConfigSchema, type TableauServerConfig } from './config';
 import type { TableauEasKey } from './eas';
 
 export interface TableauState {
-  config: TableauConfig | null;
+  config: TableauServerConfig | null;
   revision: string | null;
 }
 
 export interface TableauStore {
   get(): Promise<TableauState>;
-  set(config: Omit<TableauConfig, 'revision'> | null, expectedRevision: string | null): Promise<boolean>;
+  set(config: Omit<TableauServerConfig, 'revision'> | null, expectedRevision: string | null): Promise<boolean>;
   /** Der EAS-Schlüssel für den OAuth-2.0-Trust-Modus, falls schon einer erzeugt wurde. */
   getEasKey(): Promise<TableauEasKey | null>;
   /**
@@ -48,14 +48,14 @@ function decodeEasKey(raw: string): TableauEasKey {
 }
 
 function decode(row: { settings: string | null; revision: string | null }): TableauState {
-  const config = row.settings ? tableauConfigSchema.parse(JSON.parse(row.settings)) : null;
+  const config = row.settings ? tableauServerConfigSchema.parse(JSON.parse(row.settings)) : null;
   if (config && config.revision !== row.revision) throw new Error('Invalid Tableau configuration revision');
   return { config, revision: row.revision };
 }
 
-function encode(config: Omit<TableauConfig, 'revision'> | null) {
+function encode(config: Omit<TableauServerConfig, 'revision'> | null) {
   const revision = randomUUID();
-  return { revision, settings: config ? JSON.stringify(tableauConfigSchema.parse({ ...config, revision })) : null };
+  return { revision, settings: config ? JSON.stringify(tableauServerConfigSchema.parse({ ...config, revision })) : null };
 }
 
 export function createSqliteTableauStore(db: SqliteLike): TableauStore {

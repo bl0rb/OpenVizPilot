@@ -374,7 +374,7 @@ export function App(props: { dashboard: Dashboard }) {
             dashboardKey: dashboardKey || undefined,
             getContext,
             executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field'].includes(call.function.name)
-              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined })
+              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined })
               : call.function.name.startsWith('mcp__')
                 ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
                 : executeToolCall(call, dashboard),

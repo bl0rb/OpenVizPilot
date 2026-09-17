@@ -55,7 +55,7 @@ describe('Tableau Server chat tool registry', () => {
   it('adds the Tableau registry and prompt only when available', async () => {
     const available = vi.fn(async () => true);
     const body = await requestWith({ available });
-    expect(available).toHaveBeenCalledWith(undefined);
+    expect(available).toHaveBeenCalledWith(undefined, undefined);
     expect(body.tools.map((tool) => tool.function.name)).toEqual(expect.arrayContaining([
       'tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field',
     ]));

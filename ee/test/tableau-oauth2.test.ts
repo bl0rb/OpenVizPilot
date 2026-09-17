@@ -34,6 +34,24 @@ function asInput<T extends { revision: string }>(config: T): Omit<T, 'revision'>
 const connectedAppInput = asInput(connectedAppConfig);
 const oauth2TrustInput = asInput(oauth2TrustConfig);
 
+/** Nested (Teil B) PUT bodies for the admin-route describe block below — one site each, mirroring the flat fixtures above. */
+const connectedAppServerInput = {
+  enabled: true, serverUrl: connectedAppConfig.serverUrl, usernameClaim: connectedAppConfig.usernameClaim, apiVersion: connectedAppConfig.apiVersion,
+  sites: [{
+    id: 'default', name: 'sales', contentUrl: connectedAppConfig.siteContentUrl, authMode: 'connected-app' as const,
+    clientId: connectedAppConfig.clientId, secretId: connectedAppConfig.secretId, secretEnv: connectedAppConfig.secretEnv, siteId: '',
+  }],
+  dashboardSites: {} as Record<string, string>,
+};
+const oauth2TrustServerInput = {
+  enabled: true, serverUrl: oauth2TrustConfig.serverUrl, usernameClaim: oauth2TrustConfig.usernameClaim, apiVersion: oauth2TrustConfig.apiVersion,
+  sites: [{
+    id: 'default', name: 'oauth2', contentUrl: '', authMode: 'oauth2-trust' as const,
+    clientId: '', secretId: '', secretEnv: '', siteId: SITE_ID,
+  }],
+  dashboardSites: {} as Record<string, string>,
+};
+
 function decodeSegment(segment: string): unknown {
   return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8'));
 }
@@ -160,14 +178,14 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
     expect((await f.eas.request('/.well-known/openid-configuration')).status).toBe(404);
     expect((await f.eas.request('/jwks.json')).status).toBe(404);
 
-    await f.request('PUT', { config: connectedAppInput, expectedRevision: null });
+    await f.request('PUT', { config: connectedAppServerInput, expectedRevision: null });
     expect((await f.eas.request('/.well-known/openid-configuration')).status).toBe(404);
     expect((await f.eas.request('/jwks.json')).status).toBe(404);
   });
 
   it('serves discovery and JWKS once saved with oauth2-trust, matching the persisted key', async () => {
     const f = fixture();
-    const putResponse = await f.request('PUT', { config: oauth2TrustInput, expectedRevision: null });
+    const putResponse = await f.request('PUT', { config: oauth2TrustServerInput, expectedRevision: null });
     expect(putResponse.status).toBe(200);
     const stored = await f.store.getEasKey();
     expect(stored).not.toBeNull();
@@ -188,7 +206,7 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
 
   it('generates the key for a disabled oauth2-trust draft, and already serves discovery so Tableau can validate the Issuer URL before enablement', async () => {
     const f = fixture();
-    const draft = { ...oauth2TrustInput, enabled: false as const };
+    const draft = { ...oauth2TrustServerInput, enabled: false as const };
     const response = await f.request('PUT', { config: draft, expectedRevision: null });
     expect(response.status).toBe(200);
     expect(await f.store.getEasKey()).not.toBeNull();
@@ -201,7 +219,7 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
   it('rejects enabling oauth2-trust without an HTTPS public URL', async () => {
     const f = fixture();
     f.setPublicUrl(null);
-    const response = await f.request('PUT', { config: oauth2TrustInput, expectedRevision: null });
+    const response = await f.request('PUT', { config: oauth2TrustServerInput, expectedRevision: null });
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'public_url_required' });
     expect(await f.store.getEasKey()).toBeNull();
@@ -209,7 +227,7 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
 
   it('never returns the private key from the admin GET, and exposes only issuer/jwks/kid', async () => {
     const f = fixture();
-    await f.request('PUT', { config: oauth2TrustInput, expectedRevision: null });
+    await f.request('PUT', { config: oauth2TrustServerInput, expectedRevision: null });
     const getResponse = await f.request('GET');
     const text = await getResponse.text();
     expect(text).not.toContain('privateKeyPem');
@@ -223,7 +241,7 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
 
   it('runs the configuration self-test against its own discovery URL for oauth2-trust', async () => {
     const f = fixture();
-    await f.request('PUT', { config: oauth2TrustInput, expectedRevision: null });
+    await f.request('PUT', { config: oauth2TrustServerInput, expectedRevision: null });
     const checkResponse = await f.request('POST', undefined, '/check');
     expect(checkResponse.status).toBe(200);
     expect(await checkResponse.json()).toMatchObject({ ok: true, stage: 'configuration' });
@@ -232,7 +250,7 @@ describe('Tableau EAS: public discovery/JWKS route and admin wiring', () => {
 
   it('fails the self-test when the discovery URL is not reachable from the middleware itself', async () => {
     const f = fixture();
-    await f.request('PUT', { config: oauth2TrustInput, expectedRevision: null });
+    await f.request('PUT', { config: oauth2TrustServerInput, expectedRevision: null });
     f.fetchImpl.mockRejectedValueOnce(new Error('network unreachable'));
     const checkResponse = await f.request('POST', undefined, '/check');
     expect(checkResponse.status).toBe(400);

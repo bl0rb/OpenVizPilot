@@ -31,7 +31,7 @@ describe('Tableau routes in the assembled app', () => {
     }
     const response = await app.request('/api/admin/tableau-server', { headers: { authorization: 'Bearer test-admin' } });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ config: null, revision: null, secretConfigured: false, licensed: false, oidcReady: false, eas: null });
+    expect(await response.json()).toEqual({ config: null, revision: null, licensed: false, oidcReady: false, eas: null, secretKeyConfigured: false });
   });
 
   it('requires personal approval in addition to license entitlement', async () => {

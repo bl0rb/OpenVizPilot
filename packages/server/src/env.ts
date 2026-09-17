@@ -42,6 +42,8 @@ const envSchema = z.object({
   OVP_LICENSE_PATH: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_B64URL: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_PATH: z.string().optional(),
+  /** Schlüssel für im Web gespeicherte Secrets (aktuell: Tableau Connected-App-Secrets), siehe ee/server/src/secrets.ts. Optional — ohne ihn bleiben nur Env-Secret-Referenzen nutzbar. */
+  OVP_SECRET_KEY: emptyAsUnset(z.string().min(32, 'OVP_SECRET_KEY muss mindestens 32 Zeichen lang sein').optional()),
 });
 
 export interface AppConfig {

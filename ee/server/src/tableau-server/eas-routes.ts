@@ -20,7 +20,8 @@ export function createTableauEasRoute(store: TableauStore | null, publicUrl: () 
   const context = async (): Promise<{ issuer: string; key: TableauEasKey } | null> => {
     if (!store) return null;
     const { config } = await store.get();
-    if (config?.authMode !== 'oauth2-trust') return null;
+    // Ein gemeinsames EAS-Schlüsselpaar bedient alle Sites im oauth2-trust-Modus.
+    if (!config?.sites.some((site) => site.authMode === 'oauth2-trust')) return null;
     const key = await store.getEasKey();
     if (!key) return null;
     const url = await publicUrl();

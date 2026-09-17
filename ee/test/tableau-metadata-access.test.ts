@@ -14,7 +14,11 @@ async function setup() {
   vi.stubEnv('OVP_TABLEAU_TEST', 'private-secret');
   const db = openSqliteDatabase(':memory:');
   const store = createSqliteTableauStore(db);
-  await store.set({ enabled: true, serverUrl: 'https://tableau.example.test', siteContentUrl: 'sales', clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST', usernameClaim: 'upn', siteId: '', apiVersion: '3.23', authMode: 'connected-app' }, null);
+  await store.set({
+    enabled: true, serverUrl: 'https://tableau.example.test', usernameClaim: 'upn', apiVersion: '3.23',
+    sites: [{ id: 'default', name: 'sales', contentUrl: 'sales', authMode: 'connected-app', clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST', siteId: '' }],
+    dashboardSites: {},
+  }, null);
   const access: TableauAccess = { licensed: true, oidcReady: true, issuer: user.issuer, identityRevision: 'oidc-1', publicUrl: 'https://ovp.example.com' };
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
   const empty = { data: { fieldsConnection: { nodes: [], totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null } } } };

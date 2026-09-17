@@ -8,10 +8,18 @@ import { createTableauAdminRoute, createTableauRoute } from '../server/src/table
 import { TableauError } from '../server/src/tableau-server/errors';
 
 const input = {
-  enabled: true, serverUrl: 'https://tableau.example.com', siteContentUrl: 'sales',
-  clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST_SECRET',
-  usernameClaim: 'upn', siteId: '', apiVersion: '3.23' as const, authMode: 'connected-app' as const,
+  enabled: true, serverUrl: 'https://tableau.example.com', usernameClaim: 'upn', apiVersion: '3.23' as const,
+  sites: [{
+    id: 'default', name: 'sales', contentUrl: 'sales', authMode: 'connected-app' as const,
+    clientId: 'client', secretId: 'secret-id', secretEnv: 'OVP_TABLEAU_TEST_SECRET', siteId: '',
+  }],
+  dashboardSites: {} as Record<string, string>,
 };
+
+/** Ändert ein Feld der einzigen Site im Fixture-`input` — steht für die frühere Top-Level-Änderung. */
+function withSite(overrides: Partial<(typeof input)['sites'][number]>): typeof input {
+  return { ...input, sites: [{ ...input.sites[0]!, ...overrides }] };
+}
 const user = { issuer: 'https://idp.example.com', sub: 'oidc-user', expiresAt: Date.now() + 3600_000, claims: { upn: 'TableauUser' } };
 const cleanups: Array<() => void> = [];
 afterEach(() => { cleanups.splice(0).forEach((fn) => fn()); vi.unstubAllEnvs(); });
@@ -73,7 +81,7 @@ describe('Tableau persistence and administration', () => {
     expect(await f.store.set(input, null)).toBe(true);
     const first = await f.store.get();
     expect(first.config).toMatchObject(input);
-    expect(await f.store.set({ ...input, siteContentUrl: 'other' }, null)).toBe(false);
+    expect(await f.store.set(withSite({ contentUrl: 'other' }), null)).toBe(false);
     expect(await f.store.set(null, first.revision)).toBe(true);
     const reset = await f.store.get();
     expect(reset.config).toBeNull();
@@ -87,7 +95,7 @@ describe('Tableau persistence and administration', () => {
     const response = await f.request('PUT', { config: input, expectedRevision: null });
     expect(response.status).toBe(200);
     const text = await response.text();
-    expect(text).toContain('"secretConfigured":true');
+    expect(text).toContain('"secretConfigured":"env"');
     expect(text).not.toContain('sentinel-tableau-secret');
     expect((await f.request('PUT', { config: { ...input, secretValue: 'sentinel' }, expectedRevision: null })).status).toBe(400);
     expect((await f.request('POST', undefined, '/check')).status).toBe(200);
@@ -109,7 +117,7 @@ describe('Tableau persistence and administration', () => {
 
   it('fails closed on malformed requests and unavailable secret references', async () => {
     const f = await fixture();
-    expect((await f.request('PUT', { config: { ...input, secretEnv: 'LITELLM_API_KEY' }, expectedRevision: null })).status).toBe(400);
+    expect((await f.request('PUT', { config: withSite({ secretEnv: 'LITELLM_API_KEY' }), expectedRevision: null })).status).toBe(400);
     vi.stubEnv('OVP_TABLEAU_TEST_SECRET', '');
     expect((await f.request('PUT', { config: input, expectedRevision: null })).status).toBe(400);
     expect((await f.request('DELETE', {})).status).toBe(400);
@@ -133,7 +141,7 @@ describe('Tableau user access lifecycle', () => {
     expect(await f.service.check(user)).toEqual({ ok: true, stage: 'authentication' });
     await f.service.check(user);
     expect(f.clients).toHaveLength(1);
-    await f.store.set({ ...input, siteContentUrl: 'other' }, (await f.store.get()).revision);
+    await f.store.set(withSite({ contentUrl: 'other' }), (await f.store.get()).revision);
     await f.service.check(user);
     expect(f.clients).toHaveLength(2);
     expect(f.clients[0]!.clear).toHaveBeenCalled();

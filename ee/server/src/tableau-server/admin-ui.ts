@@ -7,9 +7,14 @@ export const tableauAdminStyles = `
   #tableau-server-admin .tableau-server-status { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 0.5rem 0 1.25rem; color: var(--text-muted); font-size: 12px; }
   #tableau-server-admin .tableau-server-status span { overflow-wrap: anywhere; }
   #tableau-server-admin .tableau-server-status strong { color: var(--text); font-weight: 600; }
-  #tableau-server-admin .tableau-server-auth { display: flex; align-items: center; min-height: 38px; padding: 0.4rem 0.55rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); }
-  #tableau-server-admin .tableau-server-toggle { display: flex; align-items: center; gap: 0.55rem; min-height: 38px; cursor: pointer; }
-  #tableau-server-admin .tableau-server-toggle input { width: auto; flex: 0 0 auto; margin: 0; }
+  #tableau-server-admin .tableau-server-auth { display: flex; align-items: center; min-height: 38px; font-weight: 400; padding: 0.4rem 0.55rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text-muted); }
+  #tableau-server-admin .tableau-server-toggle { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.55rem; cursor: pointer; }
+  /* Als Schalter statt Checkbox — passt zum Rest der Oberfläche. */
+  #tableau-server-admin .tableau-server-toggle input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 36px; height: 20px; margin: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--border); position: relative; cursor: pointer; transition: background 0.15s; }
+  #tableau-server-admin .tableau-server-toggle input::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(13 15 22 / 25%); transition: transform 0.15s; }
+  #tableau-server-admin .tableau-server-toggle input:checked { background: var(--accent); border-color: var(--accent); }
+  #tableau-server-admin .tableau-server-toggle input:checked::before { transform: translateX(16px); }
+  #tableau-server-admin .tableau-server-toggle input:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   #tableau-server-admin .tableau-server-toggle span { flex: 1; }
   #tableau-server-admin .tableau-server-custom { margin-top: -0.25rem; }
   #tableau-server-admin .tableau-server-actions { align-items: center; }
@@ -21,6 +26,8 @@ export const tableauAdminStyles = `
   #tableau-server-admin .tableau-server-mode-fields { display: contents; }
   #tableau-server-admin .tableau-server-mode-fields > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
   #tableau-server-admin .tableau-server-mode-fields > label > input, #tableau-server-admin .tableau-server-mode-fields > label > select { width: 100%; min-width: 0; }
+  /* Lange, nur lesbare URLs bekommen eine ganze Zeile; der HTTPS-Hinweis ebenso. */
+  #tableau-server-admin label:has(> .tableau-server-inline-field), #tableau-server-admin label:has(> #tableau-server-eas-jwks), #tableau-server-admin #tableau-server-eas-warning { grid-column: 1 / -1; }
   #tableau-server-admin .tableau-server-inline-field { display: flex; gap: 0.4rem; }
   #tableau-server-admin .tableau-server-inline-field input { flex: 1; min-width: 0; }
   #tableau-server-admin input[readonly] { background: var(--bg); color: var(--text-muted); }
@@ -47,7 +54,7 @@ export const tableauAdminSection = `
         <fieldset id="tableau-server-controls" disabled>
           <div class="form-grid">
             <label class="tableau-server-toggle" for="tableau-server-enabled">
-              <input id="tableau-server-enabled" type="checkbox" />
+              <input id="tableau-server-enabled" type="checkbox" role="switch" />
               <span>Tableau Server-Integration aktiviert</span>
             </label>
             <label for="tableau-server-auth-mode">Authentifizierung
@@ -85,6 +92,9 @@ export const tableauAdminSection = `
               <input id="tableau-server-custom-claim" type="text" autocomplete="off" />
             </label>
             <div id="tableau-server-oauth2-fields" class="tableau-server-mode-fields">
+              <label for="tableau-server-site-id" class="has-help"><span class="help-term">Site-ID</span><span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span>
+                <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="LUID der Site (UUID)" aria-describedby="help-tableau-site-id" />
+              </label>
               <label for="tableau-server-eas-issuer" class="has-help help-left"><span class="help-term">Issuer URL</span><span role="tooltip" id="help-tableau-issuer" class="help-tip">In Tableau bei „New Connected App → OAuth 2.0 Trust“ als Issuer URL eintragen. Muss per HTTPS erreichbar sein (OIDC-Metadaten unter <code>/.well-known/openid-configuration</code>; Tableau Server ab 2024.2 bzw. Tableau Cloud). Ändert sich die Public URL dieser Middleware, ändert sich auch die Issuer-URL — dann in Tableau nachziehen.</span>
                 <span class="tableau-server-inline-field">
                   <input id="tableau-server-eas-issuer" type="text" readonly aria-describedby="help-tableau-issuer" />
@@ -96,9 +106,6 @@ export const tableauAdminSection = `
               </label>
               <label for="tableau-server-eas-kid">Key-ID
                 <input id="tableau-server-eas-kid" type="text" readonly />
-              </label>
-              <label for="tableau-server-site-id" class="has-help help-left"><span class="help-term">Site-ID</span><span role="tooltip" id="help-tableau-site-id" class="help-tip">Site-LUID, nach dem Anlegen der Connected App in Tableau angezeigt.</span>
-                <input id="tableau-server-site-id" type="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" aria-describedby="help-tableau-site-id" />
               </label>
               <p id="tableau-server-eas-warning" class="hint error" role="status" hidden>
                 Für OAuth 2.0 Trust muss die Middleware unter einer HTTPS-Public-URL erreichbar sein. Im Abschnitt
@@ -178,7 +185,7 @@ export const tableauAdminScript = String.raw`
 
   function tableauServerRenderEas() {
     var eas = tableauServerState.eas;
-    var pending = 'Wird beim ersten Speichern in diesem Modus erzeugt.';
+    var pending = 'Nach dem ersten Speichern';
     document.getElementById('tableau-server-eas-issuer').value = eas ? eas.issuerUrl : pending;
     document.getElementById('tableau-server-eas-jwks').value = eas ? eas.jwksUrl : pending;
     document.getElementById('tableau-server-eas-kid').value = eas ? eas.kid : pending;

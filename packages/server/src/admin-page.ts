@@ -104,6 +104,8 @@ export const adminPageHtml = `<!doctype html>
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.primary:hover { background: var(--accent-hover); opacity: 1; }
   :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  /* Der Seitentitel wird beim Bereichswechsel nur für Screenreader fokussiert — kein Rahmen. */
+  #view-title:focus { outline: none; }
   input[type="checkbox"] { accent-color: var(--accent); }
   button.danger { color: var(--danger); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -5,8 +5,8 @@ import { dashboardPrefsSchema, type DashboardPrefs } from '../../server/src/pers
  * Client für die Per-Dashboard-Präferenzen (Antwortfokus, Standardfragen)
  * unter /api/memory/prefs — gleiches Header-Vertrauensmodell wie die übrigen
  * Memory-Endpoints, siehe ee/server/src/personalization.ts. Ohne
- * Enterprise-Lizenz antwortet der Endpunkt mit 402; loadPrefs liefert dann
- * null, und die Extension blendet die Bereiche aus.
+ * Enterprise-Lizenz ruft die Extension loadPrefs gar nicht erst auf (siehe
+ * features.savedQueries-Gate in App.tsx).
  */
 
 function prefsHeaders(userId: string, dashboardKey: string, apiToken?: string): Record<string, string> {
@@ -19,8 +19,10 @@ function prefsHeaders(userId: string, dashboardKey: string, apiToken?: string): 
 
 /**
  * Lädt die gespeicherten Präferenzen für (userId, dashboardKey).
- * Liefert null, wenn nichts gespeichert ist ODER die Anfrage fehlschlägt
- * (Memory evtl. deaktiviert) — der Aufrufer unterscheidet das nicht.
+ * Liefert null NUR, wenn der Server bestätigt, dass nichts gespeichert ist
+ * (`{ prefs: null }`, HTTP 200). Bei Netzwerk-/HTTP-/Formatfehlern wird
+ * geworfen — der Aufrufer darf das nicht mit "leer" verwechseln, sonst wirkt
+ * ein Ladefehler wie ein Verlust gespeicherter Fragen (siehe UI-Review P1-4).
  */
 export async function loadPrefs(
   baseUrl: string,
@@ -28,17 +30,29 @@ export async function loadPrefs(
   userId: string,
   dashboardKey: string,
 ): Promise<DashboardPrefs | null> {
+  let res: Response;
   try {
-    const res = await fetch(`${baseUrl}/api/memory/prefs`, {
+    res = await fetch(`${baseUrl}/api/memory/prefs`, {
       headers: prefsHeaders(userId, dashboardKey, apiToken),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { prefs: unknown };
-    const parsed = dashboardPrefsSchema.safeParse(data.prefs);
-    return parsed.success ? parsed.data : null;
   } catch {
-    return null;
+    throw new Error('Präferenzen konnten nicht geladen werden — Server nicht erreichbar.');
   }
+  if (!res.ok) {
+    throw new Error(`Präferenzen konnten nicht geladen werden (HTTP ${res.status}).`);
+  }
+  let data: { prefs: unknown };
+  try {
+    data = (await res.json()) as { prefs: unknown };
+  } catch {
+    throw new Error('Präferenzen konnten nicht geladen werden — ungültige Antwort.');
+  }
+  if (data.prefs === null || data.prefs === undefined) return null;
+  const parsed = dashboardPrefsSchema.safeParse(data.prefs);
+  if (!parsed.success) {
+    throw new Error('Präferenzen konnten nicht geladen werden — unerwartetes Format.');
+  }
+  return parsed.data;
 }
 
 /** Speichert die Präferenzen für (userId, dashboardKey); wirft bei Fehler. */

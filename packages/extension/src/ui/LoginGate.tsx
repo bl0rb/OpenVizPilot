@@ -1,7 +1,16 @@
 import { t, type AuthConfigResponse, type AuthSession } from '@openvizpilot/shared';
 import { LoginPanel as OidcLoginPanel } from '@openvizpilot/ee/extension';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { loginLocal } from '../chat/auth-session';
+
+/** Pflichtfeld-Prüfung für die lokale Anmeldung — pur, damit sie ohne
+ * Rendering testbar ist (UI-Review P2-8). */
+export function getLoginFieldErrors(username: string, password: string): { username?: string; password?: string } {
+  const errors: { username?: string; password?: string } = {};
+  if (!username.trim()) errors.username = t('login.usernameRequired');
+  if (!password) errors.password = t('login.passwordRequired');
+  return errors;
+}
 
 /**
  * Login-Gate der Extension: Open Core = Benutzername/Passwort (Konten aus der
@@ -20,10 +29,24 @@ function LocalLogin(props: { baseUrl: string; error?: string; onLoggedIn: (sessi
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Feldbezogene Pflichtfeld-Fehler statt eines stillen return bei leeren
+  // Zugangsdaten (UI-Review P2-8).
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const submit = async (e: Event) => {
     e.preventDefault();
-    if (!username.trim() || !password) return;
+    const nextFieldErrors = getLoginFieldErrors(username, password);
+    setFieldErrors(nextFieldErrors);
+    if (nextFieldErrors.username) {
+      usernameRef.current?.focus();
+      return;
+    }
+    if (nextFieldErrors.password) {
+      passwordRef.current?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -36,16 +59,50 @@ function LocalLogin(props: { baseUrl: string; error?: string; onLoggedIn: (sessi
   };
 
   return (
-    <form class="login-panel" onSubmit={(e) => void submit(e)}>
+    <form class="login-panel" onSubmit={(e) => void submit(e)} noValidate>
       <h2>{t('login.required')}</h2>
       <p class="memory-hint">{t('login.localHint')}</p>
       <label>
         {t('login.username')}
-        <input type="text" value={username} autocomplete="username" onInput={(e) => setUsername((e.target as HTMLInputElement).value)} />
+        <input
+          ref={usernameRef}
+          type="text"
+          value={username}
+          autocomplete="username"
+          required
+          aria-invalid={fieldErrors.username ? 'true' : undefined}
+          aria-describedby={fieldErrors.username ? 'login-username-error' : undefined}
+          onInput={(e) => {
+            setUsername((e.target as HTMLInputElement).value);
+            setFieldErrors((f) => (f.username ? { ...f, username: undefined } : f));
+          }}
+        />
+        {fieldErrors.username && (
+          <span id="login-username-error" class="field-error">
+            {fieldErrors.username}
+          </span>
+        )}
       </label>
       <label>
         {t('login.password')}
-        <input type="password" value={password} autocomplete="current-password" onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
+        <input
+          ref={passwordRef}
+          type="password"
+          value={password}
+          autocomplete="current-password"
+          required
+          aria-invalid={fieldErrors.password ? 'true' : undefined}
+          aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
+          onInput={(e) => {
+            setPassword((e.target as HTMLInputElement).value);
+            setFieldErrors((f) => (f.password ? { ...f, password: undefined } : f));
+          }}
+        />
+        {fieldErrors.password && (
+          <span id="login-password-error" class="field-error">
+            {fieldErrors.password}
+          </span>
+        )}
       </label>
       <button type="submit" disabled={busy}>
         {busy ? t('login.submitting') : t('login.submit')}

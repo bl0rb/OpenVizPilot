@@ -77,12 +77,48 @@ body {
 }
 
 .messages {
+  position: relative;
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 12px 15px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Screenreader-only: visuell versteckt, aber im Accessibility-Tree lesbar (P1 Nr. 6). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Erscheint nur, wenn der Nutzer nicht mehr nahe am unteren Rand ist (P1 Nr. 1). */
+.jump-to-latest {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  border: 1px solid #b6c6d2;
+  background: #fff;
+  color: #1a699e;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.jump-to-latest:hover {
+  background: #eef4f8;
+  border-color: #1a699e;
 }
 
 .empty-hint {
@@ -279,6 +315,17 @@ body {
   color: #666;
 }
 
+.tool-state {
+  color: #666;
+}
+
+.tool-tech {
+  margin-top: 4px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #888;
+}
+
 .tool-chip pre {
   margin: 6px 0 2px;
   max-height: 120px;
@@ -430,6 +477,17 @@ body {
   font-size: 15px;
 }
 
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-header h2 {
+  margin: 0;
+}
+
 .settings-panel label {
   display: flex;
   flex-direction: column;
@@ -476,7 +534,8 @@ body {
   gap: 8px;
 }
 
-.settings-actions button {
+.settings-actions button,
+.settings-header button {
   border: none;
   background: #1a699e;
   color: #fff;
@@ -485,7 +544,8 @@ body {
   cursor: pointer;
 }
 
-.settings-actions .btn-secondary {
+.settings-actions .btn-secondary,
+.settings-header .btn-secondary {
   background: #e0e0e0;
   color: #333;
 }
@@ -601,6 +661,10 @@ body {
   border: 1px solid #dde1e6;
   border-radius: 6px;
   font: inherit;
+}
+.login-panel .field-error {
+  display: block;
+  margin-top: 2px;
 }
 
 /* Hinweis über dem Eingabefeld, wenn im Dashboard etwas markiert wurde. */

@@ -15,6 +15,8 @@ export const mcpAdminStyles = `
   #mcp-admin .mcp-selection-count { font-size: 12px; color: var(--text-muted); margin-left: 0.5rem; }
   #mcp-admin .mcp-choices input { flex-shrink: 0; }
   #mcp-admin .mcp-empty { color: var(--text-muted); margin: 0.5rem 0; }
+  #mcp-admin input[aria-invalid="true"], #mcp-admin fieldset[aria-invalid="true"] { border-color: var(--danger); }
+  #mcp-admin .mcp-summary { border-top: 1px solid var(--border); padding-top: 0.6rem; margin-top: 0.75rem; }
 `;
 
 export const mcpAdminSection = `
@@ -24,6 +26,7 @@ export const mcpAdminSection = `
         <button id="mcp-reload" type="button">Aktualisieren</button>
       </div>
       <p class="hint">Bindet externe, nur lesende MCP-Tools an bestimmte Dashboards an — braucht eine Enterprise-Lizenz mit Feature „mcp“.</p>
+      <p class="hint">1 Site mit Dashboards und Mitgliedern anlegen · 2 Server verbinden und Tools laden · 3 Tools und Sites auswählen · 4 Freigaben speichern. Felder mit * sind Pflichtfelder.</p>
       <p id="mcp-banner" class="banner" role="status" aria-live="polite"></p>
       <fieldset id="mcp-controls" disabled>
         <h3>Sites</h3>
@@ -31,6 +34,7 @@ export const mcpAdminSection = `
         <button id="mcp-add-site" type="button">+ Site hinzufügen</button>
         <h3>MCP-Server</h3>
         <div id="mcp-servers"></div>
+        <p id="mcp-summary" class="hint mcp-summary" role="status" aria-live="polite"></p>
         <div class="row">
           <button id="mcp-add-server" type="button">+ MCP-Server hinzufügen</button>
           <button id="mcp-save" class="primary" type="button">Freigaben speichern</button>
@@ -50,6 +54,24 @@ export const mcpAdminScript = String.raw`
     mcpDirty = true;
     showBanner(mcpBanner, 'Ungespeicherte Änderungen.', '');
     mcpBanner.style.display = 'block';
+    renderMcpSummary();
+  }
+
+  function renderMcpSummary() {
+    var summary = document.getElementById('mcp-summary');
+    if (!summary) return;
+    var lines = [];
+    mcpState.settings.servers.forEach(function (server) {
+      var siteNames = server.siteIds.map(function (id) {
+        var site = mcpState.settings.sites.filter(function (item) { return item.id === id; })[0];
+        return site ? (site.name || site.id) : id;
+      });
+      if (!siteNames.length || !server.tools.length) return;
+      lines.push((server.name || server.id) + ' → ' + siteNames.join(', ') + ' (' + server.tools.length + ' Tool' + (server.tools.length === 1 ? '' : 's') + (server.enabled ? '' : ', deaktiviert') + ')');
+    });
+    summary.textContent = lines.length
+      ? 'Geplante Freigaben: ' + lines.join(' · ') + '. Ob der Zugriff tatsächlich wirksam wird, hängt zusätzlich von Lizenz, Anmeldung und weiteren bestehenden Freigaben ab.'
+      : 'Noch keine Server-Freigabe einer Site mit Tools zugeordnet.';
   }
 
   function mcpMessage(message, kind) {
@@ -86,18 +108,55 @@ export const mcpAdminScript = String.raw`
     return element;
   }
 
-  function mcpField(parent, labelText, value, change, multiline) {
+  function mcpFieldError(fieldId) {
+    return fieldId ? document.getElementById(fieldId + '-error') : null;
+  }
+
+  function mcpClearFieldError(field) {
+    field.removeAttribute('aria-invalid');
+    var errorEl = mcpFieldError(field.id);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+  }
+
+  function mcpSetFieldError(fieldId, message) {
+    var field = document.getElementById(fieldId);
+    if (!field) return null;
+    if (!message) { mcpClearFieldError(field); return null; }
+    var errorEl = mcpFieldError(fieldId);
+    if (errorEl) { errorEl.textContent = message; errorEl.hidden = false; }
+    field.setAttribute('aria-invalid', 'true');
+    return field.tagName === 'FIELDSET' ? (field.querySelector('input[type=checkbox]') || field) : field;
+  }
+
+  function mcpValidUrl(value) {
+    try {
+      var url = new URL(value);
+      return url.protocol === 'https:' && !url.username && !url.password && !url.hash && !url.search;
+    } catch (e) { return false; }
+  }
+
+  function mcpField(parent, labelText, value, change, multiline, fieldId) {
     var label = mcpElement('label', labelText, parent);
     var field = mcpElement(multiline ? 'textarea' : 'input', '', label);
     if (!multiline) field.type = 'text';
     field.value = value || '';
     field.autocomplete = 'off';
-    field.addEventListener('input', function () { change(field.value); mcpChanged(); });
+    if (fieldId) {
+      field.id = fieldId;
+      var errorEl = mcpElement('p', '', label);
+      errorEl.id = fieldId + '-error';
+      errorEl.className = 'hint error';
+      errorEl.setAttribute('role', 'status');
+      errorEl.hidden = true;
+      field.setAttribute('aria-describedby', errorEl.id);
+    }
+    field.addEventListener('input', function () { change(field.value); mcpChanged(); if (fieldId) mcpClearFieldError(field); });
     return field;
   }
 
-  function mcpChoices(parent, labelText, choices, selected, change, emptyText) {
+  function mcpChoices(parent, labelText, choices, selected, change, emptyText, groupId) {
     var group = mcpElement('fieldset', '', parent);
+    if (groupId) { group.id = groupId; group.tabIndex = -1; }
     var legend = mcpElement('legend', labelText, group);
     var count = mcpElement('span', '', legend);
     count.className = 'mcp-selection-count';
@@ -116,6 +175,14 @@ export const mcpAdminScript = String.raw`
     var noMatches = mcpElement('p', 'Keine Treffer.', group);
     noMatches.className = 'mcp-empty';
     noMatches.hidden = true;
+    if (groupId) {
+      var groupError = mcpElement('p', '', group);
+      groupError.id = groupId + '-error';
+      groupError.className = 'hint error';
+      groupError.setAttribute('role', 'status');
+      groupError.hidden = true;
+      group.setAttribute('aria-describedby', groupError.id);
+    }
     function updateCount() {
       count.textContent = list.querySelectorAll('input:checked').length + ' von ' + choices.length + ' ausgewählt';
     }
@@ -141,6 +208,7 @@ export const mcpAdminScript = String.raw`
         change(Array.from(list.querySelectorAll('input:checked')).map(function (input) { return input.value; }));
         updateCount();
         mcpChanged();
+        if (groupId) mcpClearFieldError(group);
       });
     });
     updateCount();
@@ -168,7 +236,7 @@ export const mcpAdminScript = String.raw`
       var summary = mcpElement('summary', site.name || site.id, entry);
       var fields = mcpElement('div', '', entry);
       fields.className = 'mcp-fields';
-      mcpField(fields, 'Site-Name', site.name, function (value) { site.name = value; summary.textContent = value || site.id; });
+      mcpField(fields, 'Site-Name *', site.name, function (value) { site.name = value; summary.textContent = value || site.id; }, false, 'mcp-site-name-' + site.id).required = true;
       var idField = mcpField(fields, 'Site-ID', site.id, function () {});
       idField.readOnly = true;
       mcpChoices(entry, 'Registrierte Dashboards', mcpState.dashboards.map(function (dashboard) {
@@ -202,12 +270,12 @@ export const mcpAdminScript = String.raw`
       var summary = mcpElement('summary', server.name || server.id, entry);
       var fields = mcpElement('div', '', entry);
       fields.className = 'mcp-fields';
-      mcpField(fields, 'Server-Name', server.name, function (value) { server.name = value; summary.textContent = value || server.id; });
-      mcpField(fields, 'HTTPS-Endpunkt (Streamable HTTP)', server.url, function (value) { server.url = value.trim(); server.tools = []; delete mcpTools[server.id]; renderTools(); });
+      mcpField(fields, 'Server-Name *', server.name, function (value) { server.name = value; summary.textContent = value || server.id; }, false, 'mcp-server-name-' + server.id).required = true;
+      mcpField(fields, 'HTTPS-Endpunkt (Streamable HTTP) *', server.url, function (value) { server.url = value.trim(); server.tools = []; delete mcpTools[server.id]; renderTools(); }, false, 'mcp-server-url-' + server.id).required = true;
       mcpField(fields, 'Secret-Referenz (optional, OVP_MCP_...)', server.tokenEnv, function (value) {
         if (value.trim()) server.tokenEnv = value.trim(); else delete server.tokenEnv;
         server.tools = []; delete mcpTools[server.id]; renderTools();
-      });
+      }, false, 'mcp-server-token-' + server.id);
       var enabledLabel = mcpElement('label', '', entry);
       var enabled = mcpElement('input', '', enabledLabel);
       enabled.type = 'checkbox'; enabled.checked = server.enabled;
@@ -220,7 +288,7 @@ export const mcpAdminScript = String.raw`
         server.tools.forEach(function (name) {
           if (!tools.some(function (tool) { return tool.name === name; })) tools.push({ name: name, description: 'Gespeicherte Freigabe; Verbindung erneut prüfen.' });
         });
-        mcpChoices(toolsRoot, 'Freigegebene lesende Tools', tools.map(function (tool) { return { id: tool.name, name: tool.name, description: tool.description }; }), server.tools, function (values) { server.tools = values; }, 'Keine lesenden Tools ausgewählt.');
+        mcpChoices(toolsRoot, 'Freigegebene lesende Tools *', tools.map(function (tool) { return { id: tool.name, name: tool.name, description: tool.description }; }), server.tools, function (values) { server.tools = values; }, 'Keine lesenden Tools ausgewählt.', 'mcp-server-tools-' + server.id);
       }
       renderTools();
       mcpChoices(entry, 'Für Sites verfügbar', mcpState.settings.sites.map(function (site) { return { id: site.id, name: site.name || site.id }; }), server.siteIds, function (values) { server.siteIds = values; }, 'Noch keine Sites angelegt.');
@@ -249,6 +317,7 @@ export const mcpAdminScript = String.raw`
         mcpChanged(); renderMcp();
       });
     });
+    renderMcpSummary();
   }
 
   document.getElementById('mcp-add-site').addEventListener('click', function () {
@@ -262,7 +331,41 @@ export const mcpAdminScript = String.raw`
     mcpChanged(); renderMcp();
   });
   document.getElementById('mcp-reload').addEventListener('click', loadMcp);
+
+  function validateMcp() {
+    var firstInvalid = null;
+    function check(fieldId, message) {
+      var invalidField = mcpSetFieldError(fieldId, message);
+      if (invalidField && !firstInvalid) firstInvalid = invalidField;
+    }
+    mcpState.settings.sites.forEach(function (site) {
+      check('mcp-site-name-' + site.id, site.name && site.name.trim() ? '' : 'Site-Name ist erforderlich.');
+    });
+    mcpState.settings.servers.forEach(function (server) {
+      check('mcp-server-name-' + server.id, server.name && server.name.trim() ? '' : 'Server-Name ist erforderlich.');
+      var url = (server.url || '').trim();
+      var urlError = '';
+      if (!url) urlError = 'HTTPS-Endpunkt ist erforderlich.';
+      else if (url.length > 500) urlError = 'Adresse zu lang (max. 500 Zeichen).';
+      else if (!mcpValidUrl(url)) urlError = 'Nur eine HTTPS-Adresse ohne Anmeldedaten, Anker (#) oder Query-Parameter (?), z. B. https://server.example.com/mcp';
+      check('mcp-server-url-' + server.id, urlError);
+      var tokenEnv = server.tokenEnv || '';
+      check('mcp-server-token-' + server.id, tokenEnv && (tokenEnv.length > 100 || !/^OVP_MCP_[A-Z0-9_]+$/.test(tokenEnv)) ? 'Format: OVP_MCP_ gefolgt von Großbuchstaben, Ziffern oder _.' : '');
+      var toolsError = '';
+      if (!server.tools || server.tools.length < 1) toolsError = 'Mindestens ein lesendes Tool auswählen. Zuerst Verbindung prüfen.';
+      else if (server.tools.length > 10) toolsError = 'Höchstens 10 Tools auswählen.';
+      check('mcp-server-tools-' + server.id, toolsError);
+    });
+    return firstInvalid;
+  }
+
   document.getElementById('mcp-save').addEventListener('click', function () {
+    var firstInvalid = validateMcp();
+    if (firstInvalid) {
+      mcpMessage('Bitte die markierten Felder korrigieren.', 'error');
+      firstInvalid.focus();
+      return;
+    }
     mcpControls.disabled = true;
     adminFetch('/mcp', jsonRequest('PUT', { settings: mcpState.settings, revision: mcpState.revision })).then(mcpResult).then(function (data) {
       mcpState.revision = data.revision;

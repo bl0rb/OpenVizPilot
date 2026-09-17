@@ -4,6 +4,18 @@ import { useState } from 'preact/hooks';
 import { isAllowedBackendUrl, type ExtensionSettings } from '../settings';
 import type { EeFeatures } from '../chat/features-client';
 
+/** Ob das explizit zu speichernde Formular vom zuletzt gespeicherten Stand
+ * abweicht — pur, damit die Verwerfen-/Weiterbearbeiten-Entscheidung ohne
+ * Rendering testbar ist (UI-Review P1-3). */
+export function isSettingsDirty(current: ExtensionSettings, saved: ExtensionSettings): boolean {
+  return (
+    current.backendUrl.trim() !== saved.backendUrl ||
+    current.model.trim() !== saved.model ||
+    current.apiToken.trim() !== saved.apiToken ||
+    current.dashboardContext.trim() !== saved.dashboardContext
+  );
+}
+
 export function SettingsPanel(props: {
   settings: ExtensionSettings;
   registrationMessage: string;
@@ -20,11 +32,13 @@ export function SettingsPanel(props: {
    * ohnehin nur für die aktuelle Sitzung gilt, siehe settings.ts). */
   isAuthor: boolean;
   /** Per-Dashboard-Präferenzen — siehe PrefsState in App.tsx. */
-  prefs: DashboardPrefs | null | 'loading' | 'unavailable';
+  prefs: DashboardPrefs | null | 'loading' | 'unavailable' | 'error';
   /** Freigeschaltete Enterprise-Funktionen — steuert, welche Bereiche erscheinen. */
   features: EeFeatures;
   onSave: (settings: ExtensionSettings) => Promise<string | null>;
   onSavePrefs: (prefs: DashboardPrefs) => Promise<string | null>;
+  /** Lädt die persönlichen Präferenzen nach einem Ladefehler erneut (siehe SavedQueriesPanel). */
+  onReloadPrefs: () => void;
   onClose: () => void;
 }) {
   const [backendUrl, setBackendUrl] = useState(props.settings.backendUrl);
@@ -34,8 +48,21 @@ export function SettingsPanel(props: {
   const [message, setMessage] = useState<string | null>(null);
   const [messageIsError, setMessageIsError] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Gezielte Verwerfen-/Weiterbearbeiten-Entscheidung statt stillschweigendem
+  // Verwerfen beim Zurückgehen — nur bei tatsächlich ungespeicherten Eingaben
+  // (UI-Review P1-3).
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   const urlValidation = isAllowedBackendUrl(backendUrl);
+  const isDirty = isSettingsDirty({ backendUrl, model, apiToken, dashboardContext }, props.settings);
+
+  const backToChat = () => {
+    if (isDirty) {
+      setConfirmingDiscard(true);
+      return;
+    }
+    props.onClose();
+  };
 
   const save = async () => {
     if (saving) return;
@@ -65,7 +92,25 @@ export function SettingsPanel(props: {
 
   return (
     <div class="settings-panel">
-      <h2>{t('settings.title')}</h2>
+      <div class="settings-header">
+        <h2>{t('settings.title')}</h2>
+        <button type="button" class="btn-secondary" onClick={backToChat}>
+          {t('settings.backToChat')}
+        </button>
+      </div>
+      {confirmingDiscard && (
+        <div class="settings-message" role="alert">
+          <p>{t('settings.discardPrompt')}</p>
+          <div class="settings-actions">
+            <button type="button" onClick={props.onClose}>
+              {t('settings.discardButton')}
+            </button>
+            <button type="button" class="btn-secondary" onClick={() => setConfirmingDiscard(false)}>
+              {t('settings.keepEditingButton')}
+            </button>
+          </div>
+        </div>
+      )}
       <p class="field-hint">
         {t('settings.productInfo', undefined, { version: EXTENSION_VERSION })}
         {' · '}
@@ -118,6 +163,7 @@ export function SettingsPanel(props: {
           </label>
         </section>
       )}
+      <p class="field-hint">{t('settings.explicitSaveHint')}</p>
       <label>
         {t('settings.model')}
         <select value={model} onInput={(e) => setModel((e.target as HTMLSelectElement).value)}>
@@ -140,12 +186,16 @@ export function SettingsPanel(props: {
       )}
       <div class="settings-actions">
         <button type="button" onClick={() => void save()} disabled={saving}>
-          {saving ? t('settings.saving') : t('settings.save')}
-        </button>
-        <button type="button" class="btn-secondary" onClick={props.onClose}>
-          {t('settings.close')}
+          {saving ? t('settings.saving') : t('settings.saveButton')}
         </button>
       </div>
+
+      {/* Persönliche Einstellungen speichern sofort (kein eigener Button) —
+          das explizit benennen, damit der Unterschied zum Bereich oben klar
+          ist (UI-Review P1-3). */}
+      {(props.userId || props.features.memory || props.features.savedQueries) && (
+        <p class="field-hint">{t('settings.personalSaveHint')}</p>
+      )}
 
       {/* Personalisierung ist Enterprise (ee/): ohne Lizenz erscheinen die Bereiche
           nicht, statt etwas anzubieten, das beim Speichern scheitert. Ausnahme ist
@@ -160,7 +210,7 @@ export function SettingsPanel(props: {
       )}
 
       {props.userId && props.features.savedQueries && (
-        <SavedQueriesPanel prefs={props.prefs} onSavePrefs={props.onSavePrefs} />
+        <SavedQueriesPanel prefs={props.prefs} onSavePrefs={props.onSavePrefs} onReloadPrefs={props.onReloadPrefs} />
       )}
 
       {/* Ohne Anwenderkennung gibt es keine Personalisierung. Das passiert auf

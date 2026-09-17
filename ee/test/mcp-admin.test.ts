@@ -40,6 +40,18 @@ describe('Enterprise MCP administration', () => {
     expect(adminPageHtml).toContain('Freigaben speichern');
   });
 
+  it('shows the setup order, required-field hints and a pre-save assignment summary', () => {
+    expect(adminPageHtml).toMatch(/1 Site .* · 2 Server .* · 3 Tools und Sites auswählen · 4 Freigaben speichern/);
+    expect(adminPageHtml).toContain('Pflichtfelder');
+    expect(adminPageHtml).toContain('id="mcp-summary"');
+    const script = adminPageHtml.match(/<script>([\s\S]*)<\/script>/)?.[1]!;
+    // Field-level validation mirrors the server schema and never claims guaranteed effective access.
+    expect(script).toContain('function validateMcp');
+    expect(script).toContain('Mindestens ein lesendes Tool auswählen. Zuerst Verbindung prüfen.');
+    expect(script).toContain('mcpValidUrl');
+    expect(script).toContain('Lizenz, Anmeldung und weiteren bestehenden Freigaben');
+  });
+
   it('requires admin authentication and persists site-scoped configuration', async () => {
     await withApp(true, async ({ app }) => {
       expect((await app.request('/api/admin/mcp')).status).toBe(401);

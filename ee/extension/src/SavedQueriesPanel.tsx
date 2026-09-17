@@ -9,11 +9,30 @@ import { useState } from 'preact/hooks';
  */
 export function SavedQueriesPanel(props: {
   /** Per-Dashboard-Präferenzen — siehe PrefsState in der Extension. */
-  prefs: DashboardPrefs | null | 'loading' | 'unavailable';
+  prefs: DashboardPrefs | null | 'loading' | 'unavailable' | 'error';
   onSavePrefs: (prefs: DashboardPrefs) => Promise<string | null>;
+  /** Lädt die Präferenzen erneut — nur relevant, wenn prefs === 'error'. */
+  onReloadPrefs: () => void;
 }) {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Ladefehler getrennt von "nichts gespeichert" behandeln: ein Fehler darf
+  // weder wie ein leerer Zustand aussehen noch scheinbar leere Präferenzen
+  // überschreiben können (siehe UI-Review P1-4, prefs-client.ts).
+  if (props.prefs === 'error') {
+    return (
+      <div class="prefs-section">
+        <h3>{t('savedQueries.title')}</h3>
+        <p class="settings-message" role="alert">{t('savedQueries.loadError')}</p>
+        <div class="settings-actions">
+          <button type="button" onClick={props.onReloadPrefs}>
+            {t('savedQueries.reload')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Aktuelle Präferenzen normalisiert ('loading'/'unavailable'/null → leerer
   // Datensatz), damit Select und Liste immer einen konkreten Stand zeigen.

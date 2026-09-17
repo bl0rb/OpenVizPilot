@@ -4,7 +4,6 @@ import {
   t,
   type DashboardAction,
   type SlashCommand,
-  type Suggestions,
   type ToolCall,
   type ModelOption,
 } from '@openvizpilot/shared';
@@ -31,8 +30,9 @@ import { describeContextChange, registerContextInvalidation } from '../tableau/e
 import { executeToolCall } from '../tools/registry';
 import { executeMcpTool, executeTableauTool } from '@openvizpilot/ee/extension';
 import { setConfigureHandler } from '../main';
+import { reducer } from './chat-reducer';
 import { Composer } from './Composer';
-import { summarizeToolArgs, type ChatItem } from './items';
+import { summarizeToolArgs } from './items';
 import { MessageList } from './MessageList';
 import { SettingsPanel } from './SettingsPanel';
 import type { AuthConfigResponse, AuthSession } from '@openvizpilot/shared';
@@ -41,109 +41,7 @@ import { fetchFeatures, NO_EE_FEATURES, type EeFeatures } from '../chat/features
 import { LoginGate } from './LoginGate';
 
 /** Ladezustand der Dashboard-Präferenzen — siehe Kommentar bei useState unten. */
-type PrefsState = DashboardPrefs | null | 'loading' | 'unavailable';
-
-let nextId = 1;
-
-type Action =
-  | { type: 'user'; text: string }
-  | { type: 'round-start' }
-  | { type: 'delta'; text: string }
-  | { type: 'finalize'; text: string }
-  | { type: 'suggestions'; suggestions: Suggestions }
-  | {
-      type: 'tool';
-      callId: string;
-      name: string;
-      argsSummary?: string;
-      status: 'running' | 'done';
-      preview?: string;
-    }
-  | { type: 'notice'; text: string }
-  | { type: 'error'; text: string; retryable: boolean }
-  | { type: 'done' }
-  | { type: 'clear' };
-
-function reducer(items: ChatItem[], action: Action): ChatItem[] {
-  switch (action.type) {
-    case 'user':
-      // Alte Vorschlags-Chips sind mit der neuen Frage obsolet.
-      return [
-        ...items.filter((i) => i.kind !== 'suggestions'),
-        { kind: 'user', id: nextId++, text: action.text },
-      ];
-    case 'round-start':
-      // Chips einer früheren Antwort verschwinden, sobald eine neue Runde
-      // läuft (gilt auch für Retry, der keine 'user'-Action dispatcht).
-      return [
-        ...finalizeStreaming(items).filter((i) => i.kind !== 'suggestions'),
-        { kind: 'assistant', id: nextId++, text: '', streaming: true },
-      ];
-    case 'delta': {
-      const last = items[items.length - 1];
-      if (last?.kind === 'assistant' && last.streaming) {
-        return [...items.slice(0, -1), { ...last, text: last.text + action.text }];
-      }
-      return [...items, { kind: 'assistant', id: nextId++, text: action.text, streaming: true }];
-    }
-    case 'finalize': {
-      // Gestreamten Text durch die bereinigte Endfassung ersetzen (der
-      // <suggestions>-Block wird herausgeschnitten). Robust die LETZTE
-      // Assistant-Bubble suchen — dahinter können bereits Notices liegen.
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
-        if (it?.kind === 'assistant') {
-          const updated = [...items];
-          updated[i] = { ...it, text: action.text, streaming: false };
-          return updated;
-        }
-      }
-      return items;
-    }
-    case 'suggestions':
-      return [...items, { kind: 'suggestions', id: nextId++, suggestions: action.suggestions }];
-    case 'tool': {
-      const idx = items.findIndex((i) => i.kind === 'tool' && i.callId === action.callId);
-      if (idx >= 0) {
-        const updated = [...items];
-        updated[idx] = {
-          kind: 'tool',
-          id: (items[idx] as ChatItem & { id: number }).id,
-          callId: action.callId,
-          name: action.name,
-          argsSummary: action.argsSummary,
-          status: action.status,
-          preview: action.preview,
-        };
-        return updated;
-      }
-      return [
-        ...finalizeStreaming(items),
-        {
-          kind: 'tool',
-          id: nextId++,
-          callId: action.callId,
-          name: action.name,
-          argsSummary: action.argsSummary,
-          status: action.status,
-          preview: action.preview,
-        },
-      ];
-    }
-    case 'notice':
-      return [...items, { kind: 'notice', id: nextId++, text: action.text }];
-    case 'error':
-      return [...finalizeStreaming(items), { kind: 'error', id: nextId++, text: action.text, retryable: action.retryable }];
-    case 'done':
-      return finalizeStreaming(items);
-    case 'clear':
-      return [];
-  }
-}
-
-function finalizeStreaming(items: ChatItem[]): ChatItem[] {
-  return items.map((i) => (i.kind === 'assistant' && i.streaming ? { ...i, streaming: false } : i));
-}
+type PrefsState = DashboardPrefs | null | 'loading' | 'unavailable' | 'error';
 
 export function App(props: { dashboard: Dashboard }) {
   const { dashboard } = props;
@@ -208,8 +106,12 @@ export function App(props: { dashboard: Dashboard }) {
   // — der Dashboard-Name reicht als Identifikator innerhalb eines Workbooks.
   const dashboardKey = useMemo(() => dashboard.name.slice(0, MAX_DASHBOARD_KEY_CHARS), [dashboard]);
   // 'loading' während des ersten Ladens, 'unavailable' ohne User-ID (keine
-  // Personalisierung möglich — analog zum userId-Gate im Settings-Panel).
+  // Personalisierung möglich — analog zum userId-Gate im Settings-Panel),
+  // 'error' bei einem Lade-Fehlschlag (siehe reloadPrefs unten).
   const [prefs, setPrefs] = useState<PrefsState>(userId ? 'loading' : 'unavailable');
+  // Erhöht sich bei jedem manuellen "Erneut laden" — löst den Lade-Effekt
+  // unten erneut aus (siehe reloadPrefs).
+  const [prefsReloadToken, setPrefsReloadToken] = useState(0);
 
   useEffect(() => {
     const unregister = registerContextInvalidation(dashboard, {
@@ -405,13 +307,23 @@ export function App(props: { dashboard: Dashboard }) {
     }
     let cancelled = false;
     setPrefs('loading');
-    void loadPrefs(baseUrl, apiToken || undefined, userId, dashboardKey).then((result) => {
-      if (!cancelled) setPrefs(result);
-    });
+    void loadPrefs(baseUrl, apiToken || undefined, userId, dashboardKey)
+      .then((result) => {
+        if (!cancelled) setPrefs(result);
+      })
+      .catch(() => {
+        // Lade-Fehlschlag getrennt von "nichts gespeichert" halten (siehe
+        // prefs-client.ts) — sonst wirkt ein Ladefehler wie ein Verlust
+        // gespeicherter Fragen (UI-Review P1-4).
+        if (!cancelled) setPrefs('error');
+      });
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, apiToken, userId, dashboardKey, authReady, features.savedQueries]);
+  }, [baseUrl, apiToken, userId, dashboardKey, authReady, features.savedQueries, prefsReloadToken]);
+
+  /** "Erneut laden" nach einem Präferenzen-Ladefehler — siehe SettingsPanel/SavedQueriesPanel. */
+  const reloadPrefs = useCallback(() => setPrefsReloadToken((v) => v + 1), []);
 
   /** Schreibt Präferenzen optimistisch, macht bei Fehler den State-Update rückgängig. */
   const updatePrefs = useCallback(
@@ -593,7 +505,11 @@ export function App(props: { dashboard: Dashboard }) {
   // User-ID oder ohne Enterprise-Lizenz für "savedQueries" — dann erscheint der
   // Button gar nicht erst, statt beim Speichern an einer 402 zu scheitern.
   const onSaveStandard = useMemo(() => {
-    if (!userId || !features.savedQueries) return undefined;
+    // Auch ohne Ladefehler kein Speichern anbieten, solange die eigentlichen
+    // Präferenzen nicht bekannt sind — sonst überschreibt eine einzelne neue
+    // Standardfrage einen Datensatz, den wir nie erfolgreich gelesen haben
+    // (UI-Review P1-4).
+    if (!userId || !features.savedQueries || prefs === 'error') return undefined;
     return (text: string) => {
       const current: DashboardPrefs =
         typeof prefs === 'object' && prefs !== null ? prefs : { focus: '', questions: [] };
@@ -617,7 +533,11 @@ export function App(props: { dashboard: Dashboard }) {
   // Fokus gewählt) fragt die Extension zuerst nach dem Antwortfokus — erst
   // danach erscheinen die normalen Starter-Chips (siehe MessageList).
   const showFocusOnboarding =
-    items.length === 0 && prefs !== 'loading' && prefs !== 'unavailable' && (prefs === null || prefs.focus === '');
+    items.length === 0 &&
+    prefs !== 'loading' &&
+    prefs !== 'unavailable' &&
+    prefs !== 'error' &&
+    (prefs === null || prefs.focus === '');
 
   const onPickFocus = useCallback(
     (focus: string) => {
@@ -729,7 +649,10 @@ export function App(props: { dashboard: Dashboard }) {
           class="btn-icon"
           title={t('app.header.settingsTitle')}
           aria-label={t('app.header.settingsTitle')}
-          onClick={() => setSettingsOpen((v) => !v)}
+          // Nur öffnen: ein blindes Umschalten würde die Verwerfen-/
+          // Weiterbearbeiten-Entscheidung im Panel umgehen (UI-Review P1-3) —
+          // Schließen läuft ausschließlich über "Zurück zum Chat" dort.
+          onClick={() => setSettingsOpen(true)}
         >
           ⚙
         </button>
@@ -755,6 +678,7 @@ export function App(props: { dashboard: Dashboard }) {
           features={features}
           onSave={onSaveSettings}
           onSavePrefs={updatePrefs}
+          onReloadPrefs={reloadPrefs}
           onClose={() => setSettingsOpen(false)}
         />
       ) : needsLogin && authConfig ? (

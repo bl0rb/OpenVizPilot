@@ -16,7 +16,14 @@ export type ChatItem =
     }
   | { kind: 'suggestions'; id: number; suggestions: Suggestions }
   | { kind: 'notice'; id: number; text: string }
-  | { kind: 'error'; id: number; text: string; retryable: boolean };
+  | {
+      kind: 'error';
+      id: number;
+      text: string;
+      retryable: boolean;
+      /** Gerade neu versucht (siehe App.tsx-Reducer) — blendet den Eintrag bei Erfolg/erneutem Fehler wieder aus. */
+      retrying?: boolean;
+    };
 
 /** Kompakte Argument-Zusammenfassung für die Trace-Anzeige. */
 export function summarizeToolArgs(argsJson: string): string | undefined {

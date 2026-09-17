@@ -41,7 +41,7 @@ export function Composer(props: {
   return (
     <div class="composer">
       {menu.length > 0 && (
-        <div class="slash-menu" role="listbox">
+        <div class="slash-menu" id="composer-slash-menu" role="listbox" aria-label={t('composer.slashMenuLabel')}>
           {menu.map((c, i) => (
             <button
               key={c.name}
@@ -67,6 +67,11 @@ export function Composer(props: {
         disabled={props.disabled}
         placeholder={t('composer.placeholder')}
         aria-label={t('composer.placeholder')}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-autocomplete="list"
+        aria-expanded={menu.length > 0}
+        aria-controls="composer-slash-menu"
         aria-activedescendant={menu.length > 0 ? `slash-option-${menuIndex}` : undefined}
         rows={2}
         maxLength={MAX_MESSAGE_CHARS}

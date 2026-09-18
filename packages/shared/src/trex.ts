@@ -87,7 +87,7 @@ export interface TrexOptions {
  * Version im Manifest — für Tableau sichtbar im Erweiterungsdialog. Bei einem
  * Release mitziehen, sonst zeigt der Admin-Dialog eine falsche Version an.
  */
-export const EXTENSION_VERSION = '1.3.0';
+export const EXTENSION_VERSION = '1.3.1';
 
 export function buildTrexManifest(options: TrexOptions): string {
   const dev = options.dev === true;

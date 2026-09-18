@@ -90,6 +90,15 @@ export const adminPageHtml = `<!doctype html>
   .form-field, .form-grid > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
   .form-field > input, .form-grid > label > input, .form-grid > label > select { width: 100%; min-width: 0; }
   .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 1.25rem; margin-top: 1.25rem; border-top: 1px solid var(--border); }
+  .inline-field { display: flex; gap: 0.4rem; }
+  .inline-field input { flex: 1; min-width: 0; }
+  .setup-steps { border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin: 0 0 1rem; font-size: 13px; }
+  .setup-steps summary { cursor: pointer; font-weight: 600; }
+  .setup-steps ol, .setup-steps ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+  .setup-steps li { margin: 0.3rem 0; }
+  .setup-steps table { border-collapse: collapse; margin-top: 0.5rem; font-size: 12px; }
+  .setup-steps th, .setup-steps td { text-align: left; padding: 0.3rem 0.6rem 0.3rem 0; vertical-align: top; }
+  .setup-steps code { font-size: 11px; }
   .form-section { border: 0; border-top: 1px solid var(--border); min-width: 0; margin: 1.5rem 0 0; padding: 1.25rem 0 0; }
   .form-section legend { padding: 0 0.75rem 0 0; font-weight: 600; }
   button {
@@ -379,29 +388,74 @@ export const adminPageHtml = `<!doctype html>
         </label>
       </div>
       <div id="oidc-fields">
+        <p class="hint">Reihenfolge: öffentliche URL eintragen · Redirect-URI beim Provider registrieren · Issuer und Client-ID übernehmen · speichern · nach dem ersten Login unter „Benutzerzugriff" freischalten.</p>
         <div class="form-grid">
-          <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Redirect-URI beim Provider registrieren: <code id="oidc-redirect">—</code> (ergibt sich aus der öffentlichen URL); Einrichtung siehe docs/enterprise.md.</span>
+          <label class="has-help" style="grid-column: 1 / -1;"><span class="help-term">Redirect-URI (Callback-URL)</span><span role="tooltip" id="help-oidc-redirect" class="help-tip">Genau diese Adresse beim Identity-Provider als Redirect-URI eintragen — Entra ID: Plattform „Web"; Keycloak: „Valid redirect URIs". Sie ergibt sich aus der öffentlichen URL oben und muss HTTPS sein.</span>
+            <span class="inline-field">
+              <input type="text" id="oidc-redirect" readonly placeholder="Öffentliche URL oben eintragen" aria-describedby="help-oidc-redirect" />
+              <button type="button" id="oidc-redirect-copy">Kopieren</button>
+            </span>
+          </label>
+        </div>
+        <div class="form-grid">
+          <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Legt Issuer-Format und Claim-Zuordnung fest. „Anderer" funktioniert mit jedem Provider, der ein Discovery-Dokument unter <code>&lt;Issuer&gt;/.well-known/openid-configuration</code> liefert.</span>
             <select id="oidc-provider" aria-describedby="help-oidc-provider">
               <option value="entra">Microsoft Entra ID</option>
               <option value="keycloak">Keycloak</option>
               <option value="generic">Anderer OIDC-Provider</option>
             </select>
           </label>
-          <label style="flex: 1 1 320px;">Issuer-URL
-            <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" />
+          <label style="flex: 1 1 320px;" class="has-help help-left"><span class="help-term">Issuer-URL</span><span role="tooltip" id="help-oidc-issuer" class="help-tip">Entra ID: <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> · Keycloak: <code>https://&lt;host&gt;/realms/&lt;realm&gt;</code> · sonst der „issuer"-Wert aus dem Discovery-Dokument — ohne Pfad-Suffix wie <code>/.well-known/…</code>.</span>
+            <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" aria-describedby="help-oidc-issuer" />
           </label>
         </div>
         <div class="form-grid">
-          <label style="flex: 1 1 240px;">Client-ID
-            <input type="text" id="oidc-client-id" autocomplete="off" />
+          <label style="flex: 1 1 240px;" class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-oidc-client-id" class="help-tip">Entra ID: „Anwendungs-ID (Client)" der App-Registrierung · Keycloak: „Client ID" des Clients.</span>
+            <input type="text" id="oidc-client-id" autocomplete="off" aria-describedby="help-oidc-client-id" />
           </label>
-          <label style="flex: 1 1 240px;">Client-Secret (optional, nur confidential clients)
-            <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" />
+          <label style="flex: 1 1 240px;" class="has-help"><span class="help-term">Client-Secret (nur confidential clients)</span><span role="tooltip" id="help-oidc-client-secret" class="help-tip">Leer lassen für einen public client mit PKCE (empfohlen — die Extension läuft im Browser). Nur ausfüllen, wenn der Client beim Provider als „confidential" angelegt ist (Keycloak: „Client authentication: On"). Wird in der Datenbank gespeichert; für Vault-Deployments stattdessen <code>OVP_OIDC_CLIENT_SECRET</code> setzen.</span>
+            <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-oidc-client-secret" />
           </label>
-          <label style="flex: 1 1 200px;">Scopes
-            <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" />
+          <label style="flex: 1 1 200px;" class="has-help help-left"><span class="help-term">Scopes</span><span role="tooltip" id="help-oidc-scopes" class="help-tip"><code>openid profile email</code> reicht: „email" liefert die Adresse für Tableau Cloud bzw. den Username-Claim, „profile" den Anzeigenamen unter „Benutzerzugriff".</span>
+            <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" aria-describedby="help-oidc-scopes" />
           </label>
         </div>
+        <details class="setup-steps" id="oidc-setup">
+          <summary>Einrichtung Schritt für Schritt</summary>
+          <ol id="oidc-setup-entra">
+            <li>Entra Admin Center → <em>App-Registrierungen</em> → „Neue Registrierung": Name vergeben, Kontotyp „Nur Konten in diesem Organisationsverzeichnis".</li>
+            <li>Unter <em>Authentifizierung</em> → „Plattform hinzufügen" → <strong>Web</strong> → die Redirect-URI von oben eintragen. Kein Client-Secret anlegen (public client mit PKCE); unter „Erweiterte Einstellungen" „Öffentliche Clientflows zulassen" auf <em>Nein</em> lassen.</li>
+            <li>Auf der Übersichtsseite „Anwendungs-ID (Client)" → hier als <strong>Client-ID</strong>; „Verzeichnis-ID (Mandant)" → in die <strong>Issuer-URL</strong> <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> einsetzen.</li>
+            <li><em>API-Berechtigungen</em>: Microsoft Graph → <code>openid</code>, <code>profile</code>, <code>email</code> (delegiert), Admin-Einwilligung erteilen.</li>
+            <li>Gültigen Lizenzschlüssel unten eintragen, „Prüfen &amp; speichern". Dann in der Extension einmal per SSO anmelden — die Identität erscheint unter „Benutzerzugriff" und wird dort für Chat/Tableau freigeschaltet.</li>
+          </ol>
+          <ol id="oidc-setup-keycloak" hidden>
+            <li>Keycloak Admin Console → Realm wählen → <em>Clients</em> → „Create client": Typ OpenID Connect, Client-ID frei wählen (→ hier als <strong>Client-ID</strong>).</li>
+            <li>„Capability config": <em>Client authentication</em> <strong>Off</strong> (public client mit PKCE), „Standard flow" an. Bei „On" (confidential) das Secret aus dem Tab <em>Credentials</em> unten als Client-Secret eintragen.</li>
+            <li>„Login settings": <em>Valid redirect URIs</em> = Redirect-URI von oben, <em>Web origins</em> = öffentliche URL der Middleware.</li>
+            <li><strong>Issuer-URL</strong>: <code>https://&lt;keycloak-host&gt;/realms/&lt;realm&gt;</code>. Die Nutzer brauchen im Realm eine E-Mail-Adresse (Claim „email").</li>
+            <li>Gültigen Lizenzschlüssel unten eintragen, „Prüfen &amp; speichern". Dann in der Extension einmal per SSO anmelden und die Identität unter „Benutzerzugriff" freischalten.</li>
+          </ol>
+          <ol id="oidc-setup-generic" hidden>
+            <li>Beim Provider einen OIDC-Client mit <em>Authorization Code Flow + PKCE</em> anlegen; Redirect-URI von oben registrieren.</li>
+            <li><strong>Issuer-URL</strong> = „issuer" aus <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>; <strong>Client-ID</strong> aus dem Client. Secret nur bei confidential clients.</li>
+            <li>Das ID-Token muss die Claims <code>sub</code>, <code>email</code> und <code>name</code> enthalten (Scopes <code>openid profile email</code>).</li>
+            <li>Lizenzschlüssel eintragen, „Prüfen &amp; speichern", einmal per SSO anmelden, Identität unter „Benutzerzugriff" freischalten.</li>
+          </ol>
+        </details>
+        <details class="setup-steps">
+          <summary>Env-Variablen oder Admin-UI — wann was?</summary>
+          <p>Alles hier Gespeicherte landet in der Datenbank und hat Vorrang vor den Env-Variablen (oben steht „Quelle: Admin-UI" bzw. „Env-Defaults"). Env eignet sich für Deployments, deren Konfiguration aus Helm/Vault kommt; das Admin-UI für die Einrichtung von Hand. „Auf Env-Defaults zurücksetzen" löscht die Datenbank-Werte.</p>
+          <table>
+            <tr><th>Einstellung</th><th>Env-Variable</th><th>Admin-UI</th></tr>
+            <tr><td>Anmeldemodus</td><td><code>OVP_AUTH_MODE</code></td><td>Feld „Anmeldemodus"</td></tr>
+            <tr><td>Öffentliche URL</td><td><code>OVP_PUBLIC_URL</code></td><td>Feld „Öffentliche URL"</td></tr>
+            <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Felder oben</td></tr>
+            <tr><td>Client-Secret</td><td><code>OVP_OIDC_CLIENT_SECRET</code> (empfohlen bei Vault)</td><td>Feld „Client-Secret" (Datenbank)</td></tr>
+            <tr><td>Lizenz</td><td><code>OVP_LICENSE</code> oder <code>OVP_LICENSE_PATH</code></td><td>Feld „Lizenzschlüssel"</td></tr>
+            <tr><td>Shared-Token-Modus</td><td><code>OVP_API_AUTH_TOKEN</code> (nur per Env)</td><td>—</td></tr>
+          </table>
+        </details>
       </div>
       <fieldset class="form-section"><legend>Enterprise-Lizenz</legend>
       <label class="form-field has-help"><span class="help-term">Lizenzschlüssel</span><span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span>
@@ -972,9 +1026,23 @@ export const adminPageHtml = `<!doctype html>
 
   function updateRedirectPreview() {
     var origin = authPublicUrl.value.trim().replace(/\\/$/, '');
-    oidcRedirect.textContent = origin ? origin + '/auth/callback' : '— (öffentliche URL eintragen)';
+    oidcRedirect.value = origin ? origin + '/auth/callback' : '';
   }
   authPublicUrl.addEventListener('input', updateRedirectPreview);
+  document.getElementById('oidc-redirect-copy').addEventListener('click', function () {
+    if (!oidcRedirect.value) { authPublicUrl.focus(); return; }
+    var button = this;
+    navigator.clipboard.writeText(oidcRedirect.value).then(function () {
+      button.textContent = 'Kopiert';
+      setTimeout(function () { button.textContent = 'Kopieren'; }, 1500);
+    }, function () { oidcRedirect.select(); });
+  });
+  function updateOidcSetup() {
+    ['entra', 'keycloak', 'generic'].forEach(function (key) {
+      document.getElementById('oidc-setup-' + key).hidden = oidcProvider.value !== key;
+    });
+  }
+  oidcProvider.addEventListener('change', updateOidcSetup);
 
   function describeLicenseStatus(lic) {
     if (lic.status === 'valid') {
@@ -1014,6 +1082,7 @@ export const adminPageHtml = `<!doctype html>
     authPublicUrl.value = eff.publicUrl || (data.envDefaults && data.envDefaults.publicUrl) || window.location.origin;
     authPublicUrl.placeholder = data.envDefaults && data.envDefaults.publicUrl ? 'Env: ' + data.envDefaults.publicUrl : 'https://chat.example.com';
     updateRedirectPreview();
+    updateOidcSetup();
     updateOidcVisibility();
   }
 

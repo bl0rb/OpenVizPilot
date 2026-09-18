@@ -156,6 +156,82 @@ npm run build:trex -w @openvizpilot/extension -- --url https://chat.example.com/
 
 Details (safelist, HTTPS, access protection, admin modes, memory and usage privacy): [docs/admin-deployment.md](docs/admin-deployment.md). The extension needs no full-data permission (summary data only).
 
+### Configuration from a vault (Helm)
+
+The chart never needs a secret in `values.yaml`: every sensitive value is read from an existing Kubernetes Secret (`existingSecret` + `key`), so a vault integration — External Secrets Operator, Vault Agent Injector, Secrets Store CSI — only has to materialise these keys. The plain-text fallbacks (`litellm.apiKey`, `app.authToken`, `app.adminToken`) are for dev/CI only.
+
+**Secrets — keep in the vault**
+
+| Vault key → env var | `values.yaml` | Required | Purpose |
+| --- | --- | --- | --- |
+| `LITELLM_API_KEY` | `litellm.apiKeySecret.{existingSecret,key}` | yes | API key for the OpenAI-compatible LLM endpoint |
+| `API_AUTH_TOKEN` | `app.authTokenSecret.{existingSecret,key}` | `auth.mode=token` | Shared bearer token the extension sends to `/api/*` |
+| `ADMIN_TOKEN` | `app.adminTokenSecret.{existingSecret,key}` | token-mode admin | Initial admin for `/admin`; leave unset with memory enabled for password mode |
+| `OIDC_CLIENT_SECRET` | `oidc.clientSecretSecret.{existingSecret,key}` | confidential OIDC clients | Client secret for Entra ID / Keycloak (public PKCE clients need none) |
+| `OVP_LICENSE` | `license.{existingSecret,key}` | Enterprise | Signed licence key |
+| `MEMORY_DATABASE_URL` | `memory.database.external.{existingSecret,key}` | `memory.database.mode=external` | Postgres URI (`postgresql://user:pass@host:5432/db`); with `mode=cnpg` the operator's `<release>-db-app`/`uri` is used |
+| `OVP_SECRET_KEY` | `app.secretKeySecret.{existingSecret,key}` | secrets entered in the admin UI | ≥ 32 characters (`openssl rand -hex 32`); encrypts Tableau Connected-App secrets at rest (AES-256-GCM) |
+| `OVP_TABLEAU_<NAME>` | `tableau.secretRefs[]` (`env`, `secretName`, `key`) | env-referenced site secrets | Connected-App secret per Tableau site, referenced by name in the admin UI instead of storing it in the DB |
+| `OVP_MCP_<NAME>` | `mcp.secretRefs[]` (`env`, `secretName`, `key`) | MCP servers with tokens | Bearer token per MCP server, referenced by name in the admin UI |
+
+**Plain configuration — `values.yaml`, no vault needed**
+
+| Env var | `values.yaml` | Purpose |
+| --- | --- | --- |
+| `LITELLM_BASE_URL` | `litellm.baseUrl` | LLM endpoint (required) |
+| `DEFAULT_MODEL`, `MODEL_ALLOWLIST` | `app.defaultModel`, `app.modelAllowlist` | Default model (required) and optional allow-list |
+| `PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
+| `AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
+| `OIDC_PROVIDER`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
+| `OVP_LICENSE_PUBLIC_KEY_B64URL` | `license.publicKeyB64url` | Public key of the licence issuer |
+| `MEMORY_MODEL` | `memory.model` | Model for memory summaries |
+| `SCOPE_GUARD`, `SCOPE_MODEL` | `app.scopeGuard`, `app.scopeModel` | Off-topic guard and its model |
+| `LOG_LEVEL`, `PORT` | `app.logLevel`, `containerPort` | Logging and container port |
+
+Example with one Secret synced from the vault:
+
+```yaml
+# my-values.yaml
+litellm:
+  baseUrl: http://litellm.llm.svc.cluster.local:4000
+  apiKeySecret: { existingSecret: openvizpilot-vault, key: LITELLM_API_KEY }
+app:
+  defaultModel: gpt-4.1
+  publicUrl: https://chat.example.com
+  adminTokenSecret: { existingSecret: openvizpilot-vault, key: ADMIN_TOKEN }
+  secretKeySecret: { existingSecret: openvizpilot-vault, key: OVP_SECRET_KEY }
+auth: { mode: oidc }
+oidc:
+  provider: entra
+  issuer: https://login.microsoftonline.com/<tenant>/v2.0
+  clientId: <client-id>
+  clientSecretSecret: { existingSecret: openvizpilot-vault, key: OIDC_CLIENT_SECRET }
+license:
+  existingSecret: openvizpilot-vault
+  key: OVP_LICENSE
+  publicKeyB64url: <issuer-public-key>
+memory:
+  enabled: true
+  database:
+    mode: external
+    external: { existingSecret: openvizpilot-vault, key: MEMORY_DATABASE_URL }
+tableau:
+  secretRefs:
+    - { env: OVP_TABLEAU_SECRET_SALES, secretName: openvizpilot-vault, key: TABLEAU_SECRET_SALES }
+```
+
+```yaml
+# External Secrets Operator: one ExternalSecret produces the Secret above
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata: { name: openvizpilot-vault }
+spec:
+  secretStoreRef: { name: vault, kind: ClusterSecretStore }
+  target: { name: openvizpilot-vault }
+  dataFrom:
+    - extract: { key: openvizpilot/prod }   # vault path holding the keys from the table
+```
+
 ## Editions
 
 OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the PolyForm Noncommercial license: read it, run it, modify it — free for any noncommercial purpose, but **commercial use requires an agreement**, and that includes running it inside a company. The Enterprise Edition in [`ee/`](ee/) (proprietary license, see [ee/LICENSE](ee/LICENSE)) adds Single Sign-On via OIDC — Microsoft Entra ID and Keycloak — so every dashboard user signs in with their company account and the middleware verifies each request against the identity provider instead of a shared API token. Alongside SSO, the Enterprise Edition covers user memory (`memory`) and saved queries (`savedQueries`) — a license may unlock all of them or any subset. The core edition already ships a login for the extension: admins create user accounts in the admin UI and dashboard users sign in with them. Enterprise features activate only with a valid, signed license key entered in the admin UI together with the Entra/Keycloak client settings; setup for Entra, Keycloak, the license and Helm is described in [docs/enterprise.md](docs/enterprise.md).

@@ -146,6 +146,23 @@ spec:
                   key: {{ .Values.memory.database.external.key }}
                   {{- end }}
             {{- end }}
+            {{- with .Values.app.secretKeySecret.existingSecret }}
+            - name: OVP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.app.secretKeySecret.key }}
+            {{- end }}
+            {{- range .Values.tableau.secretRefs }}
+            {{- if not (regexMatch "^OVP_TABLEAU_[A-Z0-9_]+$" .env) }}
+            {{- fail "Tableau secretRefs.env muss mit OVP_TABLEAU_ beginnen und nur A-Z, 0-9, _ enthalten" }}
+            {{- end }}
+            - name: {{ .env | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "Tableau secretRefs.secretName fehlt" .secretName | quote }}
+                  key: {{ required "Tableau secretRefs.key fehlt" .key | quote }}
+            {{- end }}
             {{- range .Values.mcp.secretRefs }}
             {{- if not (regexMatch "^OVP_MCP_[A-Z0-9_]+$" .env) }}
             {{- fail "MCP secretRefs.env muss mit OVP_MCP_ beginnen und nur A-Z, 0-9, _ enthalten" }}

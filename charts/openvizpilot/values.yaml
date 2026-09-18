@@ -8,6 +8,13 @@ image:
 imagePullSecrets: []
 mcp:
   secretRefs: []
+# Tableau-Connected-App-Secrets als Env-Referenz je Site (Alternative zum im
+# Admin-UI gespeicherten Secret): env muss mit OVP_TABLEAU_ beginnen.
+#   - env: OVP_TABLEAU_SECRET_VERTRIEB
+#     secretName: openvizpilot-tableau
+#     key: vertrieb
+tableau:
+  secretRefs: []
 nameOverride: ""
 fullnameOverride: ""
 
@@ -89,6 +96,12 @@ app:
     key: ADMIN_TOKEN
   # ... oder als Klartext (nur Dev/CI; siehe authToken oben).
   adminToken: ""
+  # Schlüssel (>= 32 Zeichen, z. B. `openssl rand -hex 32`), mit dem im Admin-UI
+  # eingetragene Tableau-Connected-App-Secrets verschlüsselt in der DB liegen
+  # (AES-256-GCM). Ohne ihn bleibt nur die Env-Referenz (tableau.secretRefs).
+  secretKeySecret:
+    existingSecret: ""
+    key: OVP_SECRET_KEY
 
 # User-Memory: persönliche Fakten pro Nutzer (Name, Gewohnheiten) in Postgres.
 # Datenbank der Middleware: Admin-Konto, Anmeldung, Befehle, Playbooks und

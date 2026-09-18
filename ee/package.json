@@ -20,7 +20,7 @@
     "@openvizpilot/shared": "0.1.0",
     "ajv": "^8.20.0",
     "hono": "^4.13.7",
-    "zod": "^4.5.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "preact": "^10.24.0",

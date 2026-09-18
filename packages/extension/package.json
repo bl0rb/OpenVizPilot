@@ -21,8 +21,8 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.9.0",
     "@tableau/extensions-api-types": "^1.12.0",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "tsx": "^4.19.0",
-    "vite": "^8.2.2"
+    "vite": "^8.3.0"
   }
 }

@@ -14,7 +14,7 @@ const CACHE_TTL_MS = 60_000;
  * Hat der Admin in der Admin-UI einen Modell-Katalog gespeichert (IDs +
  * Anzeigenamen, siehe @openvizpilot/shared/models.ts), liefert die Route NUR
  * diesen — ohne Upstream-Call. Ohne Katalog gilt wie bisher die Liste des
- * OpenAI-kompatiblen Endpunkts (60 s gecacht), gefiltert über MODEL_ALLOWLIST;
+ * OpenAI-kompatiblen Endpunkts (60 s gecacht), gefiltert über OVP_MODEL_ALLOWLIST;
  * die Anzeigenamen sind dann die rohen Modell-IDs.
  */
 export function createModelsRoute(
@@ -34,7 +34,7 @@ export function createModelsRoute(
         const catalog = await memoryStore.getModelCatalog();
         if (catalog) {
           // Effektives Default konsistent zur Chat-Route: schließt der
-          // Katalog DEFAULT_MODEL aus, ist sein erster Eintrag der Standard.
+          // Katalog OVP_DEFAULT_MODEL aus, ist sein erster Eintrag der Standard.
           return c.json({
             models: catalog,
             defaultModel: effectiveDefaultModel(config.defaultModel, catalog),

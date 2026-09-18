@@ -28,9 +28,9 @@ import { createSqliteMemoryStore, openSqliteDatabase } from './sqlite-store';
  * — mit eigenen Tabellen auf derselben Verbindung.
  *
  * Backends:
- * - Postgres (MEMORY_DATABASE_URL) — Produktionspfad auf EKS, der Helm-Chart
+ * - Postgres (OVP_DATABASE_URL) — Produktionspfad auf EKS, der Helm-Chart
  *   provisioniert dafür optional einen CloudNativePG-Cluster.
- * - SQLite via Node-Builtin node:sqlite (MEMORY_DB_PATH) — lokale Entwicklung
+ * - SQLite via Node-Builtin node:sqlite (OVP_DATABASE_PATH) — lokale Entwicklung
  *   ohne Infrastruktur.
  */
 
@@ -101,7 +101,7 @@ export interface MemoryStore {
   setSlashCommands(commands: SlashCommand[] | null): Promise<void>;
   /**
    * Admin-verwalteter Modell-Katalog (Anzeigenamen für die Extension) — null,
-   * wenn nie konfiguriert (dann gilt die Endpunkt-Liste ∩ MODEL_ALLOWLIST)
+   * wenn nie konfiguriert (dann gilt die Endpunkt-Liste ∩ OVP_MODEL_ALLOWLIST)
    * ODER wenn der gespeicherte Wert nicht mehr dem Schema entspricht.
    */
   getModelCatalog(): Promise<ModelOption[] | null>;

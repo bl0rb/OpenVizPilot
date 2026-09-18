@@ -13,7 +13,7 @@ import type { MemoryStore } from './memory/store';
 /**
  * Effektiver Anmelde-Zustand der Middleware — zur Laufzeit aus zwei Quellen:
  *
- * 1. Env/Helm (AUTH_MODE, OIDC_*, OVP_LICENSE*) als Bootstrap-Defaults.
+ * 1. Env/Helm (OVP_AUTH_MODE, OIDC_*, OVP_LICENSE*) als Bootstrap-Defaults.
  * 2. Admin-UI (Tabelle admin_settings): Modus, OIDC-Client und Lizenz-Token —
  *    überschreiben die Env-Werte, damit ein Admin SSO und Lizenz ohne
  *    Redeploy pflegen kann.
@@ -35,7 +35,7 @@ export interface AuthState {
   license: LicenseStatus;
   /** Rohtoken zur `license` — der Lizenz-Heartbeat (ee/) sendet ihn unverändert. */
   licenseToken: string | null;
-  /** Öffentlicher Origin für die SSO-Redirect-URI (Admin-UI oder PUBLIC_URL). */
+  /** Öffentlicher Origin für die SSO-Redirect-URI (Admin-UI oder OVP_PUBLIC_URL). */
   publicUrl: string | null;
   /**
    * Gesetzt, wenn die Anmeldung nicht betriebsbereit ist — die API bleibt dann
@@ -133,7 +133,7 @@ export function createAuthStateProvider(config: AppConfig, store: MemoryStore | 
         blockedReason = 'Single Sign-On ist nicht konfiguriert (Issuer und Client-ID fehlen).';
       } else if (!publicUrl) {
         // Die Redirect-URI darf nie aus dem Host-Header des Requests entstehen.
-        blockedReason = 'Single Sign-On braucht die öffentliche URL der Middleware (Admin-UI oder PUBLIC_URL).';
+        blockedReason = 'Single Sign-On braucht die öffentliche URL der Middleware (Admin-UI oder OVP_PUBLIC_URL).';
       } else {
         oidc = oidcClientFor(oidcSettings);
       }

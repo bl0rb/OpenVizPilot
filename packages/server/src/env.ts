@@ -9,36 +9,98 @@ function emptyAsUnset<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((value) => (value === '' ? undefined : value), schema);
 }
 
+/**
+ * Alte (LiteLLM-Ära) Env-Namen → aktuelle OVP_*-Namen. Die alten Namen
+ * funktionieren als Fallback weiter (siehe applyLegacyEnvFallback unten),
+ * lösen aber beim Start eine Warnung aus. Exportiert, damit Tests die
+ * Zuordnung und den Fallback-Mechanismus prüfen können.
+ */
+export const LEGACY_ENV_NAMES: Record<string, string> = {
+  OVP_LLM_BASE_URL: 'LITELLM_BASE_URL',
+  OVP_LLM_API_KEY: 'LITELLM_API_KEY',
+  OVP_DEFAULT_MODEL: 'DEFAULT_MODEL',
+  OVP_MODEL_ALLOWLIST: 'MODEL_ALLOWLIST',
+  OVP_ALLOWED_ORIGINS: 'ALLOWED_ORIGINS',
+  OVP_SERVE_STATIC_DIR: 'SERVE_STATIC_DIR',
+  OVP_API_AUTH_TOKEN: 'API_AUTH_TOKEN',
+  OVP_ADMIN_TOKEN: 'ADMIN_TOKEN',
+  OVP_DATABASE_URL: 'MEMORY_DATABASE_URL',
+  OVP_DATABASE_PATH: 'MEMORY_DB_PATH',
+  OVP_MEMORY_MODEL: 'MEMORY_MODEL',
+  OVP_SCOPE_GUARD: 'SCOPE_GUARD',
+  OVP_SCOPE_MODEL: 'SCOPE_MODEL',
+  OVP_LOG_LEVEL: 'LOG_LEVEL',
+  OVP_AUTH_MODE: 'AUTH_MODE',
+  OVP_PUBLIC_URL: 'PUBLIC_URL',
+  OVP_OIDC_PROVIDER: 'OIDC_PROVIDER',
+  OVP_OIDC_ISSUER: 'OIDC_ISSUER',
+  OVP_OIDC_CLIENT_ID: 'OIDC_CLIENT_ID',
+  OVP_OIDC_CLIENT_SECRET: 'OIDC_CLIENT_SECRET',
+  OVP_OIDC_SCOPES: 'OIDC_SCOPES',
+  OVP_APP_VERSION: 'APP_VERSION',
+};
+
+/** Kehrrichtung von LEGACY_ENV_NAMES (alter Name → neuer Name), für die Warnmeldung. */
+const LEGACY_ENV_NAMES_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_ENV_NAMES).map(([newName, oldName]) => [oldName, newName]),
+);
+
+/**
+ * Wendet den Fallback auf die alten Env-Namen an: Ist ein neuer Schlüssel
+ * nicht gesetzt (undefined oder leer), aber der alte gesetzt, übernimmt der
+ * neue Name dessen Wert. Ist der neue Schlüssel gesetzt, gewinnt er —
+ * unabhängig vom alten Wert. Gibt zusätzlich zurück, welche alten Namen
+ * tatsächlich als Fallback verwendet wurden (für die Startup-Warnung).
+ */
+function applyLegacyEnvFallback(env: NodeJS.ProcessEnv): {
+  resolved: NodeJS.ProcessEnv;
+  legacyUsed: string[];
+} {
+  const resolved: NodeJS.ProcessEnv = { ...env };
+  const legacyUsed: string[] = [];
+  for (const [newName, oldName] of Object.entries(LEGACY_ENV_NAMES)) {
+    const hasNew = resolved[newName] !== undefined && resolved[newName] !== '';
+    const oldValue = env[oldName];
+    if (!hasNew && oldValue !== undefined && oldValue !== '') {
+      resolved[newName] = oldValue;
+      legacyUsed.push(oldName);
+    }
+  }
+  return { resolved, legacyUsed };
+}
+
 const envSchema = z.object({
-  LITELLM_BASE_URL: z.string().url({ message: 'LITELLM_BASE_URL muss eine gültige URL sein' }),
-  LITELLM_API_KEY: z.string().min(1, 'LITELLM_API_KEY fehlt'),
-  DEFAULT_MODEL: z.string().min(1, 'DEFAULT_MODEL fehlt'),
-  MODEL_ALLOWLIST: z.string().optional(),
+  OVP_LLM_BASE_URL: z.string().url({ message: 'OVP_LLM_BASE_URL muss eine gültige URL sein' }),
+  OVP_LLM_API_KEY: z.string().min(1, 'OVP_LLM_API_KEY fehlt'),
+  OVP_DEFAULT_MODEL: z.string().min(1, 'OVP_DEFAULT_MODEL fehlt'),
+  OVP_MODEL_ALLOWLIST: z.string().optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  ALLOWED_ORIGINS: z.string().optional(),
-  SERVE_STATIC_DIR: z.string().optional(),
-  API_AUTH_TOKEN: z.string().optional(),
-  ADMIN_TOKEN: z.string().optional(),
-  MEMORY_DATABASE_URL: z.string().optional(),
-  MEMORY_DB_PATH: z.string().optional(),
-  MEMORY_MODEL: z.string().optional(),
-  SCOPE_GUARD: z.enum(['on', 'off']).default('on'),
-  SCOPE_MODEL: z.string().optional(),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /** Override für PORT (Plattform-Konvention bleibt PORT, z. B. Kubernetes/Cloud Run). */
+  OVP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  OVP_ALLOWED_ORIGINS: z.string().optional(),
+  OVP_SERVE_STATIC_DIR: z.string().optional(),
+  OVP_API_AUTH_TOKEN: z.string().optional(),
+  OVP_ADMIN_TOKEN: z.string().optional(),
+  OVP_DATABASE_URL: z.string().optional(),
+  OVP_DATABASE_PATH: z.string().optional(),
+  OVP_MEMORY_MODEL: z.string().optional(),
+  OVP_SCOPE_GUARD: z.enum(['on', 'off']).default('on'),
+  OVP_SCOPE_MODEL: z.string().optional(),
+  OVP_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   // --- Enterprise (ee/): Anmeldung & Lizenz ---
   // Leerer Wert = nicht gesetzt. .env.example liefert die Schlüssel bewusst
   // ohne Wert aus; ohne diese Umdeutung scheitert der dokumentierte Erststart
   // („cp .env.example .env") an einem leeren Enum-Wert.
-  AUTH_MODE: emptyAsUnset(z.enum(['none', 'token', 'local', 'oidc']).optional()),
-  PUBLIC_URL: z.string().url().optional().or(z.literal('')),
-  OIDC_PROVIDER: emptyAsUnset(z.enum(['entra', 'keycloak', 'generic']).default('generic')),
-  OIDC_ISSUER: z.string().url().optional().or(z.literal('')),
-  OIDC_CLIENT_ID: z.string().optional(),
-  OIDC_CLIENT_SECRET: z.string().optional(),
-  OIDC_SCOPES: z.string().default('openid profile email'),
+  OVP_AUTH_MODE: emptyAsUnset(z.enum(['none', 'token', 'local', 'oidc']).optional()),
+  OVP_PUBLIC_URL: z.string().url().optional().or(z.literal('')),
+  OVP_OIDC_PROVIDER: emptyAsUnset(z.enum(['entra', 'keycloak', 'generic']).default('generic')),
+  OVP_OIDC_ISSUER: z.string().url().optional().or(z.literal('')),
+  OVP_OIDC_CLIENT_ID: z.string().optional(),
+  OVP_OIDC_CLIENT_SECRET: z.string().optional(),
+  OVP_OIDC_SCOPES: z.string().default('openid profile email'),
   OVP_LICENSE: z.string().optional(),
   /** Produktversion für den Heartbeat (Helm setzt sie aus der Chart-AppVersion). */
-  APP_VERSION: z.string().optional(),
+  OVP_APP_VERSION: z.string().optional(),
   OVP_LICENSE_PATH: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_B64URL: z.string().optional(),
   OVP_LICENSE_PUBLIC_KEY_PATH: z.string().optional(),
@@ -72,14 +134,14 @@ export interface AppConfig {
   /**
    * Serverseitiger Themen-Filter vor dem Haupt-LLM-Call: Off-Topic-Fragen
    * werden abgelehnt, ohne das Hauptmodell aufzurufen (llm/scope-guard.ts).
-   * Default an; SCOPE_GUARD=off schaltet ihn ab.
+   * Default an; OVP_SCOPE_GUARD=off schaltet ihn ab.
    */
   scopeGuardEnabled: boolean;
   /** Modell für den Scope-Guard (Default: memoryModel; günstiges Modell empfohlen). */
   scopeModel: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   /**
-   * Zugriffsschutz für /api/*: 'none' (nur Netzwerk), 'token' (API_AUTH_TOKEN,
+   * Zugriffsschutz für /api/*: 'none' (nur Netzwerk), 'token' (OVP_API_AUTH_TOKEN,
    * Default sobald eines gesetzt ist) oder 'oidc' (Enterprise: Login der
    * Anwender per Single Sign-On, verifizierte Nutzer-ID — braucht eine
    * gültige Lizenz mit Feature "sso", siehe ee/).
@@ -134,55 +196,60 @@ export function loadDotEnv(): void {
 }
 
 export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const parsed = envSchema.safeParse(env);
+  const { resolved, legacyUsed } = applyLegacyEnvFallback(env);
+  if (legacyUsed.length > 0) {
+    const lines = legacyUsed.map((oldName) => `${oldName} ist veraltet — bitte ${LEGACY_ENV_NAMES_REVERSE[oldName]} verwenden`);
+    console.warn(`Veraltete Umgebungsvariablen verwendet:\n  ${lines.join('\n  ')}`);
+  }
+  const parsed = envSchema.safeParse(resolved);
   if (!parsed.success) {
     const details = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Ungültige Konfiguration (.env prüfen, Vorlage: .env.example):\n${details}`);
   }
   const e = parsed.data;
-  const allowlist = splitCsv(e.MODEL_ALLOWLIST);
-  const apiAuthToken = e.API_AUTH_TOKEN?.trim() ? e.API_AUTH_TOKEN.trim() : null;
-  const authMode = e.AUTH_MODE ?? (apiAuthToken ? 'token' : 'none');
+  const allowlist = splitCsv(e.OVP_MODEL_ALLOWLIST);
+  const apiAuthToken = e.OVP_API_AUTH_TOKEN?.trim() ? e.OVP_API_AUTH_TOKEN.trim() : null;
+  const authMode = e.OVP_AUTH_MODE ?? (apiAuthToken ? 'token' : 'none');
   if (authMode === 'token' && !apiAuthToken) {
-    throw new Error('AUTH_MODE=token verlangt ein API_AUTH_TOKEN');
+    throw new Error('OVP_AUTH_MODE=token verlangt ein OVP_API_AUTH_TOKEN');
   }
   // OIDC-Daten dürfen auch später aus der Admin-UI kommen — ohne sie bleibt
   // der Modus fail-closed (auth-state.ts), kein Startabbruch nötig.
   return {
-    litellmBaseUrl: e.LITELLM_BASE_URL.replace(/\/$/, ''),
-    litellmApiKey: e.LITELLM_API_KEY,
-    defaultModel: e.DEFAULT_MODEL,
+    litellmBaseUrl: e.OVP_LLM_BASE_URL.replace(/\/$/, ''),
+    litellmApiKey: e.OVP_LLM_API_KEY,
+    defaultModel: e.OVP_DEFAULT_MODEL,
     modelAllowlist: allowlist.length > 0 ? allowlist : null,
-    port: e.PORT,
-    allowedOrigins: splitCsv(e.ALLOWED_ORIGINS),
-    serveStaticDir: e.SERVE_STATIC_DIR?.trim() ? e.SERVE_STATIC_DIR.trim() : null,
+    port: e.OVP_PORT ?? e.PORT,
+    allowedOrigins: splitCsv(e.OVP_ALLOWED_ORIGINS),
+    serveStaticDir: e.OVP_SERVE_STATIC_DIR?.trim() ? e.OVP_SERVE_STATIC_DIR.trim() : null,
     apiAuthToken,
-    adminToken: e.ADMIN_TOKEN?.trim() ? e.ADMIN_TOKEN.trim() : null,
-    memoryDatabaseUrl: e.MEMORY_DATABASE_URL?.trim() ? e.MEMORY_DATABASE_URL.trim() : null,
-    memoryDbPath: e.MEMORY_DB_PATH?.trim() ? e.MEMORY_DB_PATH.trim() : null,
-    memoryModel: e.MEMORY_MODEL?.trim() ? e.MEMORY_MODEL.trim() : e.DEFAULT_MODEL,
-    scopeGuardEnabled: e.SCOPE_GUARD === 'on',
+    adminToken: e.OVP_ADMIN_TOKEN?.trim() ? e.OVP_ADMIN_TOKEN.trim() : null,
+    memoryDatabaseUrl: e.OVP_DATABASE_URL?.trim() ? e.OVP_DATABASE_URL.trim() : null,
+    memoryDbPath: e.OVP_DATABASE_PATH?.trim() ? e.OVP_DATABASE_PATH.trim() : null,
+    memoryModel: e.OVP_MEMORY_MODEL?.trim() ? e.OVP_MEMORY_MODEL.trim() : e.OVP_DEFAULT_MODEL,
+    scopeGuardEnabled: e.OVP_SCOPE_GUARD === 'on',
     scopeModel:
-      e.SCOPE_MODEL?.trim() ||
-      (e.MEMORY_MODEL?.trim() ? e.MEMORY_MODEL.trim() : e.DEFAULT_MODEL),
-    logLevel: e.LOG_LEVEL,
+      e.OVP_SCOPE_MODEL?.trim() ||
+      (e.OVP_MEMORY_MODEL?.trim() ? e.OVP_MEMORY_MODEL.trim() : e.OVP_DEFAULT_MODEL),
+    logLevel: e.OVP_LOG_LEVEL,
     authMode,
-    publicUrl: e.PUBLIC_URL?.trim() ? e.PUBLIC_URL.trim().replace(/\/$/, '') : null,
+    publicUrl: e.OVP_PUBLIC_URL?.trim() ? e.OVP_PUBLIC_URL.trim().replace(/\/$/, '') : null,
     // OIDC-Defaults aus der Env, sobald Issuer UND Client-ID gesetzt sind —
     // unabhängig vom Modus (die Admin-UI kann später auf SSO umschalten).
-    // Fehlen sie bei AUTH_MODE=oidc, bleibt die API fail-closed (auth-state.ts).
+    // Fehlen sie bei OVP_AUTH_MODE=oidc, bleibt die API fail-closed (auth-state.ts).
     oidc:
-      e.OIDC_ISSUER?.trim() && e.OIDC_CLIENT_ID?.trim()
+      e.OVP_OIDC_ISSUER?.trim() && e.OVP_OIDC_CLIENT_ID?.trim()
         ? {
-            provider: e.OIDC_PROVIDER,
-            issuer: e.OIDC_ISSUER.trim().replace(/\/$/, ''),
-            clientId: e.OIDC_CLIENT_ID.trim(),
-            clientSecret: e.OIDC_CLIENT_SECRET?.trim() ? e.OIDC_CLIENT_SECRET.trim() : null,
-            scopes: e.OIDC_SCOPES.trim() || 'openid profile email',
+            provider: e.OVP_OIDC_PROVIDER,
+            issuer: e.OVP_OIDC_ISSUER.trim().replace(/\/$/, ''),
+            clientId: e.OVP_OIDC_CLIENT_ID.trim(),
+            clientSecret: e.OVP_OIDC_CLIENT_SECRET?.trim() ? e.OVP_OIDC_CLIENT_SECRET.trim() : null,
+            scopes: e.OVP_OIDC_SCOPES.trim() || 'openid profile email',
           }
         : null,
     telemetryEndpoint: HEARTBEAT_ENDPOINT,
-    appVersion: e.APP_VERSION?.trim() || 'unbekannt',
+    appVersion: e.OVP_APP_VERSION?.trim() || 'unbekannt',
     licenseEnv: {
       OVP_LICENSE: e.OVP_LICENSE,
       OVP_LICENSE_PATH: e.OVP_LICENSE_PATH,

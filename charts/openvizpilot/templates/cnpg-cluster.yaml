@@ -2,7 +2,7 @@
 # CloudNativePG-Cluster für das User-Memory. Voraussetzung: der
 # CloudNativePG-Operator ist im Cluster installiert (CRD postgresql.cnpg.io).
 # Der Operator erzeugt das App-Secret "<name>-app" mit dem Key "uri",
-# das im Deployment als MEMORY_DATABASE_URL referenziert wird.
+# das im Deployment als OVP_DATABASE_URL referenziert wird.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

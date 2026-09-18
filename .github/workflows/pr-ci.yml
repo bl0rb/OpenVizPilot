@@ -62,8 +62,8 @@ jobs:
       - name: Smoke-run image
         run: |
           docker run -d --name tchat \
-            -e LITELLM_BASE_URL=http://localhost:9 -e LITELLM_API_KEY=sk-ci \
-            -e DEFAULT_MODEL=m -e MEMORY_DB_PATH=/tmp/memory.db \
+            -e OVP_LLM_BASE_URL=http://localhost:9 -e OVP_LLM_API_KEY=sk-ci \
+            -e OVP_DEFAULT_MODEL=m -e OVP_DATABASE_PATH=/tmp/memory.db \
             -p 3000:3000 openvizpilot:ci
           trap 'docker rm -f tchat' EXIT
           ok=""
@@ -93,33 +93,33 @@ jobs:
         # die required/fail-Guards prüft der Negativ-Render-Check unten.
         run: |
           helm lint charts/openvizpilot \
-            --set litellm.baseUrl=http://litellm:4000 \
-            --set litellm.apiKey=ci-render-check \
+            --set llm.baseUrl=http://litellm:4000 \
+            --set llm.apiKey=ci-render-check \
             --set app.defaultModel=test-model
 
       - name: Render Helm chart (CNPG-Memory, Default)
         run: |
           helm template test charts/openvizpilot \
-            --set litellm.baseUrl=http://litellm:4000 \
-            --set litellm.apiKey=ci-render-check \
+            --set llm.baseUrl=http://litellm:4000 \
+            --set llm.apiKey=ci-render-check \
             --set app.defaultModel=test-model > /dev/null
 
       - name: Render Helm chart (externes Postgres + Ingress)
         run: |
           helm template test charts/openvizpilot \
-            --set litellm.apiKeySecret.existingSecret=litellm-secret \
-            --set litellm.baseUrl=http://litellm:4000 \
+            --set llm.apiKeySecret.existingSecret=litellm-secret \
+            --set llm.baseUrl=http://litellm:4000 \
             --set app.defaultModel=test-model \
             --set memory.database.mode=external \
             --set memory.database.external.existingSecret=memory-db \
             --set ingress.enabled=true \
             --set ingress.host=chat.example.com > /dev/null
 
-      - name: Render Helm chart fails without LiteLLM key
+      - name: Render Helm chart fails without LLM key
         run: |
           if helm template test charts/openvizpilot \
-               --set litellm.baseUrl=http://litellm:4000 \
+               --set llm.baseUrl=http://litellm:4000 \
                --set app.defaultModel=test-model > /dev/null 2>&1; then
-            echo "expected render to fail without litellm.apiKey/apiKeySecret"
+            echo "expected render to fail without llm.apiKey/apiKeySecret"
             exit 1
           fi

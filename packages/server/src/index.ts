@@ -16,7 +16,7 @@ const { app, logger } = createApp(config);
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   logger.info(`Middleware läuft auf http://localhost:${info.port}`, {
-    litellm: config.litellmBaseUrl,
+    llmBaseUrl: config.litellmBaseUrl,
     defaultModel: config.defaultModel,
     staticDir: config.serveStaticDir ?? undefined,
   });

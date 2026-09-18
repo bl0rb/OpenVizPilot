@@ -228,7 +228,7 @@ describe('chat model validation with catalog', () => {
     expect(chatBodies[0]!.model).toBe('claude-sonnet-5');
   });
 
-  it('accepts catalog models and rejects everything else — the catalog overrides MODEL_ALLOWLIST', async () => {
+  it('accepts catalog models and rejects everything else — the catalog overrides OVP_MODEL_ALLOWLIST', async () => {
     const { app } = createApp(testConfig({ modelAllowlist: ['gpt-5'] }));
     await putCatalog(app, CATALOG);
 

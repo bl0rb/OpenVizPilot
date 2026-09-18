@@ -7,7 +7,7 @@ import type { MemoryStore } from '../memory/store';
  * Öffentlicher Read-Endpoint für die zentral (Admin-UI) verwalteten
  * Slash-Befehle — von der Extension beim Start geladen (siehe
  * extension/src/chat/commands-client.ts). Läuft unter dem normalen
- * API_AUTH_TOKEN-Regime wie /api/chat (siehe app.ts), NICHT unter dem
+ * OVP_API_AUTH_TOKEN-Regime wie /api/chat (siehe app.ts), NICHT unter dem
  * separaten Admin-Token.
  *
  * Fällt bei jedem Fehler (Store fehlt, Datenbank nicht erreichbar,

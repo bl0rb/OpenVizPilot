@@ -79,7 +79,7 @@ describe('admin presentation', () => {
   });
 
   it('allows the embedded font only on admin, without opening external font origins', async () => {
-    const instance = createApp({ ...loadEnv({ LITELLM_BASE_URL: 'http://localhost:9', LITELLM_API_KEY: 'test', DEFAULT_MODEL: 'test', ADMIN_TOKEN: 'test-admin', MEMORY_ENABLED: 'false' }), telemetryEndpoint: '' });
+    const instance = createApp({ ...loadEnv({ OVP_LLM_BASE_URL: 'http://localhost:9', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test', OVP_ADMIN_TOKEN: 'test-admin', MEMORY_ENABLED: 'false' }), telemetryEndpoint: '' });
     try {
       const response = await instance.app.request('/admin');
       expect(response.status).toBe(200);

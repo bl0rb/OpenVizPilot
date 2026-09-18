@@ -40,7 +40,7 @@ export interface AgentCallbacks {
 export interface AgentDeps {
   /** '' = gleicher Origin (Dev-Proxy bzw. Prod-Serving durch die Middleware). */
   backendUrl: string;
-  /** Optionaler Auth-Token der Middleware (API_AUTH_TOKEN). */
+  /** Optionaler Auth-Token der Middleware (OVP_API_AUTH_TOKEN). */
   apiToken?: string;
   model?: string;
   /** Obfuskierte Tableau-User-ID für das serverseitige User-Memory. */

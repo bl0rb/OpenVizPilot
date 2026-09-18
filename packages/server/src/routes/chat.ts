@@ -55,7 +55,7 @@ export function classifyUpstreamError(status: number | undefined, raw: string): 
  *
  * Der Admin-Katalog ist maßgeblich für BEIDE Pfade: explizite Modellwahl
  * (nur Katalog-IDs erlaubt) und den Default-Pfad (schließt der Katalog das
- * konfigurierte DEFAULT_MODEL aus, gilt sein ERSTER Eintrag als effektives
+ * konfigurierte OVP_DEFAULT_MODEL aus, gilt sein ERSTER Eintrag als effektives
  * Standard-Modell — identisch zur Anzeige in GET /api/models). Konnte der
  * Katalog nicht gelesen werden (DB-Fehler), gilt FAIL-CLOSED: erlaubt sind
  * nur Env-Allowlist bzw. das Default-Modell — nie "alles".

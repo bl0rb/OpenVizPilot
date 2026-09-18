@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Anmeldung an der Middleware — Vertrag zwischen Extension, Server und
  * Admin-UI.
  *
- * Modi: 'none' (nur Netzwerkschutz), 'token' (API_AUTH_TOKEN, nur per Env),
+ * Modi: 'none' (nur Netzwerkschutz), 'token' (OVP_API_AUTH_TOKEN, nur per Env),
  * 'local' (Benutzerkonten aus der Admin-UI — Open Core) und 'oidc'
  * (Single Sign-On per Entra ID/Keycloak — Enterprise, lizenzpflichtig).
  */

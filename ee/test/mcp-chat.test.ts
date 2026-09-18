@@ -26,7 +26,7 @@ describe('MCP chat integration', () => {
       yield { choices: [{ delta: {}, finish_reason: 'tool_calls' }] };
     });
     const client = { chat: { completions: { create } } } as unknown as OpenAI;
-    const config = loadEnv({ LITELLM_BASE_URL: 'http://localhost:9', LITELLM_API_KEY: 'test', DEFAULT_MODEL: 'test', SCOPE_GUARD: 'off' });
+    const config = loadEnv({ OVP_LLM_BASE_URL: 'http://localhost:9', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test', OVP_SCOPE_GUARD: 'off' });
     const app = new Hono<AuthVariables>();
     app.use('*', async (context, next) => { context.set('authUser', 'alice'); await next(); });
     app.route('/chat', createChatRoute(config, createLogger('error'), client, null, null, hasFeature, service));

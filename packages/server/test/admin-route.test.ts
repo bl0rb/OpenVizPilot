@@ -53,13 +53,13 @@ afterEach(() => {
 });
 
 describe('GET /admin', () => {
-  it('404s when no ADMIN_TOKEN is configured', async () => {
+  it('404s when no OVP_ADMIN_TOKEN is configured', async () => {
     const { app } = createApp(testConfig());
     const res = await app.request('/admin');
     expect(res.status).toBe(404);
   });
 
-  it('serves the admin page HTML when ADMIN_TOKEN is configured', async () => {
+  it('serves the admin page HTML when OVP_ADMIN_TOKEN is configured', async () => {
     const { app } = createApp(testConfig({ adminToken: 'geheim' }));
     const res = await app.request('/admin');
     expect(res.status).toBe(200);
@@ -70,13 +70,13 @@ describe('GET /admin', () => {
 });
 
 describe('/api/admin/*', () => {
-  it('404s on every sub-route when neither ADMIN_TOKEN nor a store is configured', async () => {
+  it('404s on every sub-route when neither OVP_ADMIN_TOKEN nor a store is configured', async () => {
     const { app } = createApp(testConfig());
     const res = await app.request('/api/admin/commands', { headers: { authorization: 'Bearer irrelevant' } });
     expect(res.status).toBe(404);
   });
 
-  it('401s (password mode active) when a store exists without an ADMIN_TOKEN', async () => {
+  it('401s (password mode active) when a store exists without an OVP_ADMIN_TOKEN', async () => {
     const { app } = createApp(testConfig({ memoryDbPath: tmpDbPath() }));
     const res = await app.request('/api/admin/commands', { headers: { authorization: 'Bearer irrelevant' } });
     expect(res.status).toBe(401);
@@ -92,16 +92,16 @@ describe('/api/admin/*', () => {
     expect(wrongAuth.status).toBe(401);
   });
 
-  it('is exempt from API_AUTH_TOKEN — only the admin token is checked', async () => {
+  it('is exempt from OVP_API_AUTH_TOKEN — only the admin token is checked', async () => {
     const { app } = createApp(
       testConfig({ adminToken: 'admin-geheim', apiAuthToken: 'api-geheim', memoryDbPath: tmpDbPath() }),
     );
-    // Der API_AUTH_TOKEN allein reicht NICHT für /api/admin/*:
+    // Der OVP_API_AUTH_TOKEN allein reicht NICHT für /api/admin/*:
     const withApiToken = await app.request('/api/admin/commands', {
       headers: { authorization: 'Bearer api-geheim' },
     });
     expect(withApiToken.status).toBe(401);
-    // Der Admin-Token allein reicht (ohne API_AUTH_TOKEN mitzuschicken):
+    // Der Admin-Token allein reicht (ohne OVP_API_AUTH_TOKEN mitzuschicken):
     const withAdminToken = await app.request('/api/admin/commands', {
       headers: { authorization: 'Bearer admin-geheim' },
     });
@@ -213,7 +213,7 @@ describe('GET /api/commands', () => {
       body: JSON.stringify(custom),
     });
 
-    // Öffentliche Route läuft unter API_AUTH_TOKEN, nicht ADMIN_TOKEN — hier keins konfiguriert.
+    // Öffentliche Route läuft unter OVP_API_AUTH_TOKEN, nicht OVP_ADMIN_TOKEN — hier keins konfiguriert.
     const { app } = createApp(testConfig({ memoryDbPath: dbPath }));
     const res = await app.request('/api/commands');
     const body = (await res.json()) as { commands: unknown[] };

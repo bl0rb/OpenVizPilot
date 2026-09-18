@@ -41,7 +41,7 @@ Erwartung: SSE-Events `delta` … `done`. Die Frage muss Dashboard-Bezug haben �
 
 ## 3. Tableau Desktop (echte Extensions API)
 
-1. `npm run dev` (echter LLM-Endpunkt laut `.env`) — **oder ohne API-Key**: `npm run dev:claude` nutzt die lokal angemeldete Claude Code CLI als LLM (`.env`: `LITELLM_BASE_URL=http://localhost:4020`; Latenz einige Sekunden pro Runde, nur für lokales Testen).
+1. `npm run dev` (echter LLM-Endpunkt laut `.env`) — **oder ohne API-Key**: `npm run dev:claude` nutzt die lokal angemeldete Claude Code CLI als LLM (`.env`: `OVP_LLM_BASE_URL=http://localhost:4020`; Latenz einige Sekunden pro Runde, nur für lokales Testen).
 2. Beispiel-Workbook (z. B. Superstore) öffnen, Dashboard → Objekt „Erweiterung“ aufs Dashboard ziehen → `packages/extension/public/openvizpilot.dev.trex` laden → Laufzeit-Prompt bestätigen. **Nicht** das über die Admin-UI heruntergeladene Manifest verwenden — das zeigt auf die Middleware (Port 3000), die im Dev-Betrieb keine Extension ausliefert (404 im Extension-Rahmen); die Extension kommt im Dev vom Vite-Server (5173).
 3. Fragen wie in Schritt 2; zusätzlich:
    - Marks im Dashboard selektieren → Hinweis „Auswahl in ‚X' auswerten" über dem Eingabefeld; Klick → `get_selected_marks` liefert die Selektion. Der Kontext-Hinweis „Dashboard geändert" darf dabei **nicht** erscheinen.

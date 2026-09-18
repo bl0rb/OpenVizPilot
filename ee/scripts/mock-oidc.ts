@@ -5,9 +5,9 @@
  */
 import { startMockOidc } from '../test/mock-oidc-server';
 
-const port = Number(process.env.MOCK_OIDC_PORT ?? 4030);
-const clientId = process.env.OIDC_CLIENT_ID ?? 'openvizpilot-dev';
+const port = Number(process.env.OVP_MOCK_OIDC_PORT ?? 4030);
+const clientId = process.env.OVP_OIDC_CLIENT_ID ?? 'openvizpilot-dev';
 const mock = await startMockOidc({ clientId, port });
 console.log(`[mock-oidc] Issuer: ${mock.issuer}`);
-console.log(`[mock-oidc] .env: AUTH_MODE=oidc OIDC_PROVIDER=generic OIDC_ISSUER=${mock.issuer} OIDC_CLIENT_ID=${clientId}`);
+console.log(`[mock-oidc] .env: OVP_AUTH_MODE=oidc OVP_OIDC_PROVIDER=generic OVP_OIDC_ISSUER=${mock.issuer} OVP_OIDC_CLIENT_ID=${clientId}`);
 console.log('[mock-oidc] Lizenz: npm run sign-license -w @openvizpilot/ee -- keygen ./keys && … sign ./keys/private.pem "Dev" 2030-12-31');

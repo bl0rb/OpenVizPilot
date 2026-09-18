@@ -44,7 +44,7 @@ persönliche Anmeldung, explizite Site-Mitgliedschaften und eine eigene `mcp`-Fr
 Einrichtung, Secret-Referenzen und Grenzen der Site-Zuordnung: [MCP-Dokumentation](mcp.md).
 
 Ohne Anmeldung kann jeder, der die Middleware im Netz erreicht, `/api/chat` aufrufen — mit
-`API_AUTH_TOKEN` schützt nur ein geteiltes Geheimnis, das im Workbook liegt. Im OIDC-Modus meldet
+`OVP_API_AUTH_TOKEN` schützt nur ein geteiltes Geheimnis, das im Workbook liegt. Im OIDC-Modus meldet
 sich **jeder Anwender in der Extension** mit seinem Firmenkonto an; die Middleware verifiziert das
 ID-Token des Identity-Providers bei jedem Request und nutzt dessen `sub` als vertrauenswürdige
 Nutzer-ID für Memory, Präferenzen und Statistik (statt der client-asserted Tableau-ID).
@@ -67,7 +67,7 @@ Alles Folgende lässt sich ohne Redeploy in der Admin-UI (`/admin`) im Abschnitt
 Keycloak / generisch) mit Issuer, Client-ID, optionalem Client-Secret und Scopes sowie der
 Lizenzschlüssel. „Prüfen & speichern“ verifiziert die Lizenzsignatur und lehnt Single Sign-On ohne
 gültige SSO-Lizenz ab; gespeicherte Werte gelten sofort für alle Replicas und überschreiben die
-Env-Defaults (`AUTH_MODE`, `OIDC_*`, `OVP_LICENSE`). Secrets und Token werden nie zurückgegeben,
+Env-Defaults (`OVP_AUTH_MODE`, `OVP_OIDC_*`, `OVP_LICENSE`). Secrets und Token werden nie zurückgegeben,
 nur als „vorhanden“ angezeigt.
 
 Für die Core-Edition gibt es daneben den Modus **„Benutzerkonten“**: Der Admin legt im Abschnitt
@@ -78,7 +78,7 @@ Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der W
 
 - Enterprise-Lizenz mit Feature `sso` (siehe unten).
 - Die Middleware liefert die Extension aus (Same-Origin) und ist per HTTPS unter einer festen URL erreichbar.
-  Diese **öffentliche URL** muss bekannt sein (Feld in der Admin-UI oder `PUBLIC_URL`): Aus ihr entsteht die
+  Diese **öffentliche URL** muss bekannt sein (Feld in der Admin-UI oder `OVP_PUBLIC_URL`): Aus ihr entsteht die
   Redirect-URI `<URL>/auth/callback`; sie wird bewusst nie aus dem Host-Header eines Requests abgeleitet.
   Ohne sie bleibt SSO blockiert.
 - Tableau: Popups aus der Extension müssen erlaubt sein (Standard in Tableau Server/Cloud und Desktop).
@@ -88,17 +88,17 @@ Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der W
 1. **App-Registrierung** anlegen (Entra Admin Center → App registrations → New registration).
 2. Plattform **Single-page application** (public client, PKCE) mit Redirect-URI
    `https://<middleware>/auth/callback`. Alternativ **Web** + Client-Secret (confidential client) —
-   dann `OIDC_CLIENT_SECRET` setzen.
+   dann `OVP_OIDC_CLIENT_SECRET` setzen.
 3. Unter *Token configuration* optional die Claims `email` und `name` ergänzen (für die Anzeige).
 4. Werte:
 
 ```env
-AUTH_MODE=oidc
-OIDC_PROVIDER=entra
-OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0
-OIDC_CLIENT_ID=<application-(client)-id>
-OIDC_SCOPES=openid profile email
-PUBLIC_URL=https://<middleware>
+OVP_AUTH_MODE=oidc
+OVP_OIDC_PROVIDER=entra
+OVP_OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0
+OVP_OIDC_CLIENT_ID=<application-(client)-id>
+OVP_OIDC_SCOPES=openid profile email
+OVP_PUBLIC_URL=https://<middleware>
 ```
 
 Der Issuer muss exakt dem `iss` der v2.0-Tokens entsprechen (Tenant-ID, Suffix `/v2.0`).
@@ -106,18 +106,18 @@ Der Issuer muss exakt dem `iss` der v2.0-Tokens entsprechen (Tenant-ID, Suffix `
 ## Keycloak
 
 1. Im Realm einen **Client** anlegen: Client type *OpenID Connect*, *Standard flow* an,
-   *Client authentication* aus (public client + PKCE) — oder an, dann `OIDC_CLIENT_SECRET` setzen.
+   *Client authentication* aus (public client + PKCE) — oder an, dann `OVP_OIDC_CLIENT_SECRET` setzen.
 2. *Valid redirect URIs*: `https://<middleware>/auth/callback`; *Web origins*: `https://<middleware>`.
 3. Unter *Advanced* → *Proof Key for Code Exchange Code Challenge Method*: `S256`.
 4. Werte:
 
 ```env
-AUTH_MODE=oidc
-OIDC_PROVIDER=keycloak
-OIDC_ISSUER=https://<keycloak>/realms/<realm>
-OIDC_CLIENT_ID=<client-id>
-OIDC_SCOPES=openid profile email
-PUBLIC_URL=https://<middleware>
+OVP_AUTH_MODE=oidc
+OVP_OIDC_PROVIDER=keycloak
+OVP_OIDC_ISSUER=https://<keycloak>/realms/<realm>
+OVP_OIDC_CLIENT_ID=<client-id>
+OVP_OIDC_SCOPES=openid profile email
+OVP_PUBLIC_URL=https://<middleware>
 ```
 
 ## Voraussetzung für Personalisierung
@@ -161,7 +161,7 @@ oidc:
   clientId: <client-id>
   clientSecretSecret:            # nur confidential clients
     existingSecret: openvizpilot-oidc
-    key: OIDC_CLIENT_SECRET
+    key: OVP_OIDC_CLIENT_SECRET
 license:
   existingSecret: openvizpilot-license   # Key OVP_LICENSE
   publicKeyB64url: <32 Bytes base64url>
@@ -195,8 +195,8 @@ Personalisierung weiterlaufen soll; `GET /api/features` zeigt, was gerade aktiv 
 ## Lokal ausprobieren
 
 `npm run dev:demo:sso` startet zusätzlich einen Mock-Identity-Provider (Port 4030, Auto-Login als
-„Anna Beispiel“). Dazu in der `.env`: `AUTH_MODE=oidc`, `OIDC_PROVIDER=generic`,
-`OIDC_ISSUER=http://127.0.0.1:4030`, `OIDC_CLIENT_ID=openvizpilot-dev`, `PUBLIC_URL=http://localhost:3000`
-sowie eine Dev-Lizenz (siehe oben) — alternativ alles in der Admin-UI eintragen. `PUBLIC_URL` muss auf
-die **Middleware** zeigen, nicht auf den Vite-Dev-Server: Die Redirect-URI `<PUBLIC_URL>/auth/callback`
+„Anna Beispiel“). Dazu in der `.env`: `OVP_AUTH_MODE=oidc`, `OVP_OIDC_PROVIDER=generic`,
+`OVP_OIDC_ISSUER=http://127.0.0.1:4030`, `OVP_OIDC_CLIENT_ID=openvizpilot-dev`, `OVP_PUBLIC_URL=http://localhost:3000`
+sowie eine Dev-Lizenz (siehe oben) — alternativ alles in der Admin-UI eintragen. `OVP_PUBLIC_URL` muss auf
+die **Middleware** zeigen, nicht auf den Vite-Dev-Server: Die Redirect-URI `<OVP_PUBLIC_URL>/auth/callback`
 wird von der Middleware ausgeliefert (Port 3000).

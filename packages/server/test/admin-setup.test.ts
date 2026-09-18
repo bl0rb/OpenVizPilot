@@ -134,7 +134,7 @@ describe('first-run admin setup (password mode)', () => {
     }
   });
 
-  it('serves /admin without an ADMIN_TOKEN when a store exists', async () => {
+  it('serves /admin without an OVP_ADMIN_TOKEN when a store exists', async () => {
     const { app } = createApp(passwordModeConfig());
     const res = await app.request('/admin');
     expect(res.status).toBe(200);

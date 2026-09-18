@@ -44,3 +44,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "openvizpilot.dbClusterName" -}}
 {{ printf "%s-db" (include "openvizpilot.fullname" . | trunc 55 | trimSuffix "-") }}
 {{- end -}}
+
+{{/* Guard gegen das umbenannte litellm.*-Values-Schema (jetzt llm.*). Am
+     Anfang jedes Templates mit eigenen required/fail-Checks aufrufen, damit
+     die Meldung unabhängig von der Render-Reihenfolge zuerst erscheint. */}}
+{{- define "openvizpilot.checkLegacyLitellmValues" -}}
+{{- if .Values.litellm }}{{ fail "litellm.* wurde in llm.* umbenannt (siehe README, Configuration from a vault)" }}{{ end }}
+{{- end -}}

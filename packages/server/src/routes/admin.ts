@@ -55,19 +55,19 @@ import { resolveUserAccess } from '../user-access';
  * Admin-API: zentrale Verwaltung der Slash-Befehle, Manifest-Download und
  * Einsicht in die anonyme Nutzungsstatistik — Gegenstück zur Admin-UI unter
  * GET /admin (admin-page.ts). Vom Shared-Token für /api/chat & Co.
- * (API_AUTH_TOKEN) unabhängig — siehe app.ts, wo /api/admin/* explizit von
- * der API_AUTH_TOKEN-Middleware ausgenommen wird.
+ * (OVP_API_AUTH_TOKEN) unabhängig — siehe app.ts, wo /api/admin/* explizit von
+ * der OVP_API_AUTH_TOKEN-Middleware ausgenommen wird.
  *
  * Zwei Betriebsarten (auth-status meldet den Modus an die UI):
- * - **Token-Modus** (ADMIN_TOKEN gesetzt): statisches Bearer-Token wie
+ * - **Token-Modus** (OVP_ADMIN_TOKEN gesetzt): statisches Bearer-Token wie
  *   bisher; Setup/Login sind deaktiviert.
- * - **Passwort-Modus** (kein ADMIN_TOKEN, aber Memory-Store vorhanden):
+ * - **Passwort-Modus** (kein OVP_ADMIN_TOKEN, aber Memory-Store vorhanden):
  *   Beim ERSTEN Zugriff legt der Anwender das Admin-Passwort selbst an
  *   (POST /setup, einmalig und race-sicher), danach Login mit Passwort und
  *   DB-gestützten Sessions (multi-replica-fähig) samt Lockout gegen
  *   Brute-Force — Muster wie in PaddleDoc.
  *
- * Ohne ADMIN_TOKEN UND ohne Store ist die gesamte Route deaktiviert (404) —
+ * Ohne OVP_ADMIN_TOKEN UND ohne Store ist die gesamte Route deaktiviert (404) —
  * die Admin-Funktionalität existiert dann faktisch nicht.
  *
  * Rollen: Token bzw. Admin-Konto sind der **initiale Admin**. Zusätzlich (in
@@ -231,7 +231,7 @@ export function createAdminRoute(
     ),
     async (c) => {
       if (tokenMode) {
-        return c.json({ error: 'Dieser Server nutzt ein statisches ADMIN_TOKEN' }, 400);
+        return c.json({ error: 'Dieser Server nutzt ein statisches OVP_ADMIN_TOKEN' }, 400);
       }
       const { password } = c.req.valid('json');
       if (password.length < MIN_ADMIN_PASSWORD_CHARS) {
@@ -273,7 +273,7 @@ export function createAdminRoute(
     ),
     async (c) => {
       if (tokenMode) {
-        return c.json({ error: 'Dieser Server nutzt ein statisches ADMIN_TOKEN' }, 400);
+        return c.json({ error: 'Dieser Server nutzt ein statisches OVP_ADMIN_TOKEN' }, 400);
       }
       const { password } = c.req.valid('json');
       try {
@@ -488,7 +488,7 @@ export function createAdminRoute(
 
   /**
    * Modell-Lookup für die Admin-UI: rohe, UNGEFILTERTE Liste des Endpunkts
-   * (ohne MODEL_ALLOWLIST) — der Admin sieht alles, was der Endpunkt meldet,
+   * (ohne OVP_MODEL_ALLOWLIST) — der Admin sieht alles, was der Endpunkt meldet,
    * und wählt daraus die Katalog-Einträge.
    */
   app.get('/upstream-models', async (c) => {
@@ -568,7 +568,7 @@ export function createAdminRoute(
     oidc: authSettingsSchema.shape.oidc.unwrap().extend({ clientSecret: z.string().max(500).optional() }).optional(),
     /** '' = Lizenz entfernen, undefined = unverändert lassen. */
     license: z.string().max(8000).optional(),
-    /** '' = auf PUBLIC_URL (Env) zurückfallen. */
+    /** '' = auf OVP_PUBLIC_URL (Env) zurückfallen. */
     publicUrl: z.union([z.literal(''), z.string().url().max(500)]).optional(),
   });
 

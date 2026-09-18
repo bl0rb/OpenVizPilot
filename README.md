@@ -27,7 +27,7 @@ For dashboard users
 - Personal context: an author-managed glossary for everyone; with an Enterprise license also user memory (name/preferences, visible and deletable by the user) and saved queries — answer-focus onboarding plus up to 5 standard questions per dashboard.
 - Slash commands: German and English prompt playbooks (for example `/summary` and `/compare`) with a picker menu in the chat.
 
-For administrators (`/admin` — the first visitor sets the admin password on first access, in a PaddleDoc-style flow; a static `ADMIN_TOKEN` also works; that initial admin can grant the **Admin** role to user accounts or SSO identities, which then sign in to `/admin` with their own account but cannot grant the role themselves)
+For administrators (`/admin` — the first visitor sets the admin password on first access, in a PaddleDoc-style flow; a static `OVP_ADMIN_TOKEN` also works; that initial admin can grant the **Admin** role to user accounts or SSO identities, which then sign in to `/admin` with their own account but cannot grant the role themselves)
 
 - Extension manifest download: enter the public HTTPS URL, get the ready-made `openvizpilot.trex`; the extension then talks to the origin it was loaded from, and nothing else has to be configured.
 - Model catalog: look up the models your endpoint offers and map them to friendly display names shown in the extension; the catalog is enforced on the chat endpoint.
@@ -39,7 +39,7 @@ For administrators (`/admin` — the first visitor sets the admin password on fi
 
 Built-in guardrails
 
-- Topic guard: a cheap classifier model checks every question server-side before the main LLM call; off-topic questions are refused without ever reaching the main model (`SCOPE_GUARD`, enabled by default) — on top of the scope rule in the system prompt.
+- Topic guard: a cheap classifier model checks every question server-side before the main LLM call; off-topic questions are refused without ever reaching the main model (`OVP_SCOPE_GUARD`, enabled by default) — on top of the scope rule in the system prompt.
 - Data isolation: see below — the middleware has no Tableau identity at all.
 
 ## How it works
@@ -103,7 +103,7 @@ Without a license the core runs unchanged, only without personalization and acti
 
 Both need a user identity from Tableau (`uniqueUserId`, Extensions API 1.11), so they require Tableau 2023.2 or newer — on older versions the extension still runs, and the settings panel explains why the personal sections are missing instead of hiding them silently.
 
-The middleware can remember personal facts per user (name, role, preferred views/formats) to personalize dashboard answers — identified via the obfuscated `uniqueUserId` of the Extensions API, stored in Postgres (on EKS via CloudNativePG; locally SQLite via `MEMORY_DB_PATH`). A cheap model (`MEMORY_MODEL`) extracts the facts after each turn exclusively from the user’s messages — dashboard data and metrics never reach the extraction, and the prompt additionally forbids storing them. The topical scope stays strict: the assistant only answers dashboard questions. Users can view and delete their stored facts themselves in the settings panel (`GET`/`DELETE /api/memory`).
+The middleware can remember personal facts per user (name, role, preferred views/formats) to personalize dashboard answers — identified via the obfuscated `uniqueUserId` of the Extensions API, stored in Postgres (on EKS via CloudNativePG; locally SQLite via `OVP_DATABASE_PATH`). A cheap model (`OVP_MEMORY_MODEL`) extracts the facts after each turn exclusively from the user’s messages — dashboard data and metrics never reach the extraction, and the prompt additionally forbids storing them. The topical scope stays strict: the assistant only answers dashboard questions. Users can view and delete their stored facts themselves in the settings panel (`GET`/`DELETE /api/memory`).
 
 Saved queries are the second half: the answer focus a user picks for a dashboard and the standard questions they keep as start chips, stored per (user, dashboard) and served through `GET`/`PUT /api/memory/prefs`.
 
@@ -123,7 +123,7 @@ Every user can only query data they can see in Tableau. All data access runs cli
 
 ```bash
 npm install
-cp .env.example .env   # set LITELLM_BASE_URL, LITELLM_API_KEY, DEFAULT_MODEL
+cp .env.example .env   # set OVP_LLM_BASE_URL, OVP_LLM_API_KEY, OVP_DEFAULT_MODEL
 ```
 
 | Command | Purpose |
@@ -131,7 +131,7 @@ cp .env.example .env   # set LITELLM_BASE_URL, LITELLM_API_KEY, DEFAULT_MODEL
 | `npm run dev` | Middleware (:3000) + extension (:5173) — for Tableau Desktop |
 | `npm run dev:mock` | Same, but with a mock dashboard in the browser (no Tableau) |
 | `npm run dev:demo` | Like `dev:mock`, plus a mock LLM server (:4010) — no LLM endpoint at all |
-| `npm run dev:claude` | For Tableau Desktop, answers via the locally signed-in Claude Code CLI (:4020) — a real LLM without an API key (`.env`: `LITELLM_BASE_URL=http://localhost:4020`) |
+| `npm run dev:claude` | For Tableau Desktop, answers via the locally signed-in Claude Code CLI (:4020) — a real LLM without an API key (`.env`: `OVP_LLM_BASE_URL=http://localhost:4020`) |
 | `npm test` | All unit/integration tests (vitest) |
 | `npm run typecheck` | TypeScript across all packages |
 | `npm run build` | Production build (server + extension) |
@@ -158,18 +158,18 @@ Details (safelist, HTTPS, access protection, admin modes, memory and usage priva
 
 ### Configuration from a vault (Helm)
 
-The chart never needs a secret in `values.yaml`: every sensitive value is read from an existing Kubernetes Secret (`existingSecret` + `key`), so a vault integration — External Secrets Operator, Vault Agent Injector, Secrets Store CSI — only has to materialise these keys. The plain-text fallbacks (`litellm.apiKey`, `app.authToken`, `app.adminToken`) are for dev/CI only.
+The chart never needs a secret in `values.yaml`: every sensitive value is read from an existing Kubernetes Secret (`existingSecret` + `key`), so a vault integration — External Secrets Operator, Vault Agent Injector, Secrets Store CSI — only has to materialise these keys. The plain-text fallbacks (`llm.apiKey`, `app.authToken`, `app.adminToken`) are for dev/CI only.
 
 **Secrets — keep in the vault**
 
 | Vault key → env var | `values.yaml` | Required | Purpose |
 | --- | --- | --- | --- |
-| `LITELLM_API_KEY` | `litellm.apiKeySecret.{existingSecret,key}` | yes | API key for the OpenAI-compatible LLM endpoint |
-| `API_AUTH_TOKEN` | `app.authTokenSecret.{existingSecret,key}` | `auth.mode=token` | Shared bearer token the extension sends to `/api/*` |
-| `ADMIN_TOKEN` | `app.adminTokenSecret.{existingSecret,key}` | token-mode admin | Initial admin for `/admin`; leave unset with memory enabled for password mode |
-| `OIDC_CLIENT_SECRET` | `oidc.clientSecretSecret.{existingSecret,key}` | confidential OIDC clients | Client secret for Entra ID / Keycloak (public PKCE clients need none) |
+| `OVP_LLM_API_KEY` | `llm.apiKeySecret.{existingSecret,key}` | yes | API key for the OpenAI-compatible LLM endpoint |
+| `OVP_API_AUTH_TOKEN` | `app.authTokenSecret.{existingSecret,key}` | `auth.mode=token` | Shared bearer token the extension sends to `/api/*` |
+| `OVP_ADMIN_TOKEN` | `app.adminTokenSecret.{existingSecret,key}` | token-mode admin | Initial admin for `/admin`; leave unset with memory enabled for password mode |
+| `OVP_OIDC_CLIENT_SECRET` | `oidc.clientSecretSecret.{existingSecret,key}` | confidential OIDC clients | Client secret for Entra ID / Keycloak (public PKCE clients need none) |
 | `OVP_LICENSE` | `license.{existingSecret,key}` | Enterprise | Signed licence key |
-| `MEMORY_DATABASE_URL` | `memory.database.external.{existingSecret,key}` | `memory.database.mode=external` | Postgres URI (`postgresql://user:pass@host:5432/db`); with `mode=cnpg` the operator's `<release>-db-app`/`uri` is used |
+| `OVP_DATABASE_URL` | `memory.database.external.{existingSecret,key}` | `memory.database.mode=external` | Postgres URI (`postgresql://user:pass@host:5432/db`); with `mode=cnpg` the operator's `<release>-db-app`/`uri` is used |
 | `OVP_SECRET_KEY` | `app.secretKeySecret.{existingSecret,key}` | secrets entered in the admin UI | ≥ 32 characters (`openssl rand -hex 32`); encrypts Tableau Connected-App secrets at rest (AES-256-GCM) |
 | `OVP_TABLEAU_<NAME>` | `tableau.secretRefs[]` (`env`, `secretName`, `key`) | env-referenced site secrets | Connected-App secret per Tableau site, referenced by name in the admin UI instead of storing it in the DB |
 | `OVP_MCP_<NAME>` | `mcp.secretRefs[]` (`env`, `secretName`, `key`) | MCP servers with tokens | Bearer token per MCP server, referenced by name in the admin UI |
@@ -178,34 +178,34 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 
 | Env var | `values.yaml` | Purpose |
 | --- | --- | --- |
-| `LITELLM_BASE_URL` | `litellm.baseUrl` | LLM endpoint (required) |
-| `DEFAULT_MODEL`, `MODEL_ALLOWLIST` | `app.defaultModel`, `app.modelAllowlist` | Default model (required) and optional allow-list |
-| `PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
-| `AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
-| `OIDC_PROVIDER`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
+| `OVP_LLM_BASE_URL` | `llm.baseUrl` | LLM endpoint (required) |
+| `OVP_DEFAULT_MODEL`, `OVP_MODEL_ALLOWLIST` | `app.defaultModel`, `app.modelAllowlist` | Default model (required) and optional allow-list |
+| `OVP_PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
+| `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
+| `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
 | `OVP_LICENSE_PUBLIC_KEY_B64URL` | `license.publicKeyB64url` | Public key of the licence issuer |
-| `MEMORY_MODEL` | `memory.model` | Model for memory summaries |
-| `SCOPE_GUARD`, `SCOPE_MODEL` | `app.scopeGuard`, `app.scopeModel` | Off-topic guard and its model |
-| `LOG_LEVEL`, `PORT` | `app.logLevel`, `containerPort` | Logging and container port |
+| `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
+| `OVP_SCOPE_GUARD`, `OVP_SCOPE_MODEL` | `app.scopeGuard`, `app.scopeModel` | Off-topic guard and its model |
+| `OVP_LOG_LEVEL`, `PORT` | `app.logLevel`, `containerPort` | Logging and container port |
 
 Example with one Secret synced from the vault:
 
 ```yaml
 # my-values.yaml
-litellm:
+llm:
   baseUrl: http://litellm.llm.svc.cluster.local:4000
-  apiKeySecret: { existingSecret: openvizpilot-vault, key: LITELLM_API_KEY }
+  apiKeySecret: { existingSecret: openvizpilot-vault, key: OVP_LLM_API_KEY }
 app:
   defaultModel: gpt-4.1
   publicUrl: https://chat.example.com
-  adminTokenSecret: { existingSecret: openvizpilot-vault, key: ADMIN_TOKEN }
+  adminTokenSecret: { existingSecret: openvizpilot-vault, key: OVP_ADMIN_TOKEN }
   secretKeySecret: { existingSecret: openvizpilot-vault, key: OVP_SECRET_KEY }
 auth: { mode: oidc }
 oidc:
   provider: entra
   issuer: https://login.microsoftonline.com/<tenant>/v2.0
   clientId: <client-id>
-  clientSecretSecret: { existingSecret: openvizpilot-vault, key: OIDC_CLIENT_SECRET }
+  clientSecretSecret: { existingSecret: openvizpilot-vault, key: OVP_OIDC_CLIENT_SECRET }
 license:
   existingSecret: openvizpilot-vault
   key: OVP_LICENSE
@@ -214,7 +214,7 @@ memory:
   enabled: true
   database:
     mode: external
-    external: { existingSecret: openvizpilot-vault, key: MEMORY_DATABASE_URL }
+    external: { existingSecret: openvizpilot-vault, key: OVP_DATABASE_URL }
 tableau:
   secretRefs:
     - { env: OVP_TABLEAU_SECRET_SALES, secretName: openvizpilot-vault, key: TABLEAU_SECRET_SALES }

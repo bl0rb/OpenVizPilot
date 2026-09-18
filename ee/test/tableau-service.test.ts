@@ -117,7 +117,7 @@ describe('Tableau persistence and administration', () => {
 
   it('fails closed on malformed requests and unavailable secret references', async () => {
     const f = await fixture();
-    expect((await f.request('PUT', { config: withSite({ secretEnv: 'LITELLM_API_KEY' }), expectedRevision: null })).status).toBe(400);
+    expect((await f.request('PUT', { config: withSite({ secretEnv: 'OVP_LLM_API_KEY' }), expectedRevision: null })).status).toBe(400);
     vi.stubEnv('OVP_TABLEAU_TEST_SECRET', '');
     expect((await f.request('PUT', { config: input, expectedRevision: null })).status).toBe(400);
     expect((await f.request('DELETE', {})).status).toBe(400);

@@ -4,7 +4,7 @@
 // (ein CLI-Prozess pro Request, mehrere Sekunden Latenz).
 //
 // Start:  node packages/server/scripts/claude-code-llm.mjs   (Port 4020)
-// Nutzung: LITELLM_BASE_URL=http://localhost:4020 in .env
+// Nutzung: OVP_LLM_BASE_URL=http://localhost:4020 in .env
 //
 // Tool-Calling wird emuliert: Die OpenAI-Tool-Schemas werden in den
 // System-Prompt übersetzt; ruft das Modell ein Tool, antwortet es mit
@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 
-const PORT = Number(process.env.CLAUDE_LLM_PORT ?? 4020);
+const PORT = Number(process.env.OVP_CLAUDE_LLM_PORT ?? 4020);
 const CLI_TIMEOUT_MS = 180_000;
 const MODELS = ['sonnet', 'opus', 'haiku'];
 

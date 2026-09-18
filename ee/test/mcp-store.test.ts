@@ -27,6 +27,6 @@ describe('MCP administration persistence', () => {
   it('rejects ambiguous dashboard assignments and unknown sites', () => {
     expect(mcpSettingsSchema.safeParse({ ...settings, sites: [...settings.sites, { ...settings.sites[0], id: 'other' }] }).success).toBe(false);
     expect(mcpSettingsSchema.safeParse({ ...settings, servers: [{ ...settings.servers[0], siteIds: ['unknown'] }] }).success).toBe(false);
-    expect(mcpSettingsSchema.safeParse({ ...settings, servers: [{ ...settings.servers[0], tokenEnv: 'LITELLM_API_KEY' }] }).success).toBe(false);
+    expect(mcpSettingsSchema.safeParse({ ...settings, servers: [{ ...settings.servers[0], tokenEnv: 'OVP_LLM_API_KEY' }] }).success).toBe(false);
   });
 });

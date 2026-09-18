@@ -1,3 +1,4 @@
+{{- include "openvizpilot.checkLegacyLitellmValues" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -39,45 +40,45 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.containerPort | quote }}
-            - name: LITELLM_BASE_URL
-              value: {{ required "litellm.baseUrl ist Pflicht" .Values.litellm.baseUrl | quote }}
-            - name: DEFAULT_MODEL
+            - name: OVP_LLM_BASE_URL
+              value: {{ required "llm.baseUrl ist Pflicht" .Values.llm.baseUrl | quote }}
+            - name: OVP_DEFAULT_MODEL
               value: {{ required "app.defaultModel ist Pflicht" .Values.app.defaultModel | quote }}
             {{- with .Values.app.modelAllowlist }}
-            - name: MODEL_ALLOWLIST
+            - name: OVP_MODEL_ALLOWLIST
               value: {{ . | quote }}
             {{- end }}
-            - name: APP_VERSION
+            - name: OVP_APP_VERSION
               value: {{ .Chart.AppVersion | quote }}
-            - name: LOG_LEVEL
+            - name: OVP_LOG_LEVEL
               value: {{ .Values.app.logLevel | quote }}
             {{- if not .Values.app.scopeGuard }}
-            - name: SCOPE_GUARD
+            - name: OVP_SCOPE_GUARD
               value: "off"
             {{- end }}
             {{- with .Values.app.scopeModel }}
-            - name: SCOPE_MODEL
+            - name: OVP_SCOPE_MODEL
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.app.publicUrl }}
-            - name: PUBLIC_URL
+            - name: OVP_PUBLIC_URL
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.auth.mode }}
-            - name: AUTH_MODE
+            - name: OVP_AUTH_MODE
               value: {{ . | quote }}
             {{- end }}
             {{- if eq .Values.auth.mode "oidc" }}
-            - name: OIDC_PROVIDER
+            - name: OVP_OIDC_PROVIDER
               value: {{ .Values.oidc.provider | quote }}
-            - name: OIDC_ISSUER
+            - name: OVP_OIDC_ISSUER
               value: {{ required "oidc.issuer ist Pflicht bei auth.mode=oidc" .Values.oidc.issuer | quote }}
-            - name: OIDC_CLIENT_ID
+            - name: OVP_OIDC_CLIENT_ID
               value: {{ required "oidc.clientId ist Pflicht bei auth.mode=oidc" .Values.oidc.clientId | quote }}
-            - name: OIDC_SCOPES
+            - name: OVP_OIDC_SCOPES
               value: {{ .Values.oidc.scopes | quote }}
             {{- with .Values.oidc.clientSecretSecret.existingSecret }}
-            - name: OIDC_CLIENT_SECRET
+            - name: OVP_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ . }}
@@ -95,18 +96,18 @@ spec:
             - name: OVP_LICENSE_PUBLIC_KEY_B64URL
               value: {{ . | quote }}
             {{- end }}
-            - name: LITELLM_API_KEY
+            - name: OVP_LLM_API_KEY
               valueFrom:
                 secretKeyRef:
-                  {{- if .Values.litellm.apiKeySecret.existingSecret }}
-                  name: {{ .Values.litellm.apiKeySecret.existingSecret }}
-                  key: {{ .Values.litellm.apiKeySecret.key }}
+                  {{- if .Values.llm.apiKeySecret.existingSecret }}
+                  name: {{ .Values.llm.apiKeySecret.existingSecret }}
+                  key: {{ .Values.llm.apiKeySecret.key }}
                   {{- else }}
                   name: {{ include "openvizpilot.envSecretName" . }}
-                  key: LITELLM_API_KEY
+                  key: OVP_LLM_API_KEY
                   {{- end }}
             {{- if or .Values.app.authTokenSecret.existingSecret .Values.app.authToken }}
-            - name: API_AUTH_TOKEN
+            - name: OVP_API_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   {{- if .Values.app.authTokenSecret.existingSecret }}
@@ -114,11 +115,11 @@ spec:
                   key: {{ .Values.app.authTokenSecret.key }}
                   {{- else }}
                   name: {{ include "openvizpilot.envSecretName" . }}
-                  key: API_AUTH_TOKEN
+                  key: OVP_API_AUTH_TOKEN
                   {{- end }}
             {{- end }}
             {{- if or .Values.app.adminTokenSecret.existingSecret .Values.app.adminToken }}
-            - name: ADMIN_TOKEN
+            - name: OVP_ADMIN_TOKEN
               valueFrom:
                 secretKeyRef:
                   {{- if .Values.app.adminTokenSecret.existingSecret }}
@@ -126,15 +127,15 @@ spec:
                   key: {{ .Values.app.adminTokenSecret.key }}
                   {{- else }}
                   name: {{ include "openvizpilot.envSecretName" . }}
-                  key: ADMIN_TOKEN
+                  key: OVP_ADMIN_TOKEN
                   {{- end }}
             {{- end }}
             {{- if .Values.memory.enabled }}
             {{- with .Values.memory.model }}
-            - name: MEMORY_MODEL
+            - name: OVP_MEMORY_MODEL
               value: {{ . | quote }}
             {{- end }}
-            - name: MEMORY_DATABASE_URL
+            - name: OVP_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   {{- if eq .Values.memory.database.mode "cnpg" }}

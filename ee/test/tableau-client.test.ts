@@ -48,7 +48,7 @@ describe('Tableau Phase 1 primitives', () => {
     expect(() => tableauConfigSchema.parse({ ...config, secretEnv: 'OVP_OTHER_SECRET' })).toThrow();
     expect(() => tableauConfigInputSchema.parse({ enabled: false, secretValue: 'sentinel' })).toThrow();
     expect(resolveTableauSecret(config, { OVP_TABLEAU_SECRET: 'sentinel-secret' })).toBe('sentinel-secret');
-    expect(() => resolveTableauSecret({ secretEnv: 'LITELLM_API_KEY' }, { LITELLM_API_KEY: 'secret' })).toThrow();
+    expect(() => resolveTableauSecret({ secretEnv: 'OVP_LLM_API_KEY' }, { OVP_LLM_API_KEY: 'secret' })).toThrow();
   });
 
   it('signs the exact mapped username and returns the REST sign-in mapping', async () => {

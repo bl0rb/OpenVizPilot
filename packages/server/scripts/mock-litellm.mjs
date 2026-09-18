@@ -8,7 +8,7 @@
 // - sonst                        → gestreamte Textantwort
 import http from 'node:http';
 
-const PORT = Number(process.env.MOCK_LLM_PORT ?? 4010);
+const PORT = Number(process.env.OVP_MOCK_LLM_PORT ?? 4010);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

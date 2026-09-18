@@ -1,5 +1,5 @@
 /**
- * Selbstenthaltene Admin-UI unter GET /admin (nur wenn ADMIN_TOKEN gesetzt
+ * Selbstenthaltene Admin-UI unter GET /admin (nur wenn OVP_ADMIN_TOKEN gesetzt
  * ist, siehe app.ts) — verwaltet die zentralen Slash-Befehle und zeigt die
  * anonyme Nutzungsstatistik. Bewusst als ein Template-String ohne
  * Build-Schritt (kein Vite/Extension-Bundle nötig) mit Vanilla-JS.
@@ -517,7 +517,7 @@ export const adminPageHtml = `<!doctype html>
         <table id="models-table">
           <thead>
             <tr>
-              <th class="has-help" style="width: 45%;" aria-expanded="false"><span class="help-term">Modell-ID (am Endpunkt)</span><span role="tooltip" id="help-models-id" class="help-tip">Ohne gespeicherte Liste zeigt die Extension alle vom Endpunkt gemeldeten Modelle (ggf. gefiltert über <code>MODEL_ALLOWLIST</code>).</span></th>
+              <th class="has-help" style="width: 45%;" aria-expanded="false"><span class="help-term">Modell-ID (am Endpunkt)</span><span role="tooltip" id="help-models-id" class="help-tip">Ohne gespeicherte Liste zeigt die Extension alle vom Endpunkt gemeldeten Modelle (ggf. gefiltert über <code>OVP_MODEL_ALLOWLIST</code>).</span></th>
               <th>Anzeigename in der Extension</th>
               <th class="col-del"></th>
             </tr>
@@ -993,7 +993,7 @@ export const adminPageHtml = `<!doctype html>
   function renderAuth(data) {
     featureLabels = data.featureLabels || {};
     var eff = data.effective;
-    var modeLabels = { none: 'offen (nur Netzwerkschutz)', token: 'Shared-Token (API_AUTH_TOKEN, per Env)', local: 'Benutzerkonten', oidc: 'Single Sign-On' };
+    var modeLabels = { none: 'offen (nur Netzwerkschutz)', token: 'Shared-Token (OVP_API_AUTH_TOKEN, per Env)', local: 'Benutzerkonten', oidc: 'Single Sign-On' };
     var text = 'Aktiv: ' + (modeLabels[eff.mode] || eff.mode) + ' (Quelle: ' + (eff.source === 'db' ? 'Admin-UI' : 'Env-Defaults') + ')';
     if (eff.blockedReason) text += ' — BLOCKIERT: ' + eff.blockedReason;
     authSource.textContent = text;
@@ -1671,7 +1671,7 @@ export const adminPageHtml = `<!doctype html>
   trexUrl.value = window.location.origin + '/';
 
   // Frühwarnung statt 404-Rätselraten in Tableau: liefert DIESER Server die
-  // Extension gerade gar nicht aus (Dev ohne SERVE_STATIC_DIR), würde das
+  // Extension gerade gar nicht aus (Dev ohne OVP_SERVE_STATIC_DIR), würde das
   // Manifest ins Leere zeigen — im Dev gehört openvizpilot.dev.trex (Vite)
   // nach Tableau Desktop.
   fetch('/', { method: 'HEAD' })
@@ -1679,7 +1679,7 @@ export const adminPageHtml = `<!doctype html>
       if (res.status === 404) {
         showBanner(
           trexBanner,
-          'Achtung: Dieser Server liefert die Extension aktuell NICHT aus (SERVE_STATIC_DIR nicht gesetzt) — ' +
+          'Achtung: Dieser Server liefert die Extension aktuell NICHT aus (OVP_SERVE_STATIC_DIR nicht gesetzt) — ' +
             'ein Manifest mit dieser URL zeigt in Tableau ins Leere (404). In der Entwicklung stattdessen ' +
             'packages/extension/public/openvizpilot.dev.trex verwenden.',
           'error',

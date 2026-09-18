@@ -18,7 +18,7 @@ WORKDIR /app
 COPY --from=build /app/packages/server/dist ./dist
 COPY --from=build /app/packages/extension/dist ./public
 ENV PORT=3000
-ENV SERVE_STATIC_DIR=./public
+ENV OVP_SERVE_STATIC_DIR=./public
 EXPOSE 3000
 USER node
 CMD ["node", "dist/index.js"]

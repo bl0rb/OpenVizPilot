@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Modelle des OpenAI-kompatiblen Endpunkts die Extension anbietet, und gibt
  * ihnen sprechende Anzeigenamen (z. B. "claude-sonnet-5-20260101" → "Standard
  * (schnell)"). GET /api/models liefert dann NUR diese Einträge; ohne
- * gespeicherten Katalog gilt die Endpunkt-Liste (∩ MODEL_ALLOWLIST) wie bisher.
+ * gespeicherten Katalog gilt die Endpunkt-Liste (∩ OVP_MODEL_ALLOWLIST) wie bisher.
  *
  * `id` ist die Modell-ID am Endpunkt (geht als `model` in den Chat-Request),
  * `label` der Name, den die Extension im Auswahlmenü zeigt.

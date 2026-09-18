@@ -54,14 +54,14 @@ vpa:
   #  cpu: "2"
   #  memory: 2Gi
 
-litellm:
+llm:
   # Pflicht: Basis-URL des OpenAI-kompatiblen LLM-Endpunkts (z. B. LiteLLM),
   # z. B. http://litellm.llm.svc.cluster.local:4000
   baseUrl: ""
   # API-Key: bevorzugt aus einem bestehenden Secret ...
   apiKeySecret:
     existingSecret: ""
-    key: LITELLM_API_KEY
+    key: OVP_LLM_API_KEY
   # ... oder als Klartext (nur Dev/CI; das Chart legt dann selbst ein Secret an).
   apiKey: ""
 
@@ -71,9 +71,9 @@ app:
   # Kommaseparierte Allowlist der wählbaren Modelle (leer = alle vom Proxy gemeldeten)
   modelAllowlist: ""
   logLevel: info
-  # Serverseitiger Themen-Filter vor dem Haupt-LLM-Call (SCOPE_GUARD):
+  # Serverseitiger Themen-Filter vor dem Haupt-LLM-Call (OVP_SCOPE_GUARD):
   # Fragen ohne Dashboard-Bezug werden abgelehnt, ohne das Hauptmodell
-  # aufzurufen. false setzt SCOPE_GUARD=off.
+  # aufzurufen. false setzt OVP_SCOPE_GUARD=off.
   scopeGuard: true
   # Günstiges Modell für die Klassifikation (leer = memory.model bzw. defaultModel).
   scopeModel: ""
@@ -84,7 +84,7 @@ app:
   # Leer = offen; dann MUSS der Zugriff über NetworkPolicy/Ingress beschränkt werden.
   authTokenSecret:
     existingSecret: ""
-    key: API_AUTH_TOKEN
+    key: OVP_API_AUTH_TOKEN
   authToken: ""
   # Statisches Bearer-Token für die Admin-UI (/admin) und /api/admin/* —
   # eigenes Regime, unabhängig von authToken. Leer (beides) + aktives
@@ -93,7 +93,7 @@ app:
   # durchführen). Leer UND ohne Memory = Admin-UI komplett deaktiviert.
   adminTokenSecret:
     existingSecret: ""
-    key: ADMIN_TOKEN
+    key: OVP_ADMIN_TOKEN
   # ... oder als Klartext (nur Dev/CI; siehe authToken oben).
   adminToken: ""
   # Schlüssel (>= 32 Zeichen, z. B. `openssl rand -hex 32`), mit dem im Admin-UI
@@ -200,7 +200,7 @@ oidc:
   # Nur für confidential clients (Keycloak "Client authentication: On") — public clients (PKCE) brauchen keins.
   clientSecretSecret:
     existingSecret: ""
-    key: OIDC_CLIENT_SECRET
+    key: OVP_OIDC_CLIENT_SECRET
 license:
   # Signierter Lizenzschlüssel (OVP_LICENSE) aus einem Secret …
   existingSecret: ""

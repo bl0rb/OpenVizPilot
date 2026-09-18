@@ -156,7 +156,7 @@ export function createApp(config: AppConfig): {
   });
 
   // Dev (Vite-Proxy) und Prod (Same-Origin-Serving) brauchen kein CORS.
-  // ALLOWED_ORIGINS ist der Escape Hatch für getrenntes Hosting.
+  // OVP_ALLOWED_ORIGINS ist der Escape Hatch für getrenntes Hosting.
   if (config.allowedOrigins.length > 0) {
     app.use('/api/*', cors({ origin: config.allowedOrigins }));
   }
@@ -168,7 +168,7 @@ export function createApp(config: AppConfig): {
   app.route(EAS_PATH, createTableauEasRoute(tableau?.store ?? null, async () => (await authState.get()).publicUrl));
 
   // Zugriffsschutz für /api/* — Modus zur Laufzeit aus authState:
-  // - token: Shared-Token gegen Missbrauch als offener LLM-Proxy (API_AUTH_TOKEN)
+  // - token: Shared-Token gegen Missbrauch als offener LLM-Proxy (OVP_API_AUTH_TOKEN)
   // - local: Open Core — Benutzerkonten aus der Admin-UI, Sitzungs-Token (DB);
   //          `authUser` = Benutzername
   // - oidc:  Enterprise — jeder Request trägt ein verifiziertes ID-Token des
@@ -242,7 +242,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
   app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau));
 
-  // Admin-UI: erreichbar mit statischem ADMIN_TOKEN ODER — für den
+  // Admin-UI: erreichbar mit statischem OVP_ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert
   // (routes/admin.ts). Ohne beides: 404 wie jede unbekannte Route.
   if (config.adminToken || memoryStore) {

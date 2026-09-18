@@ -21,9 +21,9 @@
 Die Middleware selbst hat keine Tableau-Anmeldung — jeder, der sie im Netz erreicht, kann über sie kostenpflichtige LLM-Aufrufe auslösen (nicht: fremde Daten lesen — Daten holt nur der Browser des jeweiligen Users). Deshalb **mindestens eine** dieser Maßnahmen:
 
 - **Netzwerkebene**: Erreichbarkeit auf die Browser-Netze der Tableau-Nutzer beschränken (interne Zone, VPN, Reverse-Proxy-ACL).
-- **`API_AUTH_TOKEN`** setzen: Die Middleware verlangt dann `Authorization: Bearer <token>` auf `/api/*`; derselbe Token wird in den Extension-Einstellungen hinterlegt (im Workbook gespeichert — er schützt gegen Netz-Fremde, nicht gegen berechtigte Workbook-Nutzer).
+- **`OVP_API_AUTH_TOKEN`** setzen: Die Middleware verlangt dann `Authorization: Bearer <token>` auf `/api/*`; derselbe Token wird in den Extension-Einstellungen hinterlegt (im Workbook gespeichert — er schützt gegen Netz-Fremde, nicht gegen berechtigte Workbook-Nutzer).
 
-Zusätzlich `MODEL_ALLOWLIST` setzen, damit Clients nur freigegebene Modelle wählen können.
+Zusätzlich `OVP_MODEL_ALLOWLIST` setzen, damit Clients nur freigegebene Modelle wählen können.
 
 ## Vertrauensmodell Backend-URL
 
@@ -41,7 +41,7 @@ helm install openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot \
 
 Wesentliche Values (`charts/openvizpilot/values.yaml` ist vollständig kommentiert):
 
-- `litellm.baseUrl` + `litellm.apiKeySecret.existingSecret` (Secret mit dem API-Key des LLM-Endpunkts; Klartext-`litellm.apiKey` nur für Dev/CI)
+- `llm.baseUrl` + `llm.apiKeySecret.existingSecret` (Secret mit dem API-Key des LLM-Endpunkts; Klartext-`llm.apiKey` nur für Dev/CI)
 - `app.defaultModel`, `app.modelAllowlist`, `app.authTokenSecret`/`app.authToken` (Zugriffsschutz)
 - `memory.enabled` + `memory.database.mode`: `cnpg` (Chart legt einen CloudNativePG-Cluster an, App-Secret `<fullname>-db-app` wird automatisch verdrahtet) oder `external` (eigene Postgres-URI aus Secret). Die Datenbank trägt Admin-Konto, Anmeldung, Befehle, Playbooks und Statistik — sie wird also auch ohne Enterprise-Lizenz gebraucht; `memory.model` = günstiges Modell für die Fakten-Extraktion (nur mit Lizenz-Feature `memory` aktiv)
 - Skalierung: `replicaCount` fest setzen ODER `autoscaling.enabled` (HPA, CPU-basiert, min/max) für **horizontale** Skalierung bei vielen Nutzern; `resources` (+ optional `vpa.enabled`, nicht zusammen mit HPA) für vertikale. Die Middleware ist statuslos, SSE-Streams brauchen keine Sticky Sessions; die Memory-Konsistenz (DSGVO-Löschung vs. laufende Extraktion) wird DB-seitig in Postgres erzwungen und ist multi-replica-sicher.
@@ -55,7 +55,7 @@ Test: `https://chat.example.com/healthz` → `{"ok":true}`; `https://chat.exampl
 <details>
 <summary>Alternative ohne Kubernetes (Bare-Metal/VM)</summary>
 
-`npm ci && npm run build`, dann `packages/server/dist/index.js` mit Node ≥ 24 starten (systemd/pm2), Umgebung nach `.env.example`, `SERVE_STATIC_DIR` auf den Extension-Build zeigen lassen, Reverse Proxy mit HTTPS davor (SSE: `proxy_buffering off;`).
+`npm ci && npm run build`, dann `packages/server/dist/index.js` mit Node ≥ 24 starten (systemd/pm2), Umgebung nach `.env.example`, `OVP_SERVE_STATIC_DIR` auf den Extension-Build zeigen lassen, Reverse Proxy mit HTTPS davor (SSE: `proxy_buffering off;`).
 </details>
 
 ## User-Memory und eigene Abfragen: Datenschutz & Betrieb
@@ -71,12 +71,12 @@ Test: `https://chat.example.com/healthz` → `{"ok":true}`; `https://chat.exampl
 
 - **Was gespeichert wird**: kurze persönliche Fakten pro Nutzer (Name, Rolle, Vorlieben — max. 30, je ≤ 300 Zeichen) in Postgres, geschlüsselt nach der **obfuskierten** `uniqueUserId` der Extensions API. **Keine Dashboard-Daten**: Die Extraktion sieht nur die Chat-Fragen des Nutzers (nie Tool-Ergebnisse), und der Extraktions-Prompt verbietet Kennzahlen/Datenwerte zusätzlich.
 - **Transparenz/Löschung (DSGVO)**: Jeder Nutzer sieht seine Fakten im Einstellungen-Panel der Extension und kann sie dort vollständig löschen (`DELETE /api/memory`) — unabhängig davon, ob die Enterprise-Lizenz noch gilt.
-- **Vertrauensgrenze**: In den Modi `none` und `token` ist die Nutzer-ID client-asserted (Header/Request-Feld). Innerhalb des per `API_AUTH_TOKEN`/Netzwerk geschützten Kreises könnte ein technisch versierter Nutzer dann eine fremde ID angeben und deren *Personalisierungs-Fakten* lesen oder löschen — **nicht** deren Dashboard-Daten (die holt weiterhin nur der jeweilige Browser in der eigenen Tableau-Session). In den Modi `local` und `oidc` ersetzt die verifizierte Anmeldung die client-asserted ID für Memory, Präferenzen und Statistik; die Enterprise-Funktionen Memory und gespeicherte Abfragen sind dann an die angemeldete Identität gebunden.
+- **Vertrauensgrenze**: In den Modi `none` und `token` ist die Nutzer-ID client-asserted (Header/Request-Feld). Innerhalb des per `OVP_API_AUTH_TOKEN`/Netzwerk geschützten Kreises könnte ein technisch versierter Nutzer dann eine fremde ID angeben und deren *Personalisierungs-Fakten* lesen oder löschen — **nicht** deren Dashboard-Daten (die holt weiterhin nur der jeweilige Browser in der eigenen Tableau-Session). In den Modi `local` und `oidc` ersetzt die verifizierte Anmeldung die client-asserted ID für Memory, Präferenzen und Statistik; die Enterprise-Funktionen Memory und gespeicherte Abfragen sind dann an die angemeldete Identität gebunden.
 - Backups/Retention der Memory-Datenbank nach euren Datenschutz-Vorgaben konfigurieren (CNPG `backup`-Spec bzw. RDS-Policies).
 
 ## Schritt 2: Manifest erzeugen und verteilen
 
-**Empfohlener Weg — Download aus der Admin-UI** (kein Checkout nötig; setzt voraus, dass die Middleware die Extension-Statik ausliefert — im Container/Helm-Deployment immer der Fall, lokal nur mit `SERVE_STATIC_DIR` + gebauter Extension; die Admin-UI warnt sonst): Auf `https://<host>/admin` anmelden (Admin-Passwort bzw. `ADMIN_TOKEN` — siehe Abschnitt „Admin-UI“), im Abschnitt **„Extension für Tableau“** die öffentliche Extension-URL prüfen (vorbelegt mit dem aktuellen Host) und **„Manifest (.trex) herunterladen“** klicken. Die Middleware validiert die URL (HTTPS-Pflicht; Query/Fragment verboten) und liefert das fertige `openvizpilot.trex`. Da die Extension bei leerer Backend-URL automatisch mit **demselben Origin** spricht, aus dem sie geladen wurde, ist damit auch die Verbindung zur Middleware korrekt konfiguriert — nichts weiter einzutragen.
+**Empfohlener Weg — Download aus der Admin-UI** (kein Checkout nötig; setzt voraus, dass die Middleware die Extension-Statik ausliefert — im Container/Helm-Deployment immer der Fall, lokal nur mit `OVP_SERVE_STATIC_DIR` + gebauter Extension; die Admin-UI warnt sonst): Auf `https://<host>/admin` anmelden (Admin-Passwort bzw. `OVP_ADMIN_TOKEN` — siehe Abschnitt „Admin-UI“), im Abschnitt **„Extension für Tableau“** die öffentliche Extension-URL prüfen (vorbelegt mit dem aktuellen Host) und **„Manifest (.trex) herunterladen“** klicken. Die Middleware validiert die URL (HTTPS-Pflicht; Query/Fragment verboten) und liefert das fertige `openvizpilot.trex`. Da die Extension bei leerer Backend-URL automatisch mit **demselben Origin** spricht, aus dem sie geladen wurde, ist damit auch die Verbindung zur Middleware korrekt konfiguriert — nichts weiter einzutragen.
 
 Alternativ per Build-Script aus dem Repo:
 
@@ -98,16 +98,16 @@ Ergebnis: `packages/extension/dist/openvizpilot.trex` — diese Datei bekommen d
 
 Unter `https://<host>/admin` liegt die Verwaltungsseite. Zwei Betriebsarten:
 
-- **Passwort-Modus (empfohlen, Default mit aktivem User-Memory)**: Ohne gesetztes `ADMIN_TOKEN` legt der **erste Besucher von `/admin` das Admin-Passwort selbst an** (Ersteinrichtung, mindestens 12 Zeichen — wie in PaddleDoc). Danach: Login mit Passwort, DB-gestützte Sessions (12 h, multi-replica-fähig) und Lockout nach 5 Fehlversuchen (15 Minuten). **Wichtig:** Die Ersteinrichtung direkt nach dem Deploy durchführen — bis dahin kann jeder, der `/admin` erreicht, das Konto beanspruchen (deshalb `/admin` ohnehin netzwerkbeschränken, s. u.). Passwort vergessen? In der Memory-Datenbank `DELETE FROM admin_account; DELETE FROM admin_sessions;` ausführen — dann steht die Ersteinrichtung wieder an.
-- **Token-Modus**: Mit gesetztem `ADMIN_TOKEN` (eigenes Regime, unabhängig vom `API_AUTH_TOKEN`) gilt das statische Bearer-Token wie bisher; Ersteinrichtung/Login sind dann deaktiviert.
+- **Passwort-Modus (empfohlen, Default mit aktivem User-Memory)**: Ohne gesetztes `OVP_ADMIN_TOKEN` legt der **erste Besucher von `/admin` das Admin-Passwort selbst an** (Ersteinrichtung, mindestens 12 Zeichen — wie in PaddleDoc). Danach: Login mit Passwort, DB-gestützte Sessions (12 h, multi-replica-fähig) und Lockout nach 5 Fehlversuchen (15 Minuten). **Wichtig:** Die Ersteinrichtung direkt nach dem Deploy durchführen — bis dahin kann jeder, der `/admin` erreicht, das Konto beanspruchen (deshalb `/admin` ohnehin netzwerkbeschränken, s. u.). Passwort vergessen? In der Memory-Datenbank `DELETE FROM admin_account; DELETE FROM admin_sessions;` ausführen — dann steht die Ersteinrichtung wieder an.
+- **Token-Modus**: Mit gesetztem `OVP_ADMIN_TOKEN` (eigenes Regime, unabhängig vom `OVP_API_AUTH_TOKEN`) gilt das statische Bearer-Token wie bisher; Ersteinrichtung/Login sind dann deaktiviert.
 
-Ohne `ADMIN_TOKEN` **und** ohne User-Memory existiert die Route nicht (404).
+Ohne `OVP_ADMIN_TOKEN` **und** ohne User-Memory existiert die Route nicht (404).
 
 **Rollen.** Token bzw. Admin-Konto sind der **initiale Admin**. Zusätzlich kann er unter „Benutzerzugriff“ einzelnen Identitäten (lokale Konten oder SSO-Identitäten) den Schalter **Admin** geben — diese **delegierten Admins** melden sich an `/admin` mit ihrem eigenen Konto an („Mit Benutzerkonto anmelden“: Benutzername/Passwort im Modus `local`, „Mit Single Sign-On anmelden“ im Modus `oidc`; die Anmeldung folgt dem jeweils aktiven Anmeldemodus). Delegierte Admins bedienen die gesamte Administration, dürfen aber die Admin-Rolle **weder vergeben noch entziehen** (API: `403 initial_admin_required`); gesperrte Konten kommen nicht durch, ein Konto ohne Rolle erhält `403 not_admin`. Ein Entzug der Rolle wirkt beim nächsten Request. `GET /api/admin/me` liefert `{ role: 'initial' | 'delegated', name, provider }`.
 
 - **Slash-Befehle**: Die deutschen Prompt-Playbooks der Extension (`/zusammenfassung` usw.) zentral bearbeiten, ergänzen (max. 20) oder auf die eingebauten Standards zurücksetzen. Die Extension lädt die Befehle beim Start vom Server (Fallback: eingebaute Defaults).
 - **Standardanalysen pro Dashboard**: Eingebundene Dashboards unabhängig von der Nutzungsstatistik auswählen, bis zu fünf Starter-Fragen und eigene Slash-Befehle hinterlegen. [Einrichtung und Zuordnung](#standardanalysen-pro-dashboard).
-- **Modelle**: Welche Modelle die Extension anbietet — per „Vom Endpunkt laden“ die Liste des LLM-Endpunkts abrufen, Einträge übernehmen und mit sprechenden **Anzeigenamen** versehen (z. B. „Standard (empfohlen)“ statt der technischen Modell-ID). Ein gespeicherter Katalog **übersteuert `MODEL_ALLOWLIST`**: Nur noch seine Modell-IDs sind wählbar — am Chat-Endpunkt erzwungen, auch für Requests ohne `model`-Feld. Enthält der Katalog das konfigurierte `DEFAULT_MODEL` nicht, gilt sein **erster Eintrag** als Standard-Modell (so kann ein Modell rein über die Admin-UI stillgelegt werden). Ist der Katalog wegen eines DB-Fehlers kurzzeitig nicht lesbar, wird **fail-closed** nur `MODEL_ALLOWLIST` bzw. das Default-Modell akzeptiert. Ohne Katalog gilt wie bisher die Endpunkt-Liste ∩ `MODEL_ALLOWLIST`.
+- **Modelle**: Welche Modelle die Extension anbietet — per „Vom Endpunkt laden“ die Liste des LLM-Endpunkts abrufen, Einträge übernehmen und mit sprechenden **Anzeigenamen** versehen (z. B. „Standard (empfohlen)“ statt der technischen Modell-ID). Ein gespeicherter Katalog **übersteuert `OVP_MODEL_ALLOWLIST`**: Nur noch seine Modell-IDs sind wählbar — am Chat-Endpunkt erzwungen, auch für Requests ohne `model`-Feld. Enthält der Katalog das konfigurierte `OVP_DEFAULT_MODEL` nicht, gilt sein **erster Eintrag** als Standard-Modell (so kann ein Modell rein über die Admin-UI stillgelegt werden). Ist der Katalog wegen eines DB-Fehlers kurzzeitig nicht lesbar, wird **fail-closed** nur `OVP_MODEL_ALLOWLIST` bzw. das Default-Modell akzeptiert. Ohne Katalog gilt wie bisher die Endpunkt-Liste ∩ `OVP_MODEL_ALLOWLIST`.
 - **Extension für Tableau**: Manifest-Download mit validierter HTTPS-URL (siehe „Schritt 2“).
 - **Nutzung (anonym)**: Aggregierte Tageszähler — Chat-Turns pro Modell, Tool-Aufrufe pro Tool, verwendete Slash-Befehle, ausgeführte Action-Chips, vom Scope-Guard abgelehnte Fragen (`scope_blocked`), Fehler — **ohne Nutzer-IDs und ohne Frage-/Antwort-Inhalte**. Dazu eine **Dashboard-Tabelle**: Fragen je Dashboard, Anzahl Anwender, Ø und Maximum Fragen je Anwender. „Anwender“ sind dabei **nicht umkehrbare Pseudonyme**: HMAC-SHA256 der obfuskierten Tableau-User-ID mit einem geheimen, pro Installation einmalig erzeugten Salt (DB-Singleton, replikaübergreifend) — es werden weder Namen noch Tableau-IDs gespeichert, und die Pseudonyme verlassen den Server nicht (die Admin-UI sieht nur Zähler). Sie sind bewusst nicht mit dem User-Memory verknüpfbar. Kennzahlen **je Anwender** (Anzahl, Ø, Maximum) werden erst ab **3 Anwendern** je Dashboard ausgewiesen — darunter „< 3“, damit sich eine einzelne Person nicht über die Zähler erraten lässt (die Fragen-Summe je Dashboard bleibt sichtbar; bei Dashboards mit nur einem Nutzer ist diese Summe naturgemäß dessen Nutzung). Gezählt werden nur frische, vom Scope-Guard akzeptierte Fragen — keine Tool-Runden, keine Wiederholungen nach Fehlern, keine abgelehnten Off-Topic-Fragen. Datenschutzrechtlich handelt es sich um pseudonymisierte Nutzungsdaten; bei Bedarf über die Retention der Memory-Datenbank (Tabelle `usage_dashboards`) begrenzen.
 
@@ -115,20 +115,53 @@ Ohne `ADMIN_TOKEN` **und** ohne User-Memory existiert die Route nicht (404).
 
 ## Themen-Scope-Guard (LLM-Absicherung)
 
-Zusätzlich zur THEMEN-SCOPE-Regel im System-Prompt prüft die Middleware standardmäßig **vor jedem Haupt-LLM-Call** mit einem günstigen Modell, ob die neueste Nutzerfrage überhaupt Dashboard-Bezug hat (`SCOPE_GUARD=on`, Default). Off-Topic-Fragen (Allgemeinwissen, Programmieraufgaben, private Themen …) werden mit einer festen Absage beantwortet — **das Hauptmodell wird dafür gar nicht erst aufgerufen**. Das macht die Absicherung zweischichtig: Selbst wenn ein Prompt-Jailbreak die System-Prompt-Regel aushebeln würde, erreicht die Frage das Hauptmodell nicht.
+Zusätzlich zur THEMEN-SCOPE-Regel im System-Prompt prüft die Middleware standardmäßig **vor jedem Haupt-LLM-Call** mit einem günstigen Modell, ob die neueste Nutzerfrage überhaupt Dashboard-Bezug hat (`OVP_SCOPE_GUARD=on`, Default). Off-Topic-Fragen (Allgemeinwissen, Programmieraufgaben, private Themen …) werden mit einer festen Absage beantwortet — **das Hauptmodell wird dafür gar nicht erst aufgerufen**. Das macht die Absicherung zweischichtig: Selbst wenn ein Prompt-Jailbreak die System-Prompt-Regel aushebeln würde, erreicht die Frage das Hauptmodell nicht.
 
-- `SCOPE_MODEL` (Values: `app.scopeModel`): Modell für die Klassifikation — ein günstiges Modell genügt (Default: `MEMORY_MODEL` bzw. `DEFAULT_MODEL`).
+- `OVP_SCOPE_MODEL` (Values: `app.scopeModel`): Modell für die Klassifikation — ein günstiges Modell genügt (Default: `OVP_MEMORY_MODEL` bzw. `OVP_DEFAULT_MODEL`).
 - Verhalten bei Guard-Fehlern/Timeouts: **fail-open** (der Chat bleibt verfügbar, die System-Prompt-Regel greift weiterhin); der Vorfall wird geloggt.
 - Geprüft wird die **neueste Nutzerfrage bei jedem Request** — auch bei Tool-Runden-Fortsetzungen, denn die Historie kommt vollständig vom Client und eine ungeprüfte „Fortsetzung“ wäre sonst eine triviale Umgehung. Pro Runde fällt ein kleiner Klassifikations-Call an (max. 5 Runden pro Frage). Requests ganz ohne Nutzernachricht lehnt die Middleware bei aktivem Guard mit 400 ab.
 - Grenze: **Ältere** Nachrichten der client-gelieferten Historie werden nicht erneut klassifiziert — dort bleibt die THEMEN-SCOPE-Regel des System-Prompts die Verteidigungslinie.
 - Abgelehnte Fragen erscheinen in der Admin-Statistik als Metrik `scope_blocked` (nur Zähler, nie Inhalte).
-- Abschalten mit `SCOPE_GUARD=off` (Values: `app.scopeGuard: false`) — z. B. wenn Latenz/Kosten des Zusatz-Calls nicht gewünscht sind.
+- Abschalten mit `OVP_SCOPE_GUARD=off` (Values: `app.scopeGuard: false`) — z. B. wenn Latenz/Kosten des Zusatz-Calls nicht gewünscht sind.
 
 ## Betrieb
 
-- Logs der Middleware enthalten nur Metadaten; Log-Level über `LOG_LEVEL`.
-- Modell-Angebot für Nutzer über den **Modell-Katalog der Admin-UI** steuern (empfohlen: sprechende Anzeigenamen) oder über `MODEL_ALLOWLIST` einschränken; der Katalog übersteuert die Allowlist. Leer (beides) = alles, was der Endpunkt meldet.
+- Logs der Middleware enthalten nur Metadaten; Log-Level über `OVP_LOG_LEVEL`.
+- Modell-Angebot für Nutzer über den **Modell-Katalog der Admin-UI** steuern (empfohlen: sprechende Anzeigenamen) oder über `OVP_MODEL_ALLOWLIST` einschränken; der Katalog übersteuert die Allowlist. Leer (beides) = alles, was der Endpunkt meldet.
 - Updates: `helm upgrade … --version <neu> --reuse-values` — die .trex-URL bleibt stabil, am Safelist-Eintrag ändert sich nichts.
+
+## Umbenannte Variablen
+
+Alle Konfigurations-Env-Variablen der Middleware wurden auf das `OVP_`-Schema vereinheitlicht.
+**Die alten Namen funktionieren weiter** (Fallback in `packages/server/src/env.ts`) — beim Start
+erscheint dafür einmalig eine Warnung im Log, welche veralteten Namen noch verwendet werden. Sind
+alter und neuer Name gleichzeitig gesetzt, gewinnt der neue.
+
+| Alt | Neu |
+| --- | --- |
+| `LITELLM_BASE_URL` | `OVP_LLM_BASE_URL` |
+| `LITELLM_API_KEY` | `OVP_LLM_API_KEY` |
+| `DEFAULT_MODEL` | `OVP_DEFAULT_MODEL` |
+| `MODEL_ALLOWLIST` | `OVP_MODEL_ALLOWLIST` |
+| `ALLOWED_ORIGINS` | `OVP_ALLOWED_ORIGINS` |
+| `SERVE_STATIC_DIR` | `OVP_SERVE_STATIC_DIR` |
+| `API_AUTH_TOKEN` | `OVP_API_AUTH_TOKEN` |
+| `ADMIN_TOKEN` | `OVP_ADMIN_TOKEN` |
+| `MEMORY_DATABASE_URL` | `OVP_DATABASE_URL` |
+| `MEMORY_DB_PATH` | `OVP_DATABASE_PATH` |
+| `MEMORY_MODEL` | `OVP_MEMORY_MODEL` |
+| `SCOPE_GUARD` | `OVP_SCOPE_GUARD` |
+| `SCOPE_MODEL` | `OVP_SCOPE_MODEL` |
+| `LOG_LEVEL` | `OVP_LOG_LEVEL` |
+| `AUTH_MODE` | `OVP_AUTH_MODE` |
+| `PUBLIC_URL` | `OVP_PUBLIC_URL` |
+| `OIDC_PROVIDER` / `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` / `OIDC_SCOPES` | `OVP_OIDC_PROVIDER` / `OVP_OIDC_ISSUER` / `OVP_OIDC_CLIENT_ID` / `OVP_OIDC_CLIENT_SECRET` / `OVP_OIDC_SCOPES` |
+| `APP_VERSION` | `OVP_APP_VERSION` |
+| `PORT` | bleibt `PORT` (Plattform-Konvention); zusätzlich als `OVP_PORT` überschreibbar |
+| `MOCK_LLM_PORT` / `MOCK_OIDC_PORT` / `CLAUDE_LLM_PORT` (Dev-Skripte) | `OVP_MOCK_LLM_PORT` / `OVP_MOCK_OIDC_PORT` / `OVP_CLAUDE_LLM_PORT` |
+
+Das Helm-Chart (`charts/openvizpilot`) kennt nur noch die neuen Namen; `litellm.*` in `values.yaml`
+wurde zu `llm.*` und schlägt beim Rendern mit einer Fehlermeldung fehl, wenn noch alte Werte gesetzt sind.
 
 ## Go-Live-Checkliste
 
@@ -136,8 +169,8 @@ Zusätzlich zur THEMEN-SCOPE-Regel im System-Prompt prüft die Middleware standa
 
 - [ ] **GHCR-Zugriff geklärt**: Image (`ghcr.io/bl0rb/openvizpilot`) und Chart (`ghcr.io/bl0rb/charts/openvizpilot`) sind nach dem Publish **privat** (GitHub-Default). Entweder in den GitHub-Package-Settings auf *public* stellen, oder im Cluster ein `imagePullSecret` hinterlegen (Values: `imagePullSecrets`) und beim Installieren `helm registry login ghcr.io` verwenden.
 - [ ] Release-Version gepinnt installiert (`--version x.y.z`, nicht `latest`).
-- [ ] Secrets als `existingSecret` (LLM-Endpunkt-Key; `API_AUTH_TOKEN` gesetzt oder Zugriff per NetworkPolicy/Ingress beschränkt — siehe „Zugriffsschutz").
-- [ ] `MODEL_ALLOWLIST` und `app.defaultModel` gesetzt; `memory.model` und `app.scopeModel` auf ein günstiges Modell.
+- [ ] Secrets als `existingSecret` (LLM-Endpunkt-Key; `OVP_API_AUTH_TOKEN` gesetzt oder Zugriff per NetworkPolicy/Ingress beschränkt — siehe „Zugriffsschutz").
+- [ ] `OVP_MODEL_ALLOWLIST` und `app.defaultModel` gesetzt; `memory.model` und `app.scopeModel` auf ein günstiges Modell.
 - [ ] Admin-Zugang geklärt: entweder `app.adminTokenSecret` gesetzt (Token-Modus) **oder** die Ersteinrichtung im Passwort-Modus **sofort nach dem Deploy** durchgeführt — und `/admin` per Ingress-/Netzwerkregel auf Admins beschränkt.
 - [ ] Ingress mit CA-signiertem TLS-Zertifikat; SSE-Buffering für `/api/chat` deaktiviert (nginx: `proxy-buffering: "off"`).
 - [ ] CloudNativePG: Storage-Größe passend, **Backups/Retention** konfiguriert (CNPG `backup`-Spec).

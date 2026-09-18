@@ -17,7 +17,7 @@ export interface TableauAccess {
   issuer: string | null;
   /** Changes to OIDC configuration must invalidate cached Tableau sessions. */
   identityRevision: string;
-  /** Öffentliche URL der Middleware (Admin-UI/PUBLIC_URL) — Grundlage der EAS-Issuer-URL im oauth2-trust-Modus. */
+  /** Öffentliche URL der Middleware (Admin-UI/OVP_PUBLIC_URL) — Grundlage der EAS-Issuer-URL im oauth2-trust-Modus. */
   publicUrl: string | null;
 }
 

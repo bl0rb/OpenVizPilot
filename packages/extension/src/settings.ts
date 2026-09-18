@@ -18,7 +18,7 @@ export interface ExtensionSettings {
   backendUrl: string;
   /** '' = Default-Modell der Middleware. */
   model: string;
-  /** Optionaler Auth-Token der Middleware (API_AUTH_TOKEN). */
+  /** Optionaler Auth-Token der Middleware (OVP_API_AUTH_TOKEN). */
   apiToken: string;
   /**
    * Freitext-Glossar/KPI-Definitionen des Workbook-Autors, workbook-weit für

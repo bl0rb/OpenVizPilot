@@ -5,7 +5,7 @@ import { DEFAULT_SLASH_COMMANDS, slashCommandListSchema, type SlashCommand, type
  * anonyme Nutzungsstatistik — Gegenstück zu server/routes/commands.ts und
  * server/routes/stats.ts.
  *
- * VERTRAUENSMODELL: Beide Endpunkte laufen unter dem normalen API_AUTH_TOKEN-
+ * VERTRAUENSMODELL: Beide Endpunkte laufen unter dem normalen OVP_API_AUTH_TOKEN-
  * Regime wie /api/chat (gleicher Header). /api/stats bekommt bewusst NIE eine
  * User-ID oder Frage-/Antwort-Inhalte — nur Metrik+Key, siehe sendUsageEvents.
  */

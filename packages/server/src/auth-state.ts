@@ -2,7 +2,7 @@ import {
   hasFeature,
   OidcClient,
   readLicenseTokenFromEnv,
-  verifyLicenseWithEnvKey,
+  verifyLicense,
   type LicenseStatus,
 } from '@openvizpilot/ee/server';
 import type { AuthMode, AuthSettings, OidcSettings } from '@openvizpilot/shared';
@@ -115,7 +115,7 @@ export function createAuthStateProvider(config: AppConfig, store: MemoryStore | 
     const license: LicenseStatus = fromEnv.error
       ? { status: 'invalid', reason: fromEnv.error }
       : licenseToken
-        ? verifyLicenseWithEnvKey(licenseToken, config.licenseEnv)
+        ? verifyLicense(licenseToken, config.licenseTrustedKeys)
         : { status: 'none' };
 
     const mode: AuthMode = settings?.mode ?? config.authMode;

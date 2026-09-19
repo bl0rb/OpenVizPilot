@@ -202,8 +202,8 @@ oidc:
     existingSecret: ""
     key: OVP_OIDC_CLIENT_SECRET
 license:
-  # Signierter Lizenzschlüssel (OVP_LICENSE) aus einem Secret …
+  # Signierter Lizenzschlüssel (OVP_LICENSE) aus einem Secret. Der
+  # Vertrauensanker (Public Key des Lizenzgenerators) ist fest eingebaut —
+  # dafür gibt es keine Chart-Option mehr.
   existingSecret: ""
   key: OVP_LICENSE
-  # … und der Ed25519-Public-Key des Lizenzgenerators (32 Bytes, base64url).
-  publicKeyB64url: ""

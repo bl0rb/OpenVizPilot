@@ -1046,9 +1046,9 @@ export const adminPageHtml = `<!doctype html>
 
   function describeLicenseStatus(lic) {
     if (lic.status === 'valid') {
-      return 'Enterprise Edition — Lizenz für „' + lic.licensee + '“ gültig bis ' + String(lic.validUntil).slice(0, 10) + ' · Features: ' + (lic.features || []).map(function (f) { return featureLabels[f] || f; }).join(', ');
+      return 'Enterprise Edition — Lizenz für „' + lic.licensee + '“ gültig bis ' + String(lic.validUntil).slice(0, 10) + ' · Lizenz-ID ' + lic.licenseId + ' · Schlüssel ' + lic.kid + ' · Features: ' + (lic.features || []).map(function (f) { return featureLabels[f] || f; }).join(', ');
     }
-    if (lic.status === 'expired') return 'Enterprise-Lizenz für „' + lic.licensee + '“ ist am ' + String(lic.validUntil).slice(0, 10) + ' abgelaufen — Enterprise-Funktionen deaktiviert.';
+    if (lic.status === 'expired') return 'Enterprise-Lizenz für „' + lic.licensee + '“ (Lizenz-ID ' + lic.licenseId + ' · Schlüssel ' + lic.kid + ') ist am ' + String(lic.validUntil).slice(0, 10) + ' abgelaufen — Enterprise-Funktionen deaktiviert.';
     if (lic.status === 'invalid') return 'Lizenz ungültig: ' + lic.reason;
     return 'Core-Edition (keine Enterprise-Lizenz hinterlegt).';
   }

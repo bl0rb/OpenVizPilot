@@ -1,17 +1,20 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload, type EeFeature } from '@openvizpilot/ee/server';
+import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload, type EeFeature } from '@openvizpilot/ee/server';
 import type { AppConfig } from '../src/env';
 
 /**
  * Baut eine echte, signierte Enterprise-Lizenz für Tests — mit einem
- * Wegwerf-Schlüsselpaar, dessen Public Key gleich mitgeliefert wird. So laufen
- * Lizenz-Tests durch dieselbe Signaturprüfung wie in Produktion, ohne den
- * Schlüssel des Betreibers zu berühren.
+ * Wegwerf-Schlüsselpaar, dessen Public Key als `licenseTrustedKeys` (eine rein
+ * programmatische, nicht aus Env/Datei/DB befüllbare AppConfig-Option)
+ * mitgeliefert wird. So laufen Lizenz-Tests durch dieselbe Signaturprüfung
+ * wie in Produktion, ohne den eingebauten Vertrauensanker (TRUSTED_LICENSE_KEYS)
+ * zu berühren. Aufrufer spreaden das Ergebnis direkt in ihre AppConfig, z. B.
+ * `testConfig({ ...testLicenseEnv(['memory']) })`.
  *
  * `features` weggelassen = alle Features des Tiers (die App leitet sie ab);
  * eine leere Liste ergibt eine gültige Lizenz OHNE Enterprise-Funktionen.
  */
-export function testLicenseEnv(features?: EeFeature[], validUntil?: string): AppConfig['licenseEnv'] {
+export function testLicenseEnv(features?: EeFeature[], validUntil?: string): Pick<AppConfig, 'licenseEnv' | 'licenseTrustedKeys'> {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const payload = JSON.stringify({
     formatVersion: LICENSE_FORMAT_VERSION,
@@ -23,7 +26,7 @@ export function testLicenseEnv(features?: EeFeature[], validUntil?: string): App
     ...(features ? { features } : {}),
   });
   return {
-    OVP_LICENSE: encodeLicenseToken(payload, signLicensePayload(payload, privateKey)),
-    OVP_LICENSE_PUBLIC_KEY_B64URL: (publicKey.export({ format: 'jwk' }) as { x: string }).x,
+    licenseEnv: { OVP_LICENSE: encodeLicenseToken(payload, signLicensePayload(payload, privateKey)) },
+    licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: (publicKey.export({ format: 'jwk' }) as { x: string }).x },
   };
 }

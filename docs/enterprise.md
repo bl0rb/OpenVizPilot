@@ -132,9 +132,13 @@ Format und Signatur entsprechen dem bestehenden WerkWorks-Lizenzgenerator (Ed255
 [ee/README.md](../ee/README.md)). Konfiguration:
 
 ```env
-OVP_LICENSE=<token>                       # oder OVP_LICENSE_PATH=/run/secrets/openvizpilot-license
-OVP_LICENSE_PUBLIC_KEY_B64URL=<32 Bytes>  # oder OVP_LICENSE_PUBLIC_KEY_PATH=/etc/openvizpilot/public.pem
+OVP_LICENSE=<token>       # oder OVP_LICENSE_PATH=/run/secrets/openvizpilot-license
 ```
+
+Der Vertrauensanker (Ed25519-Public-Key des Lizenzgenerators) ist fest im Produkt eingebaut
+(`TRUSTED_LICENSE_KEYS` in `ee/server/src/license.ts`) — dafür gibt es keine Umgebungsvariable mehr.
+Rotation braucht einen Release, nie eine Konfigurationsänderung: sonst könnte sich ein Betreiber mit
+eigenem Schlüsselpaar selbst Lizenzen ausstellen.
 
 Ohne gültige Lizenz mit Feature `sso` startet die Middleware im OIDC-Modus **nicht** (klare Fehlermeldung);
 abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Der Status ist in der Admin-UI unter
@@ -163,7 +167,6 @@ oidc:
     key: OVP_OIDC_CLIENT_SECRET
 license:
   existingSecret: openvizpilot-license   # Key OVP_LICENSE
-  publicKeyB64url: <32 Bytes base64url>
 app:
   publicUrl: https://chat.example.com
 ```

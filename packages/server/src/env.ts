@@ -102,8 +102,6 @@ const envSchema = z.object({
   /** Produktversion für den Heartbeat (Helm setzt sie aus der Chart-AppVersion). */
   OVP_APP_VERSION: z.string().optional(),
   OVP_LICENSE_PATH: z.string().optional(),
-  OVP_LICENSE_PUBLIC_KEY_B64URL: z.string().optional(),
-  OVP_LICENSE_PUBLIC_KEY_PATH: z.string().optional(),
   /** Schlüssel für im Web gespeicherte Secrets (aktuell: Tableau Connected-App-Secrets), siehe ee/server/src/secrets.ts. Optional — ohne ihn bleiben nur Env-Secret-Referenzen nutzbar. */
   OVP_SECRET_KEY: emptyAsUnset(z.string().min(32, 'OVP_SECRET_KEY muss mindestens 32 Zeichen lang sein').optional()),
 });
@@ -168,9 +166,14 @@ export interface AppConfig {
   licenseEnv: {
     OVP_LICENSE?: string;
     OVP_LICENSE_PATH?: string;
-    OVP_LICENSE_PUBLIC_KEY_B64URL?: string;
-    OVP_LICENSE_PUBLIC_KEY_PATH?: string;
   };
+  /**
+   * Vertrauensanker-Override — AUSSCHLIESSLICH für Tests. Nicht Teil von
+   * envSchema und von loadEnv() nie aus process.env befüllt: der
+   * Lizenz-Vertrauensanker ist fest eingebaut (TRUSTED_LICENSE_KEYS in
+   * ee/server/src/license.ts), niemand darf ihn über Env/Datei/DB setzen.
+   */
+  licenseTrustedKeys?: Record<string, string>;
 }
 
 function splitCsv(value: string | undefined): string[] {
@@ -200,6 +203,12 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (legacyUsed.length > 0) {
     const lines = legacyUsed.map((oldName) => `${oldName} ist veraltet — bitte ${LEGACY_ENV_NAMES_REVERSE[oldName]} verwenden`);
     console.warn(`Veraltete Umgebungsvariablen verwendet:\n  ${lines.join('\n  ')}`);
+  }
+  // Der Lizenz-Vertrauensanker ist fest eingebaut (TRUSTED_LICENSE_KEYS,
+  // ee/server/src/license.ts) — diese beiden Namen wirken nicht mehr. Nur
+  // eine Warnung, kein Fehler, damit ältere Deployments weiter starten.
+  for (const name of ['OVP_LICENSE_PUBLIC_KEY_B64URL', 'OVP_LICENSE_PUBLIC_KEY_PATH']) {
+    if (env[name]?.trim()) console.warn(`${name} wird ignoriert: der Vertrauensanker ist fest eingebaut`);
   }
   const parsed = envSchema.safeParse(resolved);
   if (!parsed.success) {
@@ -253,8 +262,6 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
     licenseEnv: {
       OVP_LICENSE: e.OVP_LICENSE,
       OVP_LICENSE_PATH: e.OVP_LICENSE_PATH,
-      OVP_LICENSE_PUBLIC_KEY_B64URL: e.OVP_LICENSE_PUBLIC_KEY_B64URL,
-      OVP_LICENSE_PUBLIC_KEY_PATH: e.OVP_LICENSE_PUBLIC_KEY_PATH,
     },
   };
 }

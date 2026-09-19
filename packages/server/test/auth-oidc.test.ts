@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
+import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
 import { startMockOidc, type MockOidc } from '../../../ee/test/mock-oidc-server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
@@ -15,6 +15,7 @@ import type { AppConfig } from '../src/env';
 
 let idp: MockOidc;
 let licenseEnv: AppConfig['licenseEnv'];
+let licenseTrustedKeys: AppConfig['licenseTrustedKeys'];
 let tmpDirs: string[] = [];
 
 beforeAll(async () => {
@@ -30,10 +31,8 @@ beforeAll(async () => {
     // Ohne features-Liste schaltet das Tier alles frei — inklusive der
     // Präferenzen, über die dieser Test die verifizierte Nutzer-ID prüft.
   });
-  licenseEnv = {
-    OVP_LICENSE: encodeLicenseToken(payload, signLicensePayload(payload, privateKey)),
-    OVP_LICENSE_PUBLIC_KEY_B64URL: (publicKey.export({ format: 'jwk' }) as { x: string }).x,
-  };
+  licenseEnv = { OVP_LICENSE: encodeLicenseToken(payload, signLicensePayload(payload, privateKey)) };
+  licenseTrustedKeys = { [DEFAULT_LICENSE_KID]: (publicKey.export({ format: 'jwk' }) as { x: string }).x };
 });
 afterAll(async () => {
   await idp.close();
@@ -73,6 +72,7 @@ function oidcConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     telemetryEndpoint: '',
     appVersion: 'test',
     licenseEnv,
+    licenseTrustedKeys,
     ...overrides,
   };
 }

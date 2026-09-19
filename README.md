@@ -148,7 +148,13 @@ The middleware runs stateless on EKS and scales horizontally (HPA) and verticall
 helm install openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot -f my-values.yaml
 ```
 
-Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). The production manifest for Tableau comes straight from the admin UI (`/admin` → “Extension for Tableau”); alternatively, generate it from a checkout:
+Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). Release images are signed keyless with Sigstore cosign (GitHub OIDC) and carry an SPDX SBOM attestation, so you can check that an image was built by this repository's release workflow before deploying it:
+
+```bash
+cosign verify ghcr.io/bl0rb/openvizpilot:1.4.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/bl0rb/OpenVizPilot/'
+```
+
+The production manifest for Tableau comes straight from the admin UI (`/admin` → “Extension for Tableau”); alternatively, generate it from a checkout:
 
 ```bash
 npm run build:trex -w @openvizpilot/extension -- --url https://chat.example.com/
@@ -183,7 +189,6 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
 | `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
 | `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
-| `OVP_LICENSE_PUBLIC_KEY_B64URL` | `license.publicKeyB64url` | Public key of the licence issuer |
 | `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
 | `OVP_SCOPE_GUARD`, `OVP_SCOPE_MODEL` | `app.scopeGuard`, `app.scopeModel` | Off-topic guard and its model |
 | `OVP_LOG_LEVEL`, `PORT` | `app.logLevel`, `containerPort` | Logging and container port |
@@ -209,7 +214,6 @@ oidc:
 license:
   existingSecret: openvizpilot-vault
   key: OVP_LICENSE
-  publicKeyB64url: <issuer-public-key>
 memory:
   enabled: true
   database:

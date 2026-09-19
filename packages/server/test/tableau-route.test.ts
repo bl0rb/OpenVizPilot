@@ -12,10 +12,12 @@ afterEach(async () => {
 });
 
 function setup(licensed = false) {
-  const config = loadEnv({ OVP_LLM_BASE_URL: 'http://127.0.0.1:1', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test',
-    OVP_ADMIN_TOKEN: 'test-admin', OVP_DATABASE_PATH: ':memory:', OVP_LOG_LEVEL: 'error',
+  const config = {
+    ...loadEnv({ OVP_LLM_BASE_URL: 'http://127.0.0.1:1', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test',
+      OVP_ADMIN_TOKEN: 'test-admin', OVP_DATABASE_PATH: ':memory:', OVP_LOG_LEVEL: 'error',
+    }),
     ...(licensed ? testLicenseEnv(['tableauServer', 'sso']) : {}),
-  });
+  };
   config.telemetryEndpoint = '';
   const result = createApp(config);
   instances.push(result);

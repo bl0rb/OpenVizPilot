@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildHeartbeatPayload,
   createSqliteTelemetryStore,
+  DEFAULT_LICENSE_KID,
   describeTelemetry,
   encodeLicenseToken,
   HEARTBEAT_INTERVAL_MS,
@@ -52,7 +53,8 @@ function licence(overrides: Record<string, unknown> = {}): { token: string; stat
     ...overrides,
   });
   const token = encodeLicenseToken(payload, signLicensePayload(payload, privateKey));
-  return { token, status: verifyLicense(token, publicKey) };
+  const b64url = (publicKey.export({ format: 'jwk' }) as { x: string }).x;
+  return { token, status: verifyLicense(token, { [DEFAULT_LICENSE_KID]: b64url }) };
 }
 
 function collectingFetch() {

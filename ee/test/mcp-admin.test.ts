@@ -13,7 +13,10 @@ const settings = { sites: [{ id: 'sales', name: 'Sales', dashboardKeys: [dashboa
 
 async function withApp(licensed: boolean, run: (instance: ReturnType<typeof createApp>) => Promise<void>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ovp-mcp-admin-'));
-  const config = loadEnv({ OVP_LLM_BASE_URL: 'http://localhost:9', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test', OVP_ADMIN_TOKEN: 'test-admin', OVP_AUTH_MODE: 'local', OVP_DATABASE_PATH: path.join(dir, 'db.sqlite'), ...testLicenseEnv(licensed ? ['mcp'] : ['memory']) });
+  const config = {
+    ...loadEnv({ OVP_LLM_BASE_URL: 'http://localhost:9', OVP_LLM_API_KEY: 'test', OVP_DEFAULT_MODEL: 'test', OVP_ADMIN_TOKEN: 'test-admin', OVP_AUTH_MODE: 'local', OVP_DATABASE_PATH: path.join(dir, 'db.sqlite') }),
+    ...testLicenseEnv(licensed ? ['mcp'] : ['memory']),
+  };
   const instance = createApp({ ...config, telemetryEndpoint: '' });
   try {
     await instance.memoryStore!.registerDashboard({ dashboardKey, name: 'Sales dashboard' });

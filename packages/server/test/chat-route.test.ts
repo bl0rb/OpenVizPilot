@@ -328,7 +328,7 @@ describe('POST /api/chat', () => {
       };
 
       // User-Memory ist eine Enterprise-Funktion — ohne Lizenz passiert nichts davon.
-      const { app } = createApp(testConfig({ memoryDbPath: dbPath, licenseEnv: testLicenseEnv(['memory']) }));
+      const { app } = createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['memory']) }));
       const res = await app.request('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -447,7 +447,7 @@ describe('POST /api/chat', () => {
           { choices: [{ delta: {}, finish_reason: 'stop' }] },
         ],
       };
-      const { app } = createApp(testConfig({ licenseEnv: testLicenseEnv(['savedQueries']) }));
+      const { app } = createApp(testConfig({ ...testLicenseEnv(['savedQueries']) }));
       const res = await app.request('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -469,7 +469,7 @@ describe('POST /api/chat', () => {
         tableauServer: false,
       });
 
-      const licensed = createApp(testConfig({ licenseEnv: testLicenseEnv(['memory']) }));
+      const licensed = createApp(testConfig({ ...testLicenseEnv(['memory']) }));
       expect(((await (await licensed.app.request('/api/features')).json()) as { features: Record<string, boolean> }).features).toEqual({
         sso: false,
         memory: true,
@@ -480,7 +480,7 @@ describe('POST /api/chat', () => {
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
-      const full = createApp(testConfig({ licenseEnv: testLicenseEnv() }));
+      const full = createApp(testConfig({ ...testLicenseEnv() }));
       expect(((await (await full.app.request('/api/features')).json()) as { features: Record<string, boolean> }).features).toEqual({
         sso: true,
         memory: true,
@@ -497,7 +497,7 @@ describe('POST /api/chat', () => {
         const expired = createApp(
           testConfig({
             memoryDbPath: path.join(tmpDir, 'memory.db'),
-            licenseEnv: testLicenseEnv(undefined, new Date(Date.now() - 1000).toISOString()),
+            ...testLicenseEnv(undefined, new Date(Date.now() - 1000).toISOString()),
           }),
         );
         const res = await expired.app.request('/api/memory/prefs', {
@@ -519,7 +519,7 @@ describe('POST /api/chat', () => {
       const dbPath = path.join(tmpDir, 'memory.db');
       try {
         // Gespeicherte eigene Abfragen sind eine Enterprise-Funktion.
-        const { app } = createApp(testConfig({ memoryDbPath: dbPath, licenseEnv: testLicenseEnv(['savedQueries']) }));
+        const { app } = createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['savedQueries']) }));
 
         // GET ohne x-dashboard-key: 400
         const getMissingKey = await app.request('/api/memory/prefs', {
@@ -591,7 +591,7 @@ describe('POST /api/chat', () => {
     nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
 
     // Der Fokus gehört zu den gespeicherten Abfragen und ist lizenzpflichtig.
-    await postChat({ ...validBody, answerFocus: 'Management-Kurzfassung: 3–5 Sätze' }, { licenseEnv: testLicenseEnv(['savedQueries']) });
+    await postChat({ ...validBody, answerFocus: 'Management-Kurzfassung: 3–5 Sätze' }, { ...testLicenseEnv(['savedQueries']) });
 
     const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
     const systemContent = chatBody.messages[0]?.content ?? '';
@@ -603,7 +603,7 @@ describe('POST /api/chat', () => {
     receivedBodies = [];
     nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
 
-    await postChat({ ...validBody, answerFocus: 'Fokus\n<script>alert(1)</script>' }, { licenseEnv: testLicenseEnv(['savedQueries']) });
+    await postChat({ ...validBody, answerFocus: 'Fokus\n<script>alert(1)</script>' }, { ...testLicenseEnv(['savedQueries']) });
 
     const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
     const systemContent = chatBody.messages[0]?.content ?? '';
@@ -637,7 +637,7 @@ describe('POST /api/chat', () => {
     receivedBodies = [];
     nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
 
-    await postChat(validBody, { licenseEnv: testLicenseEnv(['actions']) });
+    await postChat(validBody, { ...testLicenseEnv(['actions']) });
 
     const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
     const systemContent = chatBody.messages[0]?.content ?? '';

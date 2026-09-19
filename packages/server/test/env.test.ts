@@ -107,3 +107,21 @@ describe('loadEnv legacy fallback', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('removed license public-key override', () => {
+  it('warns but does not fail startup when the removed env vars are still set', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const config = loadEnv(baseEnv({ OVP_LICENSE_PUBLIC_KEY_B64URL: 'irgendwas', OVP_LICENSE_PUBLIC_KEY_PATH: '/tmp/does-not-matter' }));
+    expect(warn).toHaveBeenCalledWith('OVP_LICENSE_PUBLIC_KEY_B64URL wird ignoriert: der Vertrauensanker ist fest eingebaut');
+    expect(warn).toHaveBeenCalledWith('OVP_LICENSE_PUBLIC_KEY_PATH wird ignoriert: der Vertrauensanker ist fest eingebaut');
+    // Der Wert erreicht die Konfiguration nirgends — kein Env-Pfad zu den Vertrauensankern.
+    expect(config.licenseEnv).toEqual({ OVP_LICENSE: undefined, OVP_LICENSE_PATH: undefined });
+    expect(config.licenseTrustedKeys).toBeUndefined();
+  });
+
+  it('does not warn when the removed env vars are unset', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    loadEnv(baseEnv());
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

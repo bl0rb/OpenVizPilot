@@ -9,7 +9,7 @@
 import { createPrivateKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { encodeLicenseToken, LICENSE_FORMAT_VERSION, publicKeyFromPem, signLicensePayload, verifyLicense } from '../server/src/license';
+import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, parseLicenseToken, publicKeyFromPem, signLicensePayload, verifyLicense } from '../server/src/license';
 
 const [cmd, ...args] = process.argv.slice(2);
 
@@ -21,7 +21,8 @@ if (cmd === 'keygen') {
   fs.writeFileSync(path.join(dir, 'public.pem'), publicKey.export({ format: 'pem', type: 'spki' }));
   const jwk = publicKey.export({ format: 'jwk' }) as { x: string };
   fs.writeFileSync(path.join(dir, 'public.b64url'), jwk.x);
-  console.log(`Schlüsselpaar in ${dir}/ — OVP_LICENSE_PUBLIC_KEY_B64URL=${jwk.x}`);
+  console.log(`Schlüsselpaar in ${dir}/ — Public Key (base64url): ${jwk.x}`);
+  console.log('Für die Produktion: als neuer Eintrag (eigener kid) in TRUSTED_LICENSE_KEYS (ee/server/src/license.ts) in einem Release ausrollen — nie per Env/Datei/DB.');
 } else if (cmd === 'sign') {
   const [keyPath, licensee, validUntil, featuresCsv] = args;
   if (!keyPath || !licensee || !validUntil) {
@@ -46,7 +47,18 @@ if (cmd === 'keygen') {
     console.error('Nutzung: verify <public.pem> <token>');
     process.exit(1);
   }
-  console.log(JSON.stringify(verifyLicense(token, publicKeyFromPem(fs.readFileSync(pubPath, 'utf8'))), null, 2));
+  // Eigenständiges Dev-Werkzeug: prüft gegen den mitgegebenen Public Key, nicht
+  // gegen TRUSTED_LICENSE_KEYS — dazu unter dem kid des Tokens (oder dem
+  // Standard-kid, falls keiner gesetzt ist) nachschlagbar machen.
+  const jwk = publicKeyFromPem(fs.readFileSync(pubPath, 'utf8')).export({ format: 'jwk' }) as { x: string };
+  let kid = DEFAULT_LICENSE_KID;
+  try {
+    const payload = JSON.parse(parseLicenseToken(token).payloadJson) as { kid?: unknown };
+    if (typeof payload.kid === 'string' && payload.kid) kid = payload.kid;
+  } catch {
+    // Ungültiges Token — verifyLicense meldet das gleich selbst.
+  }
+  console.log(JSON.stringify(verifyLicense(token, { [kid]: jwk.x }), null, 2));
 } else {
   console.error('Befehle: keygen [dir] | sign <private.pem> <Lizenznehmer> <YYYY-MM-DD> [features] | verify <public.pem> <token>');
   process.exit(1);

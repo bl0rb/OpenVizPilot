@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
+import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
 import { startMockOidc, type MockOidc } from '../../../ee/test/mock-oidc-server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
@@ -51,7 +51,7 @@ function localConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
-    licenseEnv: testLicenseEnv(['savedQueries']),
+    ...testLicenseEnv(['savedQueries']),
     ...overrides,
   };
 }
@@ -227,7 +227,7 @@ describe('runtime auth settings (admin UI)', () => {
   });
 
   it('switches from open to local to SSO without restart, validating license and OIDC first', async () => {
-    const { app } = createApp(localConfig({ authMode: 'none', licenseEnv: { OVP_LICENSE_PUBLIC_KEY_B64URL: publicKeyB64url } }));
+    const { app } = createApp(localConfig({ authMode: 'none', licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: publicKeyB64url } }));
     expect((await app.request('/api/models')).status).not.toBe(401);
 
     // SSO ohne Lizenz → abgelehnt, nichts gespeichert.

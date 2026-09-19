@@ -19,7 +19,6 @@ import {
   EE_FEATURE_LABELS,
   hasFeature,
   loadLicenseFromEnv,
-  trustedPublicKeyFromEnv,
   verifyLicense,
   type LicenseStatus,
   type TelemetryStore,
@@ -588,11 +587,7 @@ export function createAdminRoute(
       const licenseToken = input.license === undefined ? stored?.license : input.license.trim() || undefined;
       let license: LicenseStatus;
       if (licenseToken) {
-        try {
-          license = verifyLicense(licenseToken, trustedPublicKeyFromEnv(config.licenseEnv));
-        } catch (err) {
-          license = { status: 'invalid', reason: err instanceof Error ? err.message : 'Public Key ungültig' };
-        }
+        license = verifyLicense(licenseToken, config.licenseTrustedKeys);
         if (license.status === 'invalid') return c.json({ error: `Lizenz ungültig: ${license.reason}` }, 400);
       } else {
         license = { status: 'none' };
@@ -604,7 +599,7 @@ export function createAdminRoute(
       if (input.mode === 'oidc') {
         // Ohne DB-Lizenz zählt die Env-Lizenz (Helm-Secret) — der effektive
         // Zustand entscheidet, nicht nur das Formular.
-        const effectiveLicense = licenseToken ? license : loadLicenseFromEnv(config.licenseEnv);
+        const effectiveLicense = licenseToken ? license : loadLicenseFromEnv(config.licenseEnv, { trustedKeys: config.licenseTrustedKeys });
         if (!hasFeature(effectiveLicense, 'sso')) {
           return c.json({ error: 'Single Sign-On braucht eine gültige Enterprise-Lizenz mit Feature „sso“ — bitte zuerst den Lizenzschlüssel eintragen.' }, 400);
         }

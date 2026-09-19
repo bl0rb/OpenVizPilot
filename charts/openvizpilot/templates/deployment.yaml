@@ -93,8 +93,7 @@ spec:
                   key: {{ $.Values.license.key }}
             {{- end }}
             {{- with .Values.license.publicKeyB64url }}
-            - name: OVP_LICENSE_PUBLIC_KEY_B64URL
-              value: {{ . | quote }}
+            {{ fail "license.publicKeyB64url wird nicht mehr unterstützt — der Vertrauensanker ist fest eingebaut" }}
             {{- end }}
             - name: OVP_LLM_API_KEY
               valueFrom:

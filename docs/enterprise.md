@@ -28,16 +28,15 @@ nur keine neuen hinzu. Welche Features gerade aktiv sind, sagt `GET /api/feature
 ## Warum SSO?
 
 Die **Tableau Server Integration** mit Feature-Schlüssel `tableauServer` ist für Tableau Server
-ab **2024.2 einschließlich** vorgesehen. Phasen 1–3 sind implementiert: Konfiguration und
-persönlicher Sign-in, REST-basierte Workbook-/View-Suche sowie Metadata-API mit Feldsuche/-detail;
-die Live-Abnahme gegen eine reale Tableau-Installation steht noch aus. Sie setzt OIDC mit `sso` und je
+ab **2024.2 einschließlich** vorgesehen: persönlicher Connected-App-Sign-in, REST-basierte
+Workbook-/View-Suche und Metadata-API mit Feldsuche/-detail. Sie setzt OIDC mit `sso` und je
 Tableau-**Site** eine eigene Connected App voraus — unterstützt werden beide Tableau-Trust-Arten: Direct
 Trust (Client-ID/Secret, Secret optional verschlüsselt im Web statt nur per Env, siehe `OVP_SECRET_KEY`) und
 OAuth 2.0 Trust (ein gemeinsamer, middleware-eigener External-Authorization-Server-Schlüssel für alle Sites,
 ohne Shared Secret aus Tableau). Mehrere Sites lassen sich Dashboards einzeln zuordnen; mit nur einer Site ist
 keine Zuordnung nötig. `/api/features` zeigt die Lizenzfreigabe; die Integration bleibt bis zur
-Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md),
-[Roadmap](tableau-server-integration.md) und [Threat Model](tableau-server-phase-0.md).
+Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md) und
+[Referenz](tableau-server.md) (Sicherheitsmodell, Connected-App-Modi, Chat-Tools).
 
 MCP wird unter **MCP & Sites (Enterprise)** in der Admin-UI eingerichtet. Es benötigt
 persönliche Anmeldung, explizite Site-Mitgliedschaften und eine eigene `mcp`-Freigabe.
@@ -171,10 +170,8 @@ app:
 
 ## Lizenzen ausstellen (WerkWorks)
 
-Der Vertrauensanker ist der Public Key des WerkWorks-Lizenzgenerators
-(`certpulse-license-generator/keys/public.pem`); er ist in `ee/server/src/license.ts` eingebettet und
-per `OVP_LICENSE_PUBLIC_KEY_B64URL` überschreibbar. Der Generator stellt OpenVizPilot-Lizenzen
-direkt aus:
+Lizenzen stellt der WerkWorks-Lizenzgenerator direkt aus (Format, Vertrauensanker und
+Upgrade-Hinweis für ältere Lizenzen: [ee/README.md](../ee/README.md)):
 
 ```bash
 certfleet-license generate --product openvizpilot \
@@ -183,14 +180,8 @@ certfleet-license generate --product openvizpilot \
 ```
 
 Ohne `--features` enthält die Lizenz alle Enterprise-Funktionen des Tiers; für einen kleineren
-Umfang `--features sso,memory` o. ä. angeben. Dasselbe geht in der Weboberfläche des Generators
-(Produktauswahl im Formular „Lizenz ausstellen"). `ee/scripts/sign-license.ts` bleibt als Notnagel,
-falls der Generator gerade nicht verfügbar ist.
-
-**Beim Upgrade beachten:** Lizenzen, die vor dieser Version mit einer ausdrücklichen
-`features`-Liste ausgestellt wurden (typisch `["sso"]`), schalten `memory` und `savedQueries` NICHT
-frei — beides war vorher lizenzfreie Kernfunktion. Solche Lizenzen neu ausstellen, wenn die
-Personalisierung weiterlaufen soll; `GET /api/features` zeigt, was gerade aktiv ist.
+Umfang `--features sso,memory` o. ä. angeben (auch über die Weboberfläche des Generators möglich).
+`GET /api/features` zeigt, was gerade aktiv ist.
 
 ## Lokal ausprobieren
 

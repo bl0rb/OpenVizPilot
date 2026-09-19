@@ -15,8 +15,12 @@ PolyForm-Noncommercial-Lizenz des restlichen Repos, sondern unter der proprietä
 | `server/src/personalization-store.ts` | Eigene Tabellen (`user_facts`, `user_memory_state`, `user_dashboard_prefs`) samt Nebenläufigkeits-Garantie gegen Wiederauferstehung gelöschter Fakten — auf der Verbindung, die der Kern ohnehin hält |
 | `server/src/personalization-schema.ts` | Datenvertrag der Präferenzen, Fokus-Vorschläge und die Regeln fürs Speichern eigener Fragen |
 | `server/src/mcp/` | MCP-Client, Admin-Verwaltung, Site-Freigaben, eigene Tabellen und serverseitige Lizenzprüfung über `mcp` |
+| `server/src/tableau-server/` | Tableau-Server-Anbindung: Connected-App-Sign-in (Direct Trust und OAuth 2.0 Trust/EAS), REST-Content-Suche, Metadata-API (Feldsuche/-detail), Site-Konfiguration und Admin-UI — lizenzpflichtig über `tableauServer`, siehe [docs/tableau-server.md](../docs/tableau-server.md) |
+| `server/src/secrets.ts` | AES-256-GCM-Verschlüsselung für im Admin-UI gespeicherte Secrets (aktuell: Tableau-Connected-App-Secrets je Site), Schlüssel aus `OVP_SECRET_KEY` |
+| `server/src/telemetry.ts`, `server/src/telemetry-store.ts` | Lizenz-Heartbeat (täglich, nur mit gültiger Lizenz) — siehe [telemetry/README.md](telemetry/README.md) |
 | `server/src/system-prompt.ts` (Kern, lizenzabhängiger Abschnitt) | Dashboard-Aktionen (Filter, Parameter, Markieren, Bereich) im System-Prompt — lizenzpflichtig über `actions` |
 | `extension/src/mcp-client.ts` | Bestätigung externer Datenübertragungen und authentifizierte MCP-Aufrufe |
+| `extension/src/tableau-client.ts` | Führt die Tableau-Server-Tools (Content-Suche, Metadata-Feldsuche/-detail) über die Middleware aus |
 | `extension/src/oidc-login.ts` | Popup-Login mit PKCE aus der Tableau-Extension heraus, Sitzung im `sessionStorage` |
 | `extension/src/LoginPanel.tsx` | Login-Ansicht der Extension |
 | `extension/src/MemoryFactsPanel.tsx` | Gespeicherte Infos über den Anwender ansehen und löschen |
@@ -32,6 +36,7 @@ lizenzpflichtigen Funktionen ausmacht, liegt unter dieser Lizenz.
 
 Einrichtung (Entra, Keycloak, Lizenz, Helm): [docs/enterprise.md](../docs/enterprise.md).
 MCP-Einrichtung und Site-Berechtigungen: [docs/mcp.md](../docs/mcp.md).
+Tableau-Server-Anbindung: [docs/tableau-server-setup.md](../docs/tableau-server-setup.md) und [docs/tableau-server.md](../docs/tableau-server.md).
 
 ## Lizenzformat
 

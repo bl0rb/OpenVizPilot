@@ -1,6 +1,6 @@
 # Tableau Server: Konfiguration und Betrieb
 
-Diese Anleitung beschreibt die implementierte Enterprise-Integration bis einschließlich Phase 3. Phase 3 umfasst Feldsuche/-detail, Formeln sowie eine begrenzte Dictionary- und Impact-Grundlage; eine vollständige Lineagevisualisierung ist nicht enthalten. Sie setzt Tableau Server 2024.2 einschließlich und REST API 3.23 oder höher als Zieluntergrenze voraus; Anfragen verwenden fest die REST-Version 3.23. Die reale Live-Abnahme wurde auf Wunsch nicht durchgeführt; die Anleitung ist deshalb keine Kompatibilitätszusage für eine konkrete Installation.
+Diese Anleitung beschreibt die Einrichtung der Tableau-Server-Integration. Was die Integration tut, ihr Sicherheitsmodell, die Chat-Tools und die HTTP-Endpunkte stehen in [tableau-server.md](tableau-server.md). Sie setzt Tableau Server 2024.2 einschließlich und REST API 3.23 oder höher voraus.
 
 ## Voraussetzungen
 
@@ -94,31 +94,9 @@ Das Ergebnis nennt Versionen und einzelne Probe-Status. Erfolg wird nur bei `sta
 
 ## Suche und Chat
 
-Das Tool `tableau_server_search` sucht persönliche, zugängliche Workbooks und Views nach Name/ID, Projekt, Owner und Tag. Der `all`-Modus umfasst nur Workbooks und Views. Projekte und Datenquellen sind Connection-Test-Primitives, aber keine aktuellen Finder-Ressourcen. Die Suche liest keine Kennzahlen, Zeilen- oder Dashboarddaten.
+Die Chat-Tools (`tableau_server_search`, `tableau_metadata_search`, `tableau_metadata_field`), ihre Parameter und die geltenden Such-/Metadaten-Limits stehen in [tableau-server.md](tableau-server.md). Voraussetzung ist die per-Nutzer-Freigabe **Tableau-API** (siehe [user-approvals.md](user-approvals.md)) zusätzlich zu Lizenz, OIDC-Mapping und Site-Zuordnung.
 
-Die Grenzen pro Anfrage sind:
-
-- höchstens 500 gescannte Datensätze;
-- bei einer View-Suche höchstens 250 Workbook-Datensätze, danach das verbleibende Budget für Views;
-- standardmäßig 20 Treffer;
-- maximal 50 Treffer;
-- maximal 10 Sekunden Gesamtbudget.
-
-Bei abgeschnittenen oder teilweise nicht lesbaren Ergebnissen werden `truncated` und `limitations` gesetzt. Kein Treffer ist bei einem begrenzten Scan kein Beweis für Nichtexistenz. `retrievedAt` ist der Abrufzeitpunkt; `updatedAt` ist eine Content-Änderung und kein Refresh-Nachweis.
-
-Die Chat-Integration ist auf Tableau-Analytics-Discovery begrenzt. Allgemeine Tableau-Server-Verwaltung und Job-Abfragen sind nicht im User-Scope. Die umgesetzte Metadata API und semantische Feld-/Lineage-Grundlage werden über `tableau_metadata_search { query, datasourceId?, limit }` und `tableau_metadata_field { fieldId }` mit festen Queries und eigenen Aktivierungsgrenzen angebunden.
-
-`tableau_metadata_search` liefert Root-Felder und Datasource-Zusammenfassung. `tableau_metadata_field` liefert das Detail eines ausgewählten `fieldId`, einschließlich berechneter Formel und begrenzter Herkunft/Nutzung. Gelieferte URL- oder Pfadmetadaten dürfen angezeigt bzw. an den LLM-Anbieter weitergegeben werden; erfundene Source-URLs, Tokens und Secrets werden niemals ergänzt oder weitergegeben.
-
-Suchtreffer werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter übermittelt. Dazu können Content-Namen, Tags, Owner-/Projektangaben und interne Tableau-Quelllinks gehören. Das ist bei der Freigabe des Anbieters und seiner Datenverarbeitung zu berücksichtigen. Tableau-Tokens und Connected-App-Secrets werden nicht mitgesendet.
-
-## Scopes und bewusst ausgelassene Funktionen
-
-- Implementiert: `tableau:content:read`.
-- Auf Phase 6 verschoben: `tableau:jobs:read`, ausschließlich für einen getrennten admin-only Jobs-/Governance-Pfad.
-- Nicht implementiert: Extract-Refresh-Tasks über JWT für Tableau Cloud; dieser Cloud-Pfad ist kein Tableau-Server-Fallback.
-- Umgesetzt: Metadata API, externe Asset-Sichtbarkeit, Feldsuche/-detail, Formeln sowie begrenzte Lineage-, Dictionary- und Impact-Grundlage; siehe [tableau-server-metadata.md](tableau-server-metadata.md). Eine vollständige Lineagevisualisierung und beliebige GraphQL-Abfragen sind ausgeschlossen.
-- Nicht implementiert: VDS und Admin-Copilot.
+Suchtreffer und Metadaten werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter übermittelt (Content-Namen, Tags, Owner-/Projektangaben, Quelllinks, Formeln). Das ist bei der Freigabe des Anbieters und seiner Datenverarbeitung zu berücksichtigen. Tableau-Tokens und Connected-App-Secrets werden nicht mitgesendet.
 
 ## Betrieb und Fehlerbehandlung
 
@@ -133,9 +111,4 @@ Suchtreffer werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter überm
 - Bei OIDC-, TLS-, Berechtigungs-, Versionierungs- oder REST-Fehlern zeigt die Anwendung eine bereinigte Fehlermeldung. Rohantworten von Tableau werden nicht weitergereicht.
 - Reload, Save, Reset und ungespeicherte Feldänderungen brechen einen laufenden Browser-Test ab und verwerfen sein Ergebnis.
 
-## Live-Abnahme
-
-Die reale Prüfung mit Connected App, Site, Claim und zwei Berechtigungsprofilen wurde auf ausdrücklichen Wunsch nicht ausgeführt. Das ist für die dokumentierte Phase kein Blocker. Vor produktiver Freigabe muss eine separate Abnahme gegen die Zielinstallation die Version, OIDC-Claim-Zuordnung, Site-Rechte, vier REST-Probes, Suchgrenzen und Secret-Rotation prüfen.
-
-Weitere technische Details und die Quellenmatrix stehen in [tableau-server-rest.md](tableau-server-rest.md) und [tableau-server-integration.md](tableau-server-integration.md).
-Die Metadata-Spezifikation steht in [tableau-server-metadata.md](tableau-server-metadata.md).
+Weitere technische Details — Sicherheitsmodell, Chat-Tools, HTTP-Endpunkte, Limits und Mindestversion — stehen in [tableau-server.md](tableau-server.md).

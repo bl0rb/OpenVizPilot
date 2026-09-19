@@ -8,8 +8,8 @@ type: application
 # version/appVersion werden beim Release vom Publish-Workflow aus dem Git-Tag
 # gesetzt (helm package --version/--app-version); die Werte hier werden beim
 # Taggen mitgezogen und dienen nur der Lesbarkeit im Repo.
-version: 1.3.1
-appVersion: "1.3.1"
+version: 1.4.0
+appVersion: "1.4.0"
 keywords:
   - tableau
   - llm

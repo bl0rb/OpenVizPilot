@@ -125,3 +125,16 @@ describe('removed license public-key override', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('OVP_ENVIRONMENT', () => {
+  it('defaults to production, treats an empty value as unset and accepts only the four environments', () => {
+    expect(loadEnv(baseEnv()).environment).toBe('production');
+    expect(loadEnv(baseEnv({ OVP_ENVIRONMENT: '' })).environment).toBe('production');
+    for (const environment of ['production', 'development', 'test', 'staging'] as const) {
+      expect(loadEnv(baseEnv({ OVP_ENVIRONMENT: environment })).environment).toBe(environment);
+    }
+    expect(() => loadEnv(baseEnv({ OVP_ENVIRONMENT: 'prod' }))).toThrow(/OVP_ENVIRONMENT/);
+    // Lease-Vertrauensanker sind fest eingebaut — kein Env-Pfad.
+    expect(loadEnv(baseEnv()).leaseTrustedKeys).toBeUndefined();
+  });
+});

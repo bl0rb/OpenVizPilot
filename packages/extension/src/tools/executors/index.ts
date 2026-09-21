@@ -1,5 +1,7 @@
 import {
   AGGREGATE_DEFAULT_MAX_ROWS,
+  BREAKDOWN_DEFAULT_MAX_GROUPS,
+  COMPARE_PERIODS_MAX_GROUPS,
   MARKS_DEFAULT_MAX_ROWS,
   SUMMARY_DEFAULT_MAX_ROWS,
   rowsToMarkdownTable,
@@ -12,15 +14,21 @@ import { describeFilter, describeParameter } from '../../tableau/context-snapsho
 import {
   MAX_AGGREGATE_SOURCE_ROWS,
   findWorksheet,
+  parseTolerantDate,
   readAllSummaryPages,
   readSummaryRows,
+  resolveColumnIndices,
   tableToRows,
 } from './helpers';
+import { executeLookupMetric, type MetricLookupNetwork } from './metrics';
 
 type ArgsOf<N extends ToolName> = z.infer<(typeof toolArgSchemas)[N]>;
 
+/** Netzwerk-Kontext für Tools, die (anders als die übrigen, dashboard-lokalen Tools) einen Server-Call brauchen — aktuell nur `lookup_metric` (W1 Trust Layer). */
+export type ToolNetworkContext = MetricLookupNetwork;
+
 export type ToolExecutors = {
-  [N in ToolName]: (args: ArgsOf<N>, dashboard: Dashboard) => Promise<string>;
+  [N in ToolName]: (args: ArgsOf<N>, dashboard: Dashboard, network: ToolNetworkContext) => Promise<string>;
 };
 
 export const executors: ToolExecutors = {
@@ -266,6 +274,204 @@ export const executors: ToolExecutors = {
     }
     if (totalGroups > shown.length) {
       parts.push(`Zeige ${shown.length} von ${totalGroups} Gruppen.`);
+    }
+    return parts.join('\n');
+  },
+
+  async lookup_metric(args, _dashboard, network) {
+    return executeLookupMetric(args, network);
+  },
+
+  async breakdown_by(args, dashboard) {
+    const ws = findWorksheet(dashboard, args.worksheet);
+    const result = await readAllSummaryPages(ws);
+    if (result.totalRowCount === 0) {
+      return `"${ws.name}" liefert aktuell keine Zeilen (möglicherweise filtern die aktiven Filter alles heraus).`;
+    }
+    const [dimIdx, measureIdx] = resolveColumnIndices(ws.name, result.columns, [args.dimension, args.measure]);
+
+    const agg = args.agg ?? 'sum';
+    interface Acc {
+      sum: number;
+      numericCount: number;
+      rowCount: number;
+    }
+    const groups = new Map<string, Acc>();
+    for (const row of result.rows) {
+      const key = row[dimIdx!]?.formattedValue ?? '';
+      let acc = groups.get(key);
+      if (!acc) {
+        acc = { sum: 0, numericCount: 0, rowCount: 0 };
+        groups.set(key, acc);
+      }
+      acc.rowCount += 1;
+      const raw = row[measureIdx!]?.value;
+      if (raw == null || raw === '') continue;
+      const num = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isNaN(num)) continue;
+      acc.sum += num;
+      acc.numericCount += 1;
+    }
+
+    const valueOf = (acc: Acc): number => {
+      if (agg === 'count') return acc.rowCount;
+      if (acc.numericCount === 0) return 0;
+      return agg === 'avg' ? Math.round((acc.sum / acc.numericCount) * 100) / 100 : acc.sum;
+    };
+
+    const rows = [...groups.entries()]
+      .map(([key, acc]) => ({ key, value: valueOf(acc) }))
+      .sort((a, b) => b.value - a.value);
+
+    const total = rows.reduce((s, r) => s + r.value, 0);
+    const top3Sum = rows.slice(0, 3).reduce((s, r) => s + r.value, 0);
+    const top3Share = total !== 0 ? (top3Sum / total) * 100 : 0;
+    const pct = (v: number): string => (total !== 0 ? `${((v / total) * 100).toFixed(1)} %` : '0.0 %');
+
+    const maxGroups = args.maxGroups ?? BREAKDOWN_DEFAULT_MAX_GROUPS;
+    const shown = rows.slice(0, maxGroups);
+    const rest = rows.slice(maxGroups);
+
+    const tableRows = shown.map((r) => [r.key, String(r.value), pct(r.value)]);
+    if (rest.length > 0) {
+      const restValue = rest.reduce((s, r) => s + r.value, 0);
+      tableRows.push([`Übrige (${rest.length})`, String(restValue), pct(restValue)]);
+    }
+
+    const parts = [rowsToMarkdownTable([args.dimension, `${agg}(${args.measure})`, 'Anteil %'], tableRows)];
+    parts.push(`\n${rows.length} Gruppen aus ${result.rows.length} Zeilen.`);
+    parts.push(`Top-3 erklären ${top3Share.toFixed(1)} % des Gesamtwerts.`);
+    if (result.truncated) {
+      parts.push(
+        `Achtung: Es wurden nur die ersten ${MAX_AGGREGATE_SOURCE_ROWS} Quellzeilen berücksichtigt — der Datensatz ist größer, die Aufschlüsselung ist ggf. unvollständig.`,
+      );
+    }
+    return parts.join('\n');
+  },
+
+  async compare_periods(args, dashboard) {
+    const ws = findWorksheet(dashboard, args.worksheet);
+    const result = await readAllSummaryPages(ws);
+    if (result.totalRowCount === 0) {
+      return `"${ws.name}" liefert aktuell keine Zeilen (möglicherweise filtern die aktiven Filter alles heraus).`;
+    }
+    const wanted = [args.dateColumn, args.measure, ...(args.groupBy ? [args.groupBy] : [])];
+    const indices = resolveColumnIndices(ws.name, result.columns, wanted);
+    const dateIdx = indices[0]!;
+    const measureIdx = indices[1]!;
+    const groupIdx = args.groupBy ? indices[2]! : -1;
+
+    const fromA = parseTolerantDate(args.periodA.from);
+    const toA = parseTolerantDate(args.periodA.to);
+    const fromB = parseTolerantDate(args.periodB.from);
+    const toB = parseTolerantDate(args.periodB.to);
+    if (!fromA || !toA || !fromB || !toB) {
+      throw new Error(
+        `Ungültiges Datum in periodA/periodB — erwartet ISO (z. B. "2024-01-01") oder "YYYY-MM-DD".`,
+      );
+    }
+
+    const agg = args.agg ?? 'sum';
+    interface Acc {
+      sum: number;
+      numericCount: number;
+      rowCount: number;
+    }
+    const newAcc = (): Acc => ({ sum: 0, numericCount: 0, rowCount: 0 });
+    const addTo = (acc: Acc, raw: unknown): void => {
+      acc.rowCount += 1;
+      if (raw == null || raw === '') return;
+      const num = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isNaN(num)) return;
+      acc.sum += num;
+      acc.numericCount += 1;
+    };
+    const valueOf = (acc: Acc): number => {
+      if (agg === 'count') return acc.rowCount;
+      if (acc.numericCount === 0) return 0;
+      return agg === 'avg' ? Math.round((acc.sum / acc.numericCount) * 100) / 100 : acc.sum;
+    };
+
+    const totalA = newAcc();
+    const totalB = newAcc();
+    const groupsA = new Map<string, Acc>();
+    const groupsB = new Map<string, Acc>();
+    let unparseableDates = 0;
+
+    for (const row of result.rows) {
+      const date = parseTolerantDate(row[dateIdx]?.value);
+      if (!date) {
+        unparseableDates += 1;
+        continue;
+      }
+      const t = date.getTime();
+      let period: 'A' | 'B' | null = null;
+      if (t >= fromA.getTime() && t < toA.getTime()) period = 'A';
+      else if (t >= fromB.getTime() && t < toB.getTime()) period = 'B';
+      if (!period) continue;
+
+      const raw = row[measureIdx]?.value;
+      addTo(period === 'A' ? totalA : totalB, raw);
+
+      if (groupIdx !== -1) {
+        const key = row[groupIdx]?.formattedValue ?? '';
+        const groups = period === 'A' ? groupsA : groupsB;
+        let acc = groups.get(key);
+        if (!acc) {
+          acc = newAcc();
+          groups.set(key, acc);
+        }
+        addTo(acc, raw);
+      }
+    }
+
+    if (totalA.rowCount === 0 && totalB.rowCount === 0) {
+      return `Keine Zeilen in Periode A (${args.periodA.from} bis ${args.periodA.to}) oder Periode B (${args.periodB.from} bis ${args.periodB.to}) gefunden — prüfe Datumsspalte "${args.dateColumn}" und die Zeiträume.`;
+    }
+
+    const valueA = valueOf(totalA);
+    const valueB = valueOf(totalB);
+    const diff = valueB - valueA;
+    const pctText =
+      valueA !== 0 ? `${((diff / Math.abs(valueA)) * 100).toFixed(1)} %` : valueB !== 0 ? 'n/a (Periode A = 0)' : '0.0 %';
+
+    const label = `${agg}(${args.measure})`;
+    const parts = [
+      `**Periode A** (${args.periodA.from} bis ${args.periodA.to}, exklusiv): ${label} = ${valueA}`,
+      `**Periode B** (${args.periodB.from} bis ${args.periodB.to}, exklusiv): ${label} = ${valueB}`,
+      `**Differenz**: ${diff} (${pctText})`,
+    ];
+
+    if (groupIdx !== -1) {
+      const keys = new Set([...groupsA.keys(), ...groupsB.keys()]);
+      const groupRows = [...keys]
+        .map((key) => {
+          const a = valueOf(groupsA.get(key) ?? newAcc());
+          const b = valueOf(groupsB.get(key) ?? newAcc());
+          return { key, a, b, d: b - a };
+        })
+        .sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
+      const shown = groupRows.slice(0, COMPARE_PERIODS_MAX_GROUPS);
+      parts.push('');
+      parts.push(
+        rowsToMarkdownTable(
+          [args.groupBy!, 'A', 'B', 'Differenz'],
+          shown.map((r) => [r.key, String(r.a), String(r.b), String(r.d)]),
+        ),
+      );
+      if (groupRows.length > shown.length) {
+        parts.push(`Zeige ${shown.length} von ${groupRows.length} Gruppen.`);
+      }
+    }
+
+    parts.push('_Perioden sind halboffen: from <= Datum < to._');
+    if (unparseableDates > 0) {
+      parts.push(`${unparseableDates} Zeile(n) mit nicht interpretierbarem Datum in "${args.dateColumn}" wurden ignoriert.`);
+    }
+    if (result.truncated) {
+      parts.push(
+        `Achtung: Es wurden nur die ersten ${MAX_AGGREGATE_SOURCE_ROWS} Quellzeilen berücksichtigt — der Datensatz ist größer, der Vergleich ist ggf. unvollständig.`,
+      );
     }
     return parts.join('\n');
   },

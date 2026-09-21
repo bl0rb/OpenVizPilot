@@ -29,14 +29,18 @@ permissions:
 jobs:
   # Release-Gate: das Image wird nur publiziert, wenn Typecheck, Tests und
   # Build-Checks (pr-ci.yml) auf dem getaggten Stand durchlaufen.
+  # Nur im öffentlichen Repo — das private Repo hat sein eigenes Pendant
+  # (enterprise-publish-image.yml).
   ci:
     name: CI Checks
+    if: github.repository == 'bl0rb/OpenVizPilot'
     uses: ./.github/workflows/pr-ci.yml
     permissions:
       contents: read
 
   publish:
     needs: ci
+    if: github.repository == 'bl0rb/OpenVizPilot'
     runs-on: ubuntu-latest
 
     steps:

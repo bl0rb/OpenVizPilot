@@ -3,12 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
-import { startMockOidc, type MockOidc } from '../../../ee/test/mock-oidc-server';
+import { DEFAULT_LICENSE_KID, EE_STUB, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
 import { userAccessId } from '../src/memory/store';
-import { testLicenseEnv } from './license-helper';
+import { activated, testLicenseEnv } from './license-helper';
 
 /**
  * Open-Core-Anmeldung (Benutzerkonten aus der Admin-UI) und die Laufzeit-
@@ -51,6 +50,7 @@ function localConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
+    environment: 'test',
     ...testLicenseEnv(['savedQueries']),
     ...overrides,
   };
@@ -62,9 +62,13 @@ async function login(app: ReturnType<typeof createApp>['app'], username: string,
   return app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username, password }) });
 }
 
-describe('local user login (open core)', () => {
+// Braucht eine echte Lizenz (testLicenseEnv(['savedQueries'])/activated) für die
+// Präferenzen-Endpunkte — im Core-Export (EE_STUB) ist jede Lizenz 'none',
+// diese Suite läuft nur im vollen Baum.
+describe.skipIf(EE_STUB)('local user login (open core)', () => {
   it('admin creates users; the extension logs in and the session binds the verified user', async () => {
-    const { app } = createApp(localConfig());
+    // Präferenzen sind lizenzpflichtig — die Installation muss aktiviert sein.
+    const { app } = await activated(createApp(localConfig()));
     // Ohne Sitzung: 401 auth_required, Config meldet Modus local.
     expect(((await (await app.request('/api/auth/config')).json()) as { mode: string }).mode).toBe('local');
     const closed = await app.request('/api/models');
@@ -204,11 +208,25 @@ describe('local user login (open core)', () => {
   });
 });
 
-describe('runtime auth settings (admin UI)', () => {
+// Braucht den Enterprise-Mock-IdP (ee/test/, nur im vollen Baum vorhanden) und
+// eine echte Lizenzprüfung für den OIDC-Modus — im Core-Export (EE_STUB) nie
+// verfügbar, diese Suite läuft nur im vollen Baum.
+describe.skipIf(EE_STUB)('runtime auth settings (admin UI)', () => {
+  /** Minimale Sicht auf ee/test/mock-oidc-server.ts — das Modul existiert nur im vollen (privaten) Baum. */
+  interface MockOidc {
+    issuer: string;
+    close(): Promise<void>;
+  }
   let idp: MockOidc;
   let licenseToken: string;
   let publicKeyB64url: string;
   beforeAll(async () => {
+    // Dynamischer statt statischer Import: ee/test/ existiert nur im vollen
+    // (privaten) Baum. Diese Zeile wird im Core-Export nie ausgeführt (siehe
+    // describe.skipIf(EE_STUB) oben) — @ts-ignore, weil dort auch der Typ
+    // nicht auflösbar ist.
+    // @ts-ignore -- nur im vollen Baum vorhanden, siehe Kommentar oben
+    const { startMockOidc } = await import('../../../ee/test/mock-oidc-server');
     idp = await startMockOidc({ clientId: 'ovp-admin-test' });
     const { publicKey, privateKey } = generateKeyPairSync('ed25519');
     publicKeyB64url = (publicKey.export({ format: 'jwk' }) as { x: string }).x;
@@ -227,7 +245,8 @@ describe('runtime auth settings (admin UI)', () => {
   });
 
   it('switches from open to local to SSO without restart, validating license and OIDC first', async () => {
-    const { app } = createApp(localConfig({ authMode: 'none', licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: publicKeyB64url } }));
+    const instance = createApp(localConfig({ authMode: 'none', licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: publicKeyB64url } }));
+    const { app } = instance;
     expect((await app.request('/api/models')).status).not.toBe(401);
 
     // SSO ohne Lizenz → abgelehnt, nichts gespeichert.
@@ -268,6 +287,10 @@ describe('runtime auth settings (admin UI)', () => {
     });
     expect(noUrl.status).toBe(400);
     expect(((await noUrl.json()) as { error: string }).error).toMatch(/öffentliche URL/);
+
+    // Offline-Lease für die neue Lizenz liegt schon vor (ohne Endpunkt läuft kein Heartbeat):
+    // sobald der Schlüssel gespeichert ist, ist die Installation aktiviert.
+    await activated(instance, { licenseId: 'admin-test' });
 
     // Lizenz + OIDC + URL → SSO aktiv, Secret bleibt beim nächsten Speichern erhalten.
     const sso = await app.request('/api/admin/auth-settings', {

@@ -70,8 +70,16 @@ export const chatRequestSchema = z.object({
    * Nutzungsstatistik gezählt.
    */
   retry: z.boolean().optional(),
+  /**
+   * Untersuchungsmodus (W3): 'investigate' hängt einen zusätzlichen
+   * Prompt-Abschnitt an (INVESTIGATE_PROMPT_SECTION, siehe system-prompt.ts)
+   * und lässt die Extension mehr Tool-Runden zulassen. Default 'ask'
+   * (bestehendes Verhalten) bei fehlendem Feld.
+   */
+  mode: z.enum(['ask', 'investigate']).optional(),
 });
 
 export type ToolCall = z.infer<typeof toolCallSchema>;
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+export type ChatMode = NonNullable<ChatRequest['mode']>;

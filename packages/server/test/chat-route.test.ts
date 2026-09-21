@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
-import { testLicenseEnv } from './license-helper';
+import { activated, testLicenseEnv } from './license-helper';
 import type { AppConfig } from '../src/env';
-import { createSqlitePersonalizationStore } from '@openvizpilot/ee/server';
+import { createSqlitePersonalizationStore, EE_STUB } from '@openvizpilot/ee/server';
 import { createSqliteMemoryStore, openSqliteDatabase } from '../src/memory/sqlite-store';
 import { createLogger } from '../src/logger';
 
@@ -110,7 +110,18 @@ afterAll(async () => {
   await new Promise<void>((resolve, reject) =>
     fixtureServer.close((err) => (err ? reject(err) : resolve())),
   );
+  fs.rmSync(licensedDir, { recursive: true, force: true });
 });
+
+/**
+ * Enterprise-Funktionen brauchen seit L1 eine aktivierte Installation — also
+ * eine Datenbank mit Lease. Jede lizenzierte App bekommt eine eigene SQLite-Datei.
+ */
+const licensedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openvizpilot-route-licensed-'));
+let licensedCount = 0;
+async function licensedApp(overrides: Partial<AppConfig>): Promise<ReturnType<typeof createApp>> {
+  return activated(createApp(testConfig({ memoryDbPath: path.join(licensedDir, `licensed-${licensedCount++}.db`), ...overrides })));
+}
 
 function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -135,6 +146,7 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
+    environment: 'test',
     licenseEnv: {},
     ...overrides,
   };
@@ -149,7 +161,7 @@ async function postChat(
   body: unknown,
   overrides: Partial<AppConfig> = {},
 ): Promise<{ status: number; events: ParsedEvent[]; json?: unknown }> {
-  const { app } = createApp(testConfig(overrides));
+  const { app } = overrides.licenseEnv ? await licensedApp(overrides) : createApp(testConfig(overrides));
   const res = await app.request('/api/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -181,7 +193,10 @@ function chunkDelta(content: string) {
   return { choices: [{ delta: { content }, finish_reason: null }] };
 }
 
-describe('POST /api/chat', () => {
+// Enterprise-Funktionen (User-Memory, gespeicherte Abfragen, Dashboard-Aktionen)
+// brauchen eine echte Lizenzprüfung (testLicenseEnv/activated) — im Core-Export
+// (EE_STUB) ist jede Lizenz 'none', diese Suite läuft nur im vollen Baum.
+describe.skipIf(EE_STUB)('POST /api/chat', () => {
   it('streams text deltas and a done event', async () => {
     nextResponse = {
       kind: 'sse',
@@ -328,7 +343,7 @@ describe('POST /api/chat', () => {
       };
 
       // User-Memory ist eine Enterprise-Funktion — ohne Lizenz passiert nichts davon.
-      const { app } = createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['memory']) }));
+      const { app } = await activated(createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['memory']) })));
       const res = await app.request('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -447,7 +462,7 @@ describe('POST /api/chat', () => {
           { choices: [{ delta: {}, finish_reason: 'stop' }] },
         ],
       };
-      const { app } = createApp(testConfig({ ...testLicenseEnv(['savedQueries']) }));
+      const { app } = await licensedApp({ ...testLicenseEnv(['savedQueries']) });
       const res = await app.request('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -469,7 +484,11 @@ describe('POST /api/chat', () => {
         tableauServer: false,
       });
 
-      const licensed = createApp(testConfig({ ...testLicenseEnv(['memory']) }));
+      // Lizenz ohne Aktivierung (noch nie eine Lease): nur Core.
+      const pending = createApp(testConfig({ memoryDbPath: path.join(licensedDir, 'pending.db'), ...testLicenseEnv(['memory']) }));
+      expect(((await (await pending.app.request('/api/features')).json()) as { features: Record<string, boolean> }).features.memory).toBe(false);
+
+      const licensed = await licensedApp({ ...testLicenseEnv(['memory']) });
       expect(((await (await licensed.app.request('/api/features')).json()) as { features: Record<string, boolean> }).features).toEqual({
         sso: false,
         memory: true,
@@ -480,7 +499,7 @@ describe('POST /api/chat', () => {
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
-      const full = createApp(testConfig({ ...testLicenseEnv() }));
+      const full = await licensedApp({ ...testLicenseEnv() });
       expect(((await (await full.app.request('/api/features')).json()) as { features: Record<string, boolean> }).features).toEqual({
         sso: true,
         memory: true,
@@ -519,7 +538,7 @@ describe('POST /api/chat', () => {
       const dbPath = path.join(tmpDir, 'memory.db');
       try {
         // Gespeicherte eigene Abfragen sind eine Enterprise-Funktion.
-        const { app } = createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['savedQueries']) }));
+        const { app } = await activated(createApp(testConfig({ memoryDbPath: dbPath, ...testLicenseEnv(['savedQueries']) })));
 
         // GET ohne x-dashboard-key: 400
         const getMissingKey = await app.request('/api/memory/prefs', {
@@ -643,6 +662,38 @@ describe('POST /api/chat', () => {
     const systemContent = chatBody.messages[0]?.content ?? '';
     expect(systemContent).toContain('apply_filter');
     expect(systemContent).not.toContain('IMMER ein leeres Array');
+  });
+
+  it('omits the investigate prompt section by default (mode absent)', async () => {
+    receivedBodies = [];
+    nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
+
+    await postChat(validBody);
+
+    const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
+    expect(chatBody.messages[0]?.content).not.toContain('UNTERSUCHUNGSMODUS');
+  });
+
+  it('omits the investigate prompt section when mode is "ask"', async () => {
+    receivedBodies = [];
+    nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
+
+    await postChat({ ...validBody, mode: 'ask' });
+
+    const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
+    expect(chatBody.messages[0]?.content).not.toContain('UNTERSUCHUNGSMODUS');
+  });
+
+  it('includes the investigate prompt section when mode is "investigate"', async () => {
+    receivedBodies = [];
+    nextResponse = { kind: 'sse', chunks: [{ choices: [{ delta: {}, finish_reason: 'stop' }] }] };
+
+    await postChat({ ...validBody, mode: 'investigate' });
+
+    const chatBody = receivedBodies[0] as { messages: Array<{ role: string; content: string }> };
+    const systemContent = chatBody.messages[0]?.content ?? '';
+    expect(systemContent).toContain('UNTERSUCHUNGSMODUS');
+    expect(systemContent).toContain('Hauptursache');
   });
 
   it('injects authorContext into the system prompt with the closing tag escaped', async () => {

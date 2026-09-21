@@ -132,4 +132,52 @@ export const DEFAULT_SLASH_COMMANDS: SlashCommand[] = [
     template:
       'Goal: Assess the data quality of this dashboard. Approach: Check for obvious gaps (empty values, missing groups) and whether active filters or parameters hide part of the data. Format: List of findings with likely causes and a note on what viewers should keep in mind when interpreting the results.',
   },
+  {
+    name: 'fuehrungsbericht',
+    description: 'Executive brief of the dashboard for leadership',
+    argHint: '<audience>',
+    template:
+      'Goal: Create an executive brief of this dashboard for {{args}}. Approach: Gather the key figures, active filters and any notable deviations with tools; use only data from this dashboard and flag any uncertainties. Format: 1) Key takeaways (max. 3 sentences), 2) Most important metrics with value and change, 3) Notable deviations/anomalies, 4) Recommended actions (max. 3), 5) Data basis (worksheets, active filters, as-of state).',
+  },
+  {
+    name: 'exec-brief',
+    description: 'Executive brief of the dashboard for leadership',
+    argHint: '<audience>',
+    template:
+      'Goal: Create an executive brief of this dashboard for {{args}}. Approach: Gather the key figures, active filters and any notable deviations with tools; use only data from this dashboard and flag any uncertainties. Format: 1) Key takeaways (max. 3 sentences), 2) Most important metrics with value and change, 3) Notable deviations/anomalies, 4) Recommended actions (max. 3), 5) Data basis (worksheets, active filters, as-of state).',
+  },
+  {
+    name: 'herkunft',
+    description: 'Explain the provenance chain of a number or field',
+    argHint: 'Kennzahl oder Feld',
+    template: `Explain where the number for {{args}} comes from. Follow the provenance chain step by step and present it exactly in this format:
+
+**Dashboard** → name
+**Worksheet** → name
+**Field** → name (data type; calculated field with formula if known)
+**Definition** → company definition from the metric catalogue (call lookup_metric; 'not in catalogue' otherwise)
+**Datasource** → name, connection type
+**Tables** → upstream tables if Tableau Server metadata is available, otherwise 'not available'
+**Filters** → active filters and parameters affecting this worksheet
+**Certification** → certified / not certified / unknown
+
+Use get_worksheet_fields, get_datasource_info, get_filters, get_parameters, lookup_metric and — if available — tableau_metadata_search then tableau_metadata_field. Never invent a formula or table; write 'not available' instead.`,
+  },
+  {
+    name: 'lineage',
+    description: 'Explain the provenance chain of a number or field',
+    argHint: 'Kennzahl oder Feld',
+    template: `Explain where the number for {{args}} comes from. Follow the provenance chain step by step and present it exactly in this format:
+
+**Dashboard** → name
+**Worksheet** → name
+**Field** → name (data type; calculated field with formula if known)
+**Definition** → company definition from the metric catalogue (call lookup_metric; 'not in catalogue' otherwise)
+**Datasource** → name, connection type
+**Tables** → upstream tables if Tableau Server metadata is available, otherwise 'not available'
+**Filters** → active filters and parameters affecting this worksheet
+**Certification** → certified / not certified / unknown
+
+Use get_worksheet_fields, get_datasource_info, get_filters, get_parameters, lookup_metric and — if available — tableau_metadata_search then tableau_metadata_field. Never invent a formula or table; write 'not available' instead.`,
+  },
 ];

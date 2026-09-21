@@ -27,14 +27,18 @@ permissions:
 
 jobs:
   # Release-Gate wie beim Image-Publish: erst wenn die PR-CI grün ist.
+  # Nur im öffentlichen Repo — das Chart entsteht ausschließlich aus dem
+  # Core-Export, das private Repo publiziert hier nichts.
   ci:
     name: CI Checks
+    if: github.repository == 'bl0rb/OpenVizPilot'
     uses: ./.github/workflows/pr-ci.yml
     permissions:
       contents: read
 
   publish-chart:
     needs: ci
+    if: github.repository == 'bl0rb/OpenVizPilot'
     runs-on: ubuntu-latest
 
     steps:

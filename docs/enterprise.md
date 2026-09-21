@@ -141,17 +141,98 @@ Rotation braucht einen Release, nie eine Konfigurationsänderung: sonst könnte 
 eigenem Schlüsselpaar selbst Lizenzen ausstellen.
 
 Ohne gültige Lizenz mit Feature `sso` startet die Middleware im OIDC-Modus **nicht** (klare Fehlermeldung);
-abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Der Status ist in der Admin-UI unter
-„Anmeldung, Single Sign-On & Lizenz“ sichtbar.
+abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Nach `validUntil` bleiben die
+Enterprise-Funktionen noch **7 Tage** aktiv (Subscription-Karenz, Warnbanner in der Admin-UI) und
+schalten erst danach ab — unabhängig von der separaten 30-Tage-Lease-Karenz unten. Der Status ist in
+der Admin-UI unter „Anmeldung, Single Sign-On & Lizenz“ sichtbar.
 
 Für Entwicklung und Tests: `npm run sign-license -w @openvizpilot/ee -- keygen ./keys` erzeugt ein
 Schlüsselpaar, `… -- sign ./keys/private.pem "Firma GmbH" 2027-12-31` einen Token.
 
-## Lizenz-Heartbeat
+## Aktivierung, Lease und Karenz
 
 Eine lizenzierte Installation meldet sich einmal täglich bei WerkWorks — Umfang,
 Verhalten und der Text für Vertrag und Lizenzdokument stehen in
-[ee/telemetry/README.md](../ee/telemetry/README.md).
+[ee/telemetry/README.md](../ee/telemetry/README.md). Seit L1 ist dieser Heartbeat
+zugleich die **Aktivierung**: Die Installation (dauerhafte Installation-ID aus der
+Datenbank) erhält eine signierte **Lease** über 7 Tage, die der Heartbeat alle
+24 Stunden erneuert. Enterprise-Funktionen sind aktiv, wenn die Lizenz gültig ist
+**und** die Installation eine Lease hat (aktiv oder in Karenz). Der erste Heartbeat
+läuft sofort beim Start; ein neu eingetragener Lizenzschlüssel und „Jetzt
+aktualisieren“ in der Admin-UI lösen ihn ebenfalls sofort aus — eine online
+erreichbare Installation ist binnen Sekunden aktiviert.
+
+Zustände (Lizenzkarte in der Admin-UI):
+
+- **Ausstehend** — diese Installation hatte **noch nie** eine Lease (frisch
+  installiert oder gerade auf diese Version aktualisiert): es laufen nur die
+  Core-Funktionen, bis die erste Aktivierung gelingt — online über den Heartbeat
+  (ausgehend HTTPS auf `werkworks.de`, Port 443) oder per Offline-Lease (unten).
+  Die Admin-UI zeigt in diesem Zustand einen deutlichen Hinweis mit beiden Wegen.
+- **Aktiv bis …** / **Offline-Lease bis …** — gültige Lease.
+- **Grace bis …** — es gab eine Lease, sie ist abgelaufen und konnte nicht erneuert
+  werden, der Ablauf liegt weniger als **30 Tage** zurück. Enterprise bleibt an:
+  Nichterreichbarkeit von werkworks.de schaltet innerhalb von 30 Tagen nach
+  Lease-Ablauf nichts ab.
+- **Blockiert** — WerkWorks hat ein Aktivierungslimit gemeldet (mehr produktive
+  Installationen als lizenziert) und es gibt keine gültige Lease: nur Core. Eine
+  bestehende Installation stilllegen oder übertragen (siehe unten — sofort frei,
+  kein Ticket nötig; nach 14 Tagen ohne Heartbeat gilt eine Installation ohnehin
+  als frei) oder die Lizenz erweitern. Eine noch gültige Lease wird durch das
+  Limit nie ungültig.
+- **Abgelaufen** — Karenz vorbei: nur Core, bis der nächste Heartbeat gelingt oder
+  eine Offline-Lease eingespielt wird.
+
+Lease-Signaturen prüft das Produkt gegen einen eigenen eingebauten Schlüssel
+(`TRUSTED_LEASE_KEYS` in `ee/server/src/license.ts`); eine Lease gilt nur für die
+Installation-ID und Lizenz-ID, für die sie ausgestellt wurde, und erweitert nie die
+Features der Lizenz.
+
+### Stilllegen und Übertragen
+
+Auf der Lizenzkarte listet „Installationen dieser Lizenz“ die aktiven
+Installationen derselben Lizenz (aus der Antwort des letzten Heartbeats, nie
+gespeichert). Ein Admin kann seine eigene Installation stilllegen (Button
+„Diese Installation stilllegen“, Bestätigung nötig — Platz wird sofort frei) oder
+im DR-/Migrationsfall von der neuen Installation aus eine andere Installation
+derselben Lizenz übernehmen („Diese Installation ersetzen“ in deren Zeile): Die
+Zielinstallation wird stillgelegt, die eigene im selben Zug aktiviert. Nachweis
+ist der Lizenz-Token, den auch der Heartbeat sendet — kein zusätzliches Login
+nötig. Die stillgelegte Seite sieht das beim nächsten eigenen Heartbeat
+(„blockiert“, wer sie ersetzt hat) und kann sich, wenn wieder Platz ist, mit
+einem normalen Heartbeat neu aktivieren. Eine selbst stillgelegte Installation
+sendet dagegen keine automatischen Heartbeats mehr — sie bleibt stillgelegt, bis
+ein Admin „Jetzt aktualisieren“ auslöst. Beide Aktionen sind **nur dem
+initialen Admin** vorbehalten (Admin-Token bzw. Admin-Konto; delegierte Admins
+erhalten `403 initial_admin_required`) — Routen `POST
+/api/admin/license/{deactivate,transfer}`, Body `{ confirm: true }` bzw.
+`{ installationId }`; `GET /api/admin/license/installations` (löst denselben
+Heartbeat aus) dürfen alle Admins lesen.
+
+### Umgebungen
+
+`OVP_ENVIRONMENT` (Helm `app.environment`) ∈ `production | development | test |
+staging`, Default `production`. Eine Lizenz erlaubt **eine produktive**
+Installation; Entwicklung, Test und Staging sind inklusive (Lizenz-Payload
+`environments`, Default `{ production: 1, nonProduction: unlimited }`). WerkWorks
+zählt je Lizenz die in den letzten 14 Tagen aktiven Installationen.
+
+### Offline-Aktivierung
+
+Für Installationen ohne Zugang zu werkworks.de: In der Admin-UI unter
+„Offline-Aktivierung“ die **Aktivierungsanfrage** (`ovp-activation-request.json`
+mit Installation-ID, Lizenz-ID, Version, Umgebung) herunterladen und an WerkWorks
+senden. Zurück kommt eine mit dem Lease-Schlüssel signierte Offline-Lease (bis zu
+365 Tage), die im Feld „Lease einfügen“ gespeichert wird (`PUT
+/api/admin/license/lease`) — damit ist die Installation aktiviert. Der Heartbeat
+läuft weiter und ersetzt sie nur durch eine Lease mit späterem Ablauf. Rechtzeitig
+vor Ablauf eine neue Offline-Lease anfordern; nach dem Ablauf gilt die 30-Tage-Karenz.
+
+Alternativ ohne WerkWorks-Handarbeit: Dieselbe Anfrage-Datei direkt unter
+`https://werkworks.de/ovp-lizenz/offline.php` einreichen (Lizenz-Token
+bereithalten, gültig min(365 Tage, Lizenzablauf)) — die Lease kommt sofort als
+Download zurück. Offline-Installationen senden keine Heartbeats und belegen
+ihren Platz bis zum Lease-Ablauf.
 
 ## Helm
 
@@ -169,7 +250,45 @@ license:
   existingSecret: openvizpilot-license   # Key OVP_LICENSE
 app:
   publicUrl: https://chat.example.com
+  environment: production                # development | test | staging zählen nicht gegen die Lizenz
 ```
+
+## Bezug des Enterprise-Images
+
+Das Enterprise-Image (`ghcr.io/bl0rb/openvizpilot-enterprise`, cosign-signiert und mit SBOM wie das
+Core-Image) ist ein **privates** GHCR-Paket, gebaut aus dem privaten Repository. WerkWorks vergibt dafür
+ein Kunden-Lese-Token — GHCR-Paketzugriff wird **je Paket** vergeben, das Token ist also auf
+`openvizpilot-enterprise` beschränkt (Fine-grained PAT mit `read:packages`). Zum Erhalt: info@werkworks.de.
+
+Mit dem Token im Cluster ein Image-Pull-Secret anlegen:
+
+```bash
+kubectl create secret docker-registry openvizpilot-enterprise-pull \
+  --docker-server=ghcr.io \
+  --docker-username=<beliebig, z. B. der Firmenname> \
+  --docker-password=<Kunden-Lese-Token> \
+  --namespace openvizpilot
+```
+
+und im Chart referenzieren:
+
+```yaml
+image:
+  edition: enterprise
+imagePullSecrets:
+  - name: openvizpilot-enterprise-pull
+```
+
+`image.repository` bleibt dabei leer — es wird aus `image.edition` abgeleitet
+(`ghcr.io/bl0rb/openvizpilot-enterprise`); ein explizit gesetzter Wert (z. B. eigene
+Registry-Spiegelung) hat Vorrang. Ohne `imagePullSecrets` bricht das Rendern mit
+`image.edition: enterprise` kontrolliert ab: „Enterprise-Image ist privat: imagePullSecrets mit dem
+WerkWorks-Registry-Token setzen“.
+
+**Source-Review:** Der vollständige Quellcode der Enterprise Edition liegt in einem privaten
+Repository (`ee/` in diesem — öffentlichen — Repository ist nur ein funktionsloser Stub mit
+identischer API-Oberfläche). Kunden erhalten nach Vertrag/NDA Einsicht in das private Repository zur
+Prüfung; Anfragen ebenfalls an info@werkworks.de.
 
 ## Lizenzen ausstellen (WerkWorks)
 

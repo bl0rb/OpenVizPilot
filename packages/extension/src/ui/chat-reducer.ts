@@ -72,7 +72,13 @@ export function reducer(items: ChatItem[], action: Action): ChatItem[] {
         const it = withoutRetrying[i];
         if (it?.kind === 'assistant') {
           const updated = [...withoutRetrying];
-          updated[i] = { ...it, text: action.text, streaming: false };
+          const verifiedMetrics = verifiedMetricsSince(withoutRetrying);
+          updated[i] = {
+            ...it,
+            text: action.text,
+            streaming: false,
+            verifiedMetrics: verifiedMetrics.length > 0 ? verifiedMetrics : undefined,
+          };
           return updated;
         }
       }
@@ -126,4 +132,30 @@ export function reducer(items: ChatItem[], action: Action): ChatItem[] {
 
 function finalizeStreaming(items: ChatItem[]): ChatItem[] {
   return items.map((i) => (i.kind === 'assistant' && i.streaming ? { ...i, streaming: false } : i));
+}
+
+/**
+ * W1 Trust Layer: Namen der Kennzahlen, die seit der letzten User-Frage per
+ * `lookup_metric` bestätigt wurden (abgeschlossene Tool-Aufrufe, deren
+ * `preview` mit der maschinenlesbaren Zeile `metric: <Name>` beginnt — siehe
+ * executors/metrics.ts; `metric: none` = kein Treffer, zählt nicht).
+ */
+function verifiedMetricsSince(items: ChatItem[]): string[] {
+  let start = 0;
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]?.kind === 'user') {
+      start = i;
+      break;
+    }
+  }
+  const names: string[] = [];
+  for (let i = start; i < items.length; i++) {
+    const it = items[i];
+    if (it?.kind !== 'tool' || it.name !== 'lookup_metric' || it.status !== 'done' || !it.preview) continue;
+    const firstLine = it.preview.split('\n', 1)[0]?.trim() ?? '';
+    const match = /^metric:\s*(.+)$/.exec(firstLine);
+    const name = match?.[1]?.trim();
+    if (name && name !== 'none' && !names.includes(name)) names.push(name);
+  }
+  return names;
 }

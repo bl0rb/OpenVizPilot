@@ -11,7 +11,7 @@ function config(): AppConfig {
     litellmBaseUrl: 'https://llm.example.test', litellmApiKey: 'llm-secret', defaultModel: 'model', modelAllowlist: null,
     port: 3000, allowedOrigins: [], serveStaticDir: null, apiAuthToken: null, adminToken: null,
     memoryDatabaseUrl: null, memoryDbPath: null, memoryModel: 'memory', scopeGuardEnabled: false, scopeModel: 'scope',
-    logLevel: 'error', authMode: 'none', publicUrl: null, oidc: null, telemetryEndpoint: '', appVersion: 'test', licenseEnv: {},
+    logLevel: 'error', authMode: 'none', publicUrl: null, oidc: null, telemetryEndpoint: '', appVersion: 'test', environment: 'test', licenseEnv: {},
   };
 }
 

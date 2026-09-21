@@ -2,9 +2,11 @@ import {
   authSettingsSchema,
   type AuthSettings,
   dashboardPlaybookSchema,
+  metricCatalogSchema,
   modelCatalogSchema,
   slashCommandListSchema,
   type DashboardPlaybook,
+  type Metric,
   type ModelOption,
   type SlashCommand,
 } from '@openvizpilot/shared';
@@ -72,6 +74,11 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS admin_models (
+      id INTEGER PRIMARY KEY,
+      catalog TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS admin_metric_catalog (
       id INTEGER PRIMARY KEY,
       catalog TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -203,6 +210,31 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       }
       db.prepare(
         `INSERT INTO admin_models (id, catalog, updated_at)
+         VALUES (1, ?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET catalog = excluded.catalog, updated_at = excluded.updated_at`,
+      ).run(JSON.stringify(catalog));
+    },
+
+    async getMetricCatalog(): Promise<Metric[] | null> {
+      const rows = db.prepare('SELECT catalog FROM admin_metric_catalog WHERE id = 1').all() as Array<{ catalog: string }>;
+      const row = rows[0];
+      if (!row) return null;
+      try {
+        const parsed = metricCatalogSchema.safeParse(JSON.parse(row.catalog));
+        // Ungültig (z. B. altes Schema): wie "nie konfiguriert" behandeln.
+        return parsed.success ? parsed.data : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setMetricCatalog(catalog: Metric[] | null): Promise<void> {
+      if (catalog === null) {
+        db.prepare('DELETE FROM admin_metric_catalog WHERE id = 1').run();
+        return;
+      }
+      db.prepare(
+        `INSERT INTO admin_metric_catalog (id, catalog, updated_at)
          VALUES (1, ?, datetime('now'))
          ON CONFLICT(id) DO UPDATE SET catalog = excluded.catalog, updated_at = excluded.updated_at`,
       ).run(JSON.stringify(catalog));

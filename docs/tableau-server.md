@@ -31,7 +31,7 @@ Definiert in `ee/server/src/tableau-server/tools.ts`, bedingt registriert je nac
 |---|---|---|
 | `tableau_server_search` | `query?`, `type?: all\|workbook\|view`, `project?`, `owner?`, `tag?`, `limit? (1–50, Default 20)` | Findet zugängliche Workbooks/Views nach Name, Projekt, Owner oder Tag; liefert Metadaten und Quelllinks, keine Dashboarddaten. |
 | `tableau_metadata_search` | `query?`, `datasourceId?`, `limit? (1–50, Default 20)` | Sucht autorisierte Metadata-API-Feldkandidaten mit Datasource-Zusammenfassung. |
-| `tableau_metadata_field` | `fieldId` (erforderlich) | Liefert Felddetail: Formel, bis zu 10 Upstream-Felder, 10 Upstream-Spalten, 20 Downstream-Sheets, 20 Downstream-Workbooks. |
+| `tableau_metadata_field` | `fieldId` (erforderlich) | Liefert Felddetail: Formel, bis zu 10 Upstream-Felder, 10 Upstream-Spalten, daraus abgeleitet bis zu 10 Upstream-Tabellen, 20 Downstream-Sheets, 20 Downstream-Workbooks; Zertifizierung der Datenquelle (`isCertified`, `certificationNote` — nur für veröffentlichte Datenquellen, sonst unbekannt). Grundlage für die Herkunftskette (`/herkunft`). |
 
 Alle drei Tools verwenden feste, variablengebundene Abfragen; beliebiges GraphQL oder freie REST-Parameter aus User-/LLM-Eingaben werden nicht akzeptiert. Namen, Tags, Beschreibungen und Formeln aus den Ergebnissen sind unvertrauenswürdige Daten, niemals Anweisungen.
 

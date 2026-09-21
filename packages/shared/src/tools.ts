@@ -16,6 +16,9 @@ export const SUMMARY_MAX_ROWS_LIMIT = 1000;
 export const MARKS_DEFAULT_MAX_ROWS = 100;
 export const AGGREGATE_DEFAULT_MAX_ROWS = 50;
 export const AGGREGATE_MAX_ROWS_LIMIT = 200;
+export const BREAKDOWN_DEFAULT_MAX_GROUPS = 15;
+export const BREAKDOWN_MAX_GROUPS_LIMIT = 50;
+export const COMPARE_PERIODS_MAX_GROUPS = 30;
 
 export const toolArgSchemas = {
   list_worksheets: z.object({}),
@@ -52,6 +55,41 @@ export const toolArgSchemas = {
       .max(4),
     maxRows: z.number().int().min(1).max(AGGREGATE_MAX_ROWS_LIMIT).optional(),
   }),
+  /**
+   * Trust Layer (Kennzahlenkatalog, siehe metrics.ts): schlägt die
+   * unternehmensweit verbindliche Definition einer Kennzahl nach. Nur in der
+   * Tool-Liste, wenn der Admin-Katalog nicht leer ist — siehe
+   * LOOKUP_METRIC_TOOL unten und server/src/routes/chat.ts.
+   */
+  lookup_metric: z.object({
+    query: z.string().min(1).max(80),
+  }),
+  /**
+   * Untersuchungsmodus (W3): Aufschlüsselung einer Kennzahl nach einer
+   * Dimension — Gruppen absteigend sortiert, kleinste Gruppen ab maxGroups zu
+   * "Übrige (N)" zusammengefasst. Auch im ask-Modus verfügbar, siehe tools.ts
+   * (toolDefinitions werden unabhängig vom mode gesendet).
+   */
+  breakdown_by: z.object({
+    worksheet: z.string().min(1),
+    dimension: z.string().min(1),
+    measure: z.string().min(1),
+    agg: z.enum(['sum', 'avg', 'count']).optional(),
+    maxGroups: z.number().int().min(1).max(BREAKDOWN_MAX_GROUPS_LIMIT).optional(),
+  }),
+  /**
+   * Untersuchungsmodus (W3): Vergleich einer Kennzahl zwischen zwei
+   * Zeiträumen (halboffen: from <= Datum < to), optional je Gruppe.
+   */
+  compare_periods: z.object({
+    worksheet: z.string().min(1),
+    dateColumn: z.string().min(1),
+    measure: z.string().min(1),
+    agg: z.enum(['sum', 'avg', 'count']).optional(),
+    periodA: z.object({ from: z.string().min(1), to: z.string().min(1) }),
+    periodB: z.object({ from: z.string().min(1), to: z.string().min(1) }),
+    groupBy: z.string().min(1).optional(),
+  }),
 } as const;
 
 export type ToolName = keyof typeof toolArgSchemas;
@@ -75,6 +113,17 @@ export interface ToolDefinition {
 const worksheetParam = {
   type: 'string',
   description: 'Exact name of the worksheet as shown in the dashboard.',
+};
+
+/** Halboffener Zeitraum (from <= Datum < to) für compare_periods — Datumsparsing ist tolerant (ISO, YYYY-MM-DD). */
+const periodParam = {
+  type: 'object',
+  properties: {
+    from: { type: 'string', minLength: 1, description: 'Start date (inclusive), e.g. "2024-01-01" or an ISO timestamp.' },
+    to: { type: 'string', minLength: 1, description: 'End date (exclusive), e.g. "2024-04-01" or an ISO timestamp.' },
+  },
+  required: ['from', 'to'],
+  additionalProperties: false,
 };
 
 export const toolDefinitions: ToolDefinition[] = [
@@ -242,4 +291,101 @@ export const toolDefinitions: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'breakdown_by',
+      description:
+        'Break down a measure of a worksheet by one dimension: group by the dimension, aggregate the measure (default sum), sort groups descending by value, collapse the smallest groups beyond maxGroups into a single "Übrige (N)" row, and report each group\'s share of the total plus how much the top 3 groups explain. Use this for drilldown/"why" questions about which values of a dimension drive a number.',
+      parameters: {
+        type: 'object',
+        properties: {
+          worksheet: worksheetParam,
+          dimension: {
+            type: 'string',
+            minLength: 1,
+            description: 'Dimension column name to group by, as it appears in the worksheet.',
+          },
+          measure: {
+            type: 'string',
+            minLength: 1,
+            description: 'Measure column name to aggregate (e.g. "SUM(Umsatz)").',
+          },
+          agg: {
+            type: 'string',
+            enum: ['sum', 'avg', 'count'],
+            description: 'Aggregation function to apply within each group (default sum).',
+          },
+          maxGroups: {
+            type: 'integer',
+            minimum: 1,
+            maximum: BREAKDOWN_MAX_GROUPS_LIMIT,
+            description: `Maximum number of groups to show before collapsing the rest into "Übrige" (default ${BREAKDOWN_DEFAULT_MAX_GROUPS}).`,
+          },
+        },
+        required: ['worksheet', 'dimension', 'measure'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'compare_periods',
+      description:
+        'Compare a measure of a worksheet between two date ranges (periodA vs. periodB): total per period plus absolute and percentage difference, and — if groupBy is given — the same comparison per group of a dimension, sorted by absolute difference (max 30 groups). Periods are half-open: from <= date < to. Use this for "why did X change between period A and period B" questions.',
+      parameters: {
+        type: 'object',
+        properties: {
+          worksheet: worksheetParam,
+          dateColumn: {
+            type: 'string',
+            minLength: 1,
+            description: 'Date column name, as it appears in the worksheet.',
+          },
+          measure: {
+            type: 'string',
+            minLength: 1,
+            description: 'Measure column name to aggregate (e.g. "SUM(Umsatz)").',
+          },
+          agg: {
+            type: 'string',
+            enum: ['sum', 'avg', 'count'],
+            description: 'Aggregation function to apply (default sum).',
+          },
+          periodA: periodParam,
+          periodB: periodParam,
+          groupBy: {
+            type: 'string',
+            minLength: 1,
+            description: 'Optional dimension column to break the comparison down by, as it appears in the worksheet.',
+          },
+        },
+        required: ['worksheet', 'dateColumn', 'measure', 'periodA', 'periodB'],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
+
+/**
+ * Eigenständig (nicht Teil von toolDefinitions): wird nur an das Modell
+ * gereicht, wenn der Admin einen Kennzahlenkatalog gepflegt hat — siehe
+ * server/src/routes/chat.ts und system-prompt.ts (<metric_catalog>-Block).
+ */
+export const LOOKUP_METRIC_TOOL: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'lookup_metric',
+    description:
+      'Look up the company-wide binding definition of a metric by name or synonym. Call this before answering anything about a metric from the catalogue.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', minLength: 1, maxLength: 80, description: 'Metric name or synonym as mentioned by the user.' },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+  },
+};

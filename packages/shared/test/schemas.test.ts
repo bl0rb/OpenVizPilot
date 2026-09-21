@@ -81,4 +81,19 @@ describe('chatRequestSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('defaults to no explicit mode when omitted (Extension/Server treat this as "ask")', () => {
+    const result = chatRequestSchema.safeParse(validRequest);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.mode).toBeUndefined();
+  });
+
+  it('accepts mode "ask" and "investigate"', () => {
+    expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'ask' }).success).toBe(true);
+    expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'investigate' }).success).toBe(true);
+  });
+
+  it('rejects an unknown mode', () => {
+    expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'deep-dive' }).success).toBe(false);
+  });
 });

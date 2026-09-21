@@ -3,6 +3,7 @@ import {
   createAuthCallbackRoute,
   createPersonalizationRoutes,
   describeLicense,
+  sendHeartbeatOnce,
   startHeartbeat,
   USAGE_WINDOW_DAYS,
   EE_FEATURES,
@@ -10,6 +11,9 @@ import {
   requireOidcUser,
   type AuthVariables,
   type EeFeature,
+  type HeartbeatAction,
+  type HeartbeatResponseInfo,
+  type TelemetryStore,
   McpService,
   createMcpRoute,
   TableauService,
@@ -33,6 +37,7 @@ import { createChatRoute } from './routes/chat';
 import { createCommandsRoute } from './routes/commands';
 import { createDashboardsRoute } from './routes/dashboards';
 import { createHealthRoute } from './routes/health';
+import { createMetricsRoute } from './routes/metrics';
 import { createModelsRoute } from './routes/models';
 import { createStatsRoute } from './routes/stats';
 import { requireUserAccess } from './user-access';
@@ -44,6 +49,8 @@ export function createApp(config: AppConfig): {
   logger: Logger;
   memoryStore: MemoryStore | null;
   authState: AuthStateProvider;
+  /** Lease-Zustand der Installation (Tests aktivieren darüber; sonst nur intern). */
+  telemetryStore: TelemetryStore | null;
   /** Beendet den Lizenz-Heartbeat (Tests, Shutdown). */
   stopHeartbeat: () => void;
 } {
@@ -63,9 +70,9 @@ export function createApp(config: AppConfig): {
 
   // Anmelde-Zustand (Modus, OIDC-Client, Enterprise-Lizenz) — Env-Defaults,
   // zur Laufzeit aus der Admin-UI überschreibbar (auth-state.ts).
-  const authState = createAuthStateProvider(config, memoryStore, logger);
+  const authState = createAuthStateProvider(config, memoryStore, logger, telemetryStore);
   void authState.get().then((state) => {
-    if (state.license.status !== 'none') logger.info('Enterprise-Lizenz', describeLicense(state.license));
+    if (state.license.status !== 'none') logger.info('Enterprise-Lizenz', describeLicense(state.license, state.lease));
     logger.info('Anmeldung', { mode: state.mode, source: state.source, ...(state.blockedReason ? { blocked: state.blockedReason } : {}) });
   });
   const authLog = (level: 'info' | 'warn' | 'error', msg: string, data?: Record<string, unknown>) =>
@@ -93,19 +100,23 @@ export function createApp(config: AppConfig): {
   }, logger, () => backend.store.getUsageSalt()) : null;
 
   /**
-   * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft.
-   * Nur mit gültiger Lizenz, nur mit Datenbank — Open Core sendet nie, und ein
-   * Fehler der Gegenstelle bleibt folgenlos (siehe ee/server/src/telemetry.ts).
+   * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft, und
+   * erneuert die Lease der Installation. Nur mit gültiger Lizenz, nur mit
+   * Datenbank — Open Core sendet nie, und ein Fehler der Gegenstelle bleibt
+   * folgenlos (siehe ee/server/src/telemetry.ts).
    */
-  const stopHeartbeat =
+  const heartbeat =
     telemetryStore && memoryStore
-      ? startHeartbeat({
+      ? {
           endpoint: config.telemetryEndpoint,
           license: async () => {
             const state = await authState.get();
-            return { status: state.license, token: state.licenseToken };
+            // Signaturprüfung ohne Lease: Auch eine blockierte Installation meldet sich weiter.
+            return { status: state.verifiedLicense, token: state.licenseToken };
           },
           version: config.appVersion,
+          environment: config.environment,
+          publicUrl: async () => (await authState.get()).publicUrl,
           store: telemetryStore,
           usage: async () => {
             // Nur Zahlen: unterschiedliche Pseudonyme und Anzahl Dashboards.
@@ -116,8 +127,19 @@ export function createApp(config: AppConfig): {
             };
           },
           logger,
-        })
-      : () => undefined;
+          leaseTrustedKeys: config.leaseTrustedKeys,
+          leaseActive: async () => (await authState.get()).lease.state === 'active',
+        }
+      : null;
+  const stopHeartbeat = heartbeat ? startHeartbeat(heartbeat) : () => undefined;
+  /**
+   * Sofortiger Heartbeat (neuer Lizenzschlüssel, „Jetzt aktualisieren“, Stilllegen/Übertragen,
+   * Installationsliste) — wirft nie.
+   */
+  const refreshLease = heartbeat
+    ? (options: { action?: HeartbeatAction; onResponse?: (info: HeartbeatResponseInfo) => void; reactivate?: boolean } = {}) =>
+        sendHeartbeatOnce(heartbeat, Date.now(), { force: true, ...options }).catch(() => 'failed' as const)
+    : null;
 
   const app = new Hono<AuthVariables>();
 
@@ -238,9 +260,10 @@ export function createApp(config: AppConfig): {
   // weiter funktionieren.
   app.route('/api/memory', createPersonalizationRoutes({ store: personalizationStore, logger, hasFeature: licensedFeature }));
   app.route('/api/commands', createCommandsRoute(memoryStore, logger));
+  app.route('/api/metrics', createMetricsRoute(memoryStore, logger));
   app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau, refreshLease));
 
   // Admin-UI: erreichbar mit statischem OVP_ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert
@@ -253,5 +276,5 @@ export function createApp(config: AppConfig): {
     app.use('*', serveStatic({ root: config.serveStaticDir }));
   }
 
-  return { app, logger, memoryStore, authState, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); } };
+  return { app, logger, memoryStore, authState, telemetryStore, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); } };
 }

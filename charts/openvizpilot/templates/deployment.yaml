@@ -1,4 +1,5 @@
 {{- include "openvizpilot.checkLegacyLitellmValues" . }}
+{{- include "openvizpilot.checkEnterpriseImagePullSecret" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,7 +30,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: middleware
-          image: "{{ required "image.repository ist Pflicht" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ include "openvizpilot.imageRepository" . }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
@@ -62,6 +63,10 @@ spec:
             {{- end }}
             {{- with .Values.app.publicUrl }}
             - name: OVP_PUBLIC_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.app.environment }}
+            - name: OVP_ENVIRONMENT
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.auth.mode }}

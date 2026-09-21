@@ -96,6 +96,7 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
+    environment: 'test',
     licenseEnv: {},
     ...overrides,
   };

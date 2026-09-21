@@ -132,23 +132,28 @@ const WORKSHEETS: MockWorksheetSpec[] = [
       { fieldName: 'Region', dataType: 'string' },
       { fieldName: 'Produkt', dataType: 'string' },
       { fieldName: 'SUM(Umsatz)', dataType: 'float' },
+      { fieldName: 'Bestelldatum', dataType: 'date' },
     ],
     // 4 Regionen × 3 Produkte, im Kopf nachrechenbar: Umsatz steigt in 100er-Schritten
     // (Nord=100..300, Süd=400..600, Ost=700..900, West=1000..1200). Regionssummen:
     // Nord 600, Süd 1500, Ost 2400, West 3300 (Gesamt 7800).
+    // Bestelldatum (für compare_periods-Tests): Produkt A/B im Januar/Februar
+    // 2024, Produkt C im März 2024 — ergibt bei periodA=[2024-01-01,2024-03-01)
+    // vs. periodB=[2024-03-01,2024-04-01) je Region eine unterschiedliche
+    // Differenz (Value-Objekt wie beim echten Reader für date-Spalten).
     rows: [
-      ['Nord', 'Produkt A', 100],
-      ['Nord', 'Produkt B', 200],
-      ['Nord', 'Produkt C', 300],
-      ['Süd', 'Produkt A', 400],
-      ['Süd', 'Produkt B', 500],
-      ['Süd', 'Produkt C', 600],
-      ['Ost', 'Produkt A', 700],
-      ['Ost', 'Produkt B', 800],
-      ['Ost', 'Produkt C', 900],
-      ['West', 'Produkt A', 1000],
-      ['West', 'Produkt B', 1100],
-      ['West', 'Produkt C', 1200],
+      ['Nord', 'Produkt A', 100, new Date('2024-01-15')],
+      ['Nord', 'Produkt B', 200, new Date('2024-02-15')],
+      ['Nord', 'Produkt C', 300, new Date('2024-03-15')],
+      ['Süd', 'Produkt A', 400, new Date('2024-01-15')],
+      ['Süd', 'Produkt B', 500, new Date('2024-02-15')],
+      ['Süd', 'Produkt C', 600, new Date('2024-03-15')],
+      ['Ost', 'Produkt A', 700, new Date('2024-01-15')],
+      ['Ost', 'Produkt B', 800, new Date('2024-02-15')],
+      ['Ost', 'Produkt C', 900, new Date('2024-03-15')],
+      ['West', 'Produkt A', 1000, new Date('2024-01-15')],
+      ['West', 'Produkt B', 1100, new Date('2024-02-15')],
+      ['West', 'Produkt C', 1200, new Date('2024-03-15')],
     ],
     filters: [],
     datasource: {

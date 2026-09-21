@@ -2,9 +2,11 @@ import {
   authSettingsSchema,
   type AuthSettings,
   dashboardPlaybookSchema,
+  metricCatalogSchema,
   modelCatalogSchema,
   slashCommandListSchema,
   type DashboardPlaybook,
+  type Metric,
   type ModelOption,
   type SlashCommand,
 } from '@openvizpilot/shared';
@@ -81,6 +83,11 @@ const SCHEMA_SQL = `
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
   CREATE TABLE IF NOT EXISTS admin_models (
+    id SMALLINT PRIMARY KEY,
+    catalog TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+  CREATE TABLE IF NOT EXISTS admin_metric_catalog (
     id SMALLINT PRIMARY KEY,
     catalog TEXT NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -246,6 +253,34 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
       }
       await pool.query(
         `INSERT INTO admin_models (id, catalog, updated_at)
+         VALUES (1, $1, now())
+         ON CONFLICT (id) DO UPDATE SET catalog = EXCLUDED.catalog, updated_at = now()`,
+        [JSON.stringify(catalog)],
+      );
+    },
+
+    async getMetricCatalog(): Promise<Metric[] | null> {
+      await ensureSchema();
+      const result = await pool.query('SELECT catalog FROM admin_metric_catalog WHERE id = 1');
+      const row = result.rows[0] as { catalog: string } | undefined;
+      if (!row) return null;
+      try {
+        const parsed = metricCatalogSchema.safeParse(JSON.parse(row.catalog));
+        // Ungültig (z. B. altes Schema): wie "nie konfiguriert" behandeln.
+        return parsed.success ? parsed.data : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setMetricCatalog(catalog: Metric[] | null): Promise<void> {
+      await ensureSchema();
+      if (catalog === null) {
+        await pool.query('DELETE FROM admin_metric_catalog WHERE id = 1');
+        return;
+      }
+      await pool.query(
+        `INSERT INTO admin_metric_catalog (id, catalog, updated_at)
          VALUES (1, $1, now())
          ON CONFLICT (id) DO UPDATE SET catalog = EXCLUDED.catalog, updated_at = now()`,
         [JSON.stringify(catalog)],

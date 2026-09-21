@@ -2,7 +2,9 @@ import {
   MAX_MESSAGES,
   MAX_MESSAGE_CHARS,
   extractSuggestions,
+  t,
   type ChatMessage,
+  type ChatMode,
   type DoneEventData,
   type Suggestions,
   type ToolCall,
@@ -10,7 +12,14 @@ import {
 } from '@openvizpilot/shared';
 import { streamChat } from './sse-client';
 
-export const MAX_TOOL_ROUNDS = 5;
+/** Rundenbudget je Modus (W3 Untersuchungsmodus: mehr Schritte für Plan + Belege). */
+export const TOOL_ROUNDS_BY_MODE: Record<ChatMode, number> = {
+  ask: 5,
+  investigate: 12,
+};
+
+/** @deprecated Beibehalten für externe Referenzen — Budget ist jetzt modusabhängig, siehe TOOL_ROUNDS_BY_MODE. */
+export const MAX_TOOL_ROUNDS = TOOL_ROUNDS_BY_MODE.ask;
 
 /** Grobes Zeichen-Budget für die mitgesendete Historie (~15–20k Tokens). */
 const MAX_HISTORY_CHARS = 60_000;
@@ -51,6 +60,8 @@ export interface AgentDeps {
   answerFocus?: string;
   /** Dashboard-Name — nur für die anonyme Nutzungsstatistik pro Dashboard. */
   dashboardKey?: string;
+  /** Untersuchungsmodus vs. normaler Chat (Default 'ask') — steuert Rundenbudget und Server-Prompt-Abschnitt. */
+  mode?: ChatMode;
   getContext(): Promise<string>;
   executeTool(call: ToolCall, approval?: NonNullable<ToolCallsEventData['external']>[string], signal?: AbortSignal): Promise<string>;
 }
@@ -96,6 +107,7 @@ export class ChatSession {
       }
 
       let toolChoice: 'auto' | 'none' = 'auto';
+      const maxRounds = TOOL_ROUNDS_BY_MODE[deps.mode ?? 'ask'];
       for (let round = 1; ; round++) {
         cb.onRoundStart();
         let assistantText = '';
@@ -113,6 +125,7 @@ export class ChatSession {
             authorContext: deps.authorContext,
             answerFocus: deps.answerFocus,
             dashboardKey: deps.dashboardKey,
+            mode: deps.mode,
             // Nur beim Retry nach Fehler (userText === null) — sonst zählte
             // die Statistik dieselbe Frage doppelt.
             ...(userText === null && round === 1 ? { retry: true } : {}),
@@ -187,9 +200,13 @@ export class ChatSession {
             this.messages.push({ role: 'tool', tool_call_id: call.id, content });
           }
           if (abort.signal.aborted) return;
-          if (round >= MAX_TOOL_ROUNDS) {
+          if (round >= maxRounds) {
             toolChoice = 'none';
-            cb.onNotice('Maximale Tool-Runden erreicht — erzwinge Textantwort.');
+            cb.onNotice(
+              deps.mode === 'investigate'
+                ? t('app.chat.toolBudgetReachedInvestigate')
+                : t('app.chat.toolBudgetReached'),
+            );
           }
           continue;
         }

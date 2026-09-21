@@ -9,7 +9,7 @@
  * — nie in der URL (siehe Datenschutz-Regel: keine Secrets in URLs/Logs).
  */
 import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles } from '@openvizpilot/ee/server';
-import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
+import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Ruler, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
 import { adminFont } from './admin-font';
 
 const adminLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -97,6 +97,10 @@ export const adminPageHtml = `<!doctype html>
   .setup-steps ol, .setup-steps ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
   .setup-steps li { margin: 0.3rem 0; }
   .setup-steps table { border-collapse: collapse; margin-top: 0.5rem; font-size: 12px; }
+  .license-card { width: auto; margin: 0.5rem 0 0.75rem; font-size: 13px; }
+  .license-card th { background: none; white-space: nowrap; padding-left: 0; }
+  .license-card td { overflow-wrap: anywhere; }
+  .license-card .lease-blocked { color: var(--danger); font-weight: 600; }
   .setup-steps th, .setup-steps td { text-align: left; padding: 0.3rem 0.6rem 0.3rem 0; vertical-align: top; }
   .setup-steps code { font-size: 11px; }
   .form-section { border: 0; border-top: 1px solid var(--border); min-width: 0; margin: 1.5rem 0 0; padding: 1.25rem 0 0; }
@@ -155,6 +159,10 @@ export const adminPageHtml = `<!doctype html>
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   dialog input { min-height: 44px; }
+  #metric-dialog { width: min(640px, calc(100% - 2rem)); }
+  #metric-dialog input[aria-invalid="true"], #metric-dialog textarea[aria-invalid="true"] { border-color: var(--danger); }
+  .metric-question-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0.5rem 0.75rem; align-items: end; border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem; margin: 0 0 0.6rem; }
+  .metric-question-row label { display: grid; gap: 0.3rem; font-size: 13px; font-weight: 500; min-width: 0; }
   .has-help { position: relative; }
   /* Nur der Begriff ist der Auslöser — nicht das Eingabefeld darunter, sonst
      ploppt beim Überfahren eines Formulars an jedem Feld ein Tooltip auf. */
@@ -323,6 +331,7 @@ export const adminPageHtml = `<!doctype html>
         <a href="#tableau-server-admin">${adminIcon(Network)}Tableau Server <span class="nav-ee">EE</span></a>
         <a href="#commands-admin">${adminIcon(Terminal)}Slash-Befehle</a>
         <a href="#playbooks-admin">${adminIcon(LayoutDashboard)}Dashboard-Analysen</a>
+        <a href="#metrics-admin">${adminIcon(Ruler)}Kennzahlen</a>
         <a href="#models-admin">${adminIcon(Settings)}Modelle</a>
         <p class="nav-group">Zugriff</p>
         <a href="#auth-admin">${adminIcon(ShieldCheck)}Anmeldung &amp; Lizenz</a>
@@ -332,7 +341,7 @@ export const adminPageHtml = `<!doctype html>
         <a href="#usage-admin">${adminIcon(ChartNoAxesCombined)}Nutzung</a>
       </nav>
       <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
-        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="tableau-server-admin">Tableau Server</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="models-admin">Modelle</option></optgroup>
+        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="tableau-server-admin">Tableau Server</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="metrics-admin">Kennzahlen</option><option value="models-admin">Modelle</option></optgroup>
         <optgroup label="Zugriff"><option value="auth-admin">Anmeldung &amp; Lizenz</option><option value="users-admin">Benutzerkonten</option></optgroup>
         <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option></optgroup>
       </select>
@@ -453,6 +462,7 @@ export const adminPageHtml = `<!doctype html>
             <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Felder oben</td></tr>
             <tr><td>Client-Secret</td><td><code>OVP_OIDC_CLIENT_SECRET</code> (empfohlen bei Vault)</td><td>Feld „Client-Secret" (Datenbank)</td></tr>
             <tr><td>Lizenz</td><td><code>OVP_LICENSE</code> oder <code>OVP_LICENSE_PATH</code></td><td>Feld „Lizenzschlüssel"</td></tr>
+            <tr><td>Umgebung</td><td><code>OVP_ENVIRONMENT</code> (nur per Env)</td><td>—</td></tr>
             <tr><td>Shared-Token-Modus</td><td><code>OVP_API_AUTH_TOKEN</code> (nur per Env)</td><td>—</td></tr>
           </table>
         </details>
@@ -462,6 +472,49 @@ export const adminPageHtml = `<!doctype html>
         <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false" aria-describedby="help-license-token"></textarea>
       </label>
       <p id="license-summary" class="hint">Lade …</p>
+      <div id="license-card" hidden>
+        <p id="license-pending" class="banner" role="alert"><strong>Installation noch nicht aktiviert — es laufen nur die Core-Funktionen.</strong> Enterprise-Funktionen schalten sich mit der ersten Aktivierung frei. Online: ausgehend HTTPS auf <code>werkworks.de</code> (Port 443) zulassen und „Jetzt aktualisieren“ klicken — der Heartbeat läuft auch sofort beim Start. Offline: unter „Offline-Aktivierung“ die Anfrage herunterladen, an WerkWorks senden und die Lease einfügen.</p>
+        <p id="license-subscription-grace" class="banner error" role="status" hidden></p>
+        <table class="license-card">
+          <tr><th scope="row">Lizenznehmer</th><td id="lic-licensee"></td></tr>
+          <tr><th scope="row">Lizenz-ID</th><td id="lic-id"></td></tr>
+          <tr><th scope="row" class="has-help" aria-expanded="false"><span class="help-term">Umgebung</span><span role="tooltip" id="help-lic-env" class="help-tip">Aus <code>OVP_ENVIRONMENT</code> (production | development | test | staging, Helm <code>app.environment</code>). Eine Lizenz erlaubt eine produktive Installation; Entwicklung, Test und Staging sind inklusive.</span></th><td id="lic-env"></td></tr>
+          <tr><th scope="row" class="has-help" aria-expanded="false"><span class="help-term">Installation-ID</span><span role="tooltip" id="help-lic-inst" class="help-tip">Zufällige, dauerhafte Kennung dieser Installation aus der Datenbank — an sie ist die Lease gebunden. Ein neuer Datenbank-Cluster ist eine neue Installation.</span></th><td><span class="has-help" aria-expanded="false" id="lic-inst"><span class="help-term">…</span><span role="tooltip" id="lic-inst-full" class="help-tip">…</span></span></td></tr>
+          <tr><th scope="row" class="has-help" aria-expanded="false"><span class="help-term">Aktivierung</span><span role="tooltip" id="help-lic-lease" class="help-tip">Der tägliche Heartbeat holt bei WerkWorks eine 7-Tage-Lease für diese Installation. Ohne jede Lease laufen nur Core-Funktionen. Ist werkworks.de nach einer Aktivierung nicht erreichbar, bleibt Enterprise 30 Tage nach Lease-Ablauf aktiv (Grace). Blockiert: mehr produktive Installationen als lizenziert — eine stilllegen oder die Lizenz erweitern.</span></th><td id="lic-lease"></td></tr>
+          <tr><th scope="row">Lizenz gültig bis</th><td id="lic-valid"></td></tr>
+          <tr><th scope="row">Features</th><td id="lic-features"></td></tr>
+        </table>
+        <div class="row" style="gap: 0.5rem; flex-wrap: wrap;">
+          <button id="license-refresh">Jetzt aktualisieren</button>
+        </div>
+        <div id="license-installations-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;" hidden>
+          <strong>Installationen dieser Lizenz</strong>
+          <p id="license-installations-hint" class="banner error" role="alert" hidden></p>
+          <div style="overflow-x: auto;">
+            <table id="license-installations-table">
+              <thead>
+                <tr><th>ID</th><th>Umgebung</th><th>Öffentliche URL</th><th>Zuletzt gesehen</th><th>Version</th><th>Offline</th><th class="col-del"></th></tr>
+              </thead>
+              <tbody id="license-installations-body"></tbody>
+            </table>
+          </div>
+          <div class="row" style="gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <button id="license-deactivate">Diese Installation stilllegen</button>
+          </div>
+        </div>
+        <details class="setup-steps" id="offline-activation" style="margin-top: 0.75rem;">
+          <summary>Offline-Aktivierung</summary>
+          <p>Für Installationen ohne Zugang zu werkworks.de: Anfrage herunterladen, an WerkWorks senden, die zurückerhaltene Lease hier einfügen. Sie gilt bis zu 365 Tage; der Heartbeat läuft weiter und ersetzt sie nur durch eine längere.</p>
+          <div class="row" style="gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+            <button id="activation-request-download">Aktivierungsanfrage herunterladen</button>
+            <label class="form-field has-help" style="flex: 1 1 320px;"><span class="help-term">Lease einfügen</span><span role="tooltip" id="help-lic-lease-paste" class="help-tip">Datei <code>&lt;Lizenznehmer&gt;.openvizpilot-lease</code> von WerkWorks — Inhalt vollständig einfügen. Sie muss zu Installation-ID und Lizenz-ID passen.</span>
+              <textarea id="license-lease" rows="2" placeholder="Signierte Lease (<Payload>.<Signatur>)" spellcheck="false" aria-describedby="help-lic-lease-paste"></textarea>
+            </label>
+            <button class="primary" id="license-lease-save">Lease speichern</button>
+          </div>
+          <p>Ohne Internetzugang: Anfrage-Datei direkt unter <a href="https://werkworks.de/ovp-lizenz/offline.php" target="_blank" rel="noopener">werkworks.de/ovp-lizenz/offline.php</a> einreichen (Lizenz-Token bereithalten) — die Lease kommt sofort zurück, ohne WerkWorks-Rückfrage.</p>
+        </details>
+      </div>
       <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
         <strong>Lizenz-Heartbeat</strong>
         <p id="telemetry-status" class="hint"></p>
@@ -562,6 +615,33 @@ export const adminPageHtml = `<!doctype html>
       </fieldset>
     </section>
 
+    <section class="card" id="metrics-admin" hidden>
+      <h2>Kennzahlen</h2>
+      <p class="hint">Unternehmensweit verbindliche Definitionen — der Assistent erkennt Name oder Synonym in der Frage und hält sich an die hinterlegte Definition.</p>
+      <p id="metrics-source" class="hint"></p>
+      <p id="metrics-banner" class="banner"></p>
+      <div style="overflow-x: auto;">
+        <table id="metrics-table">
+          <thead>
+            <tr>
+              <th>Kennzahl</th>
+              <th class="has-help" aria-expanded="false"><span class="help-term">Synonyme</span><span role="tooltip" id="help-metric-synonyms" class="help-tip">Abkürzungen und Schreibweisen, unter denen Anwender fragen — z. B. DB2, DB II, CM2.</span></th>
+              <th class="col-desc">Definition</th>
+              <th>Owner</th>
+              <th>Datenquelle</th>
+              <th class="col-del"></th>
+            </tr>
+          </thead>
+          <tbody id="metrics-body"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button id="add-metric">+ Kennzahl</button>
+        <button class="primary" id="save-metrics">Speichern</button>
+        <button class="danger" id="reset-metrics">Zurücksetzen</button>
+      </div>
+    </section>
+
     <section class="card" id="models-admin" hidden>
       <h2>Modelle in der Extension</h2>
       <p class="hint">Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt der technischen Modell-ID.</p>
@@ -648,6 +728,49 @@ export const adminPageHtml = `<!doctype html>
     <div class="form-actions">
       <button type="button" id="user-password-cancel">Abbrechen</button>
       <button type="submit" id="user-password-save" class="primary">Passwort speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="metric-dialog" aria-labelledby="metric-dialog-title">
+  <form id="metric-form">
+    <h2 id="metric-dialog-title">Kennzahl anlegen</h2>
+    <label class="form-field has-help" for="metric-id"><span class="help-term">ID</span><span role="tooltip" id="help-metric-id" class="help-tip">Eindeutiger technischer Schlüssel (Kleinbuchstaben, Ziffern, „-“) — nur intern; im Chat zählen Name und Synonyme.</span>
+      <input type="text" id="metric-id" required maxlength="40" placeholder="z. B. deckungsbeitrag-ii" autocomplete="off" aria-describedby="metric-id-error" />
+    </label>
+    <p id="metric-id-error" class="hint error" role="status" hidden></p>
+    <label class="form-field" for="metric-name">Kennzahl
+      <input type="text" id="metric-name" required maxlength="80" placeholder="z. B. Deckungsbeitrag II" autocomplete="off" aria-describedby="metric-name-error" />
+    </label>
+    <p id="metric-name-error" class="hint error" role="status" hidden></p>
+    <label class="form-field has-help" for="metric-synonyms"><span class="help-term">Synonyme (kommagetrennt)</span><span role="tooltip" id="help-metric-synonyms-field" class="help-tip">Abkürzungen und Schreibweisen, unter denen Anwender fragen — z. B. DB2, DB II, CM2.</span>
+      <input type="text" id="metric-synonyms" maxlength="440" placeholder="z. B. DB2, DB II, CM2" autocomplete="off" aria-describedby="metric-synonyms-error" />
+    </label>
+    <p id="metric-synonyms-error" class="hint error" role="status" hidden></p>
+    <label class="form-field" for="metric-definition">Definition
+      <textarea id="metric-definition" rows="3" required maxlength="1000" placeholder="z. B. Umsatz − variable Kosten − Fixkosten" aria-describedby="metric-definition-error"></textarea>
+    </label>
+    <p id="metric-definition-error" class="hint error" role="status" hidden></p>
+    <div class="form-grid">
+      <label class="form-field" for="metric-owner">Owner (optional)
+        <input type="text" id="metric-owner" maxlength="80" placeholder="z. B. Controlling" autocomplete="off" />
+      </label>
+      <label class="form-field" for="metric-datasource">Datenquelle (optional)
+        <input type="text" id="metric-datasource" maxlength="120" placeholder="z. B. Finance Semantic Model" autocomplete="off" />
+      </label>
+    </div>
+    <label class="form-field has-help" for="metric-interpretation"><span class="help-term">Interpretationshinweis (optional)</span><span role="tooltip" id="help-metric-interpretation" class="help-tip">Wie der Wert einzuordnen ist, z. B. Schwellenwerte — hilft dem Assistenten bei der Einschätzung.</span>
+      <textarea id="metric-interpretation" rows="2" maxlength="500" placeholder="z. B. Unter 18 % kritisch"></textarea>
+    </label>
+    <fieldset class="form-section">
+      <legend class="has-help" aria-expanded="false"><span class="help-term">Geprüfte Fragen (bis zu 5)</span><span role="tooltip" id="help-metric-questions" class="help-tip">Typische Frage und wie sie beantwortet werden soll; der Assistent hält sich daran.</span></legend>
+      <div id="metric-questions"></div>
+      <button type="button" id="metric-add-question">+ Frage</button>
+    </fieldset>
+    <p id="metric-dialog-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" id="metric-dialog-cancel">Abbrechen</button>
+      <button type="submit" id="metric-dialog-save" class="primary">Übernehmen</button>
     </div>
   </form>
 </dialog>
@@ -834,6 +957,7 @@ export const adminPageHtml = `<!doctype html>
     loadUserAccess();
     loadCommands();
     loadPlaybooks();
+    loadMetrics();
     loadModels();
     loadStats();
   }
@@ -1045,12 +1169,123 @@ export const adminPageHtml = `<!doctype html>
   oidcProvider.addEventListener('change', updateOidcSetup);
 
   function describeLicenseStatus(lic) {
-    if (lic.status === 'valid') {
-      return 'Enterprise Edition — Lizenz für „' + lic.licensee + '“ gültig bis ' + String(lic.validUntil).slice(0, 10) + ' · Lizenz-ID ' + lic.licenseId + ' · Schlüssel ' + lic.kid + ' · Features: ' + (lic.features || []).map(function (f) { return featureLabels[f] || f; }).join(', ');
-    }
+    if (lic.status === 'valid') return 'Enterprise Edition — Lizenz gültig (Schlüssel ' + lic.kid + ').';
+    if (lic.status === 'inactive') return 'Enterprise-Lizenz gültig, Installation nicht aktiviert — Enterprise-Funktionen deaktiviert: ' + lic.reason;
     if (lic.status === 'expired') return 'Enterprise-Lizenz für „' + lic.licensee + '“ (Lizenz-ID ' + lic.licenseId + ' · Schlüssel ' + lic.kid + ') ist am ' + String(lic.validUntil).slice(0, 10) + ' abgelaufen — Enterprise-Funktionen deaktiviert.';
     if (lic.status === 'invalid') return 'Lizenz ungültig: ' + lic.reason;
     return 'Core-Edition (keine Enterprise-Lizenz hinterlegt).';
+  }
+
+  function fmtDate(iso) {
+    return iso ? new Date(iso).toLocaleDateString('de-DE') : '—';
+  }
+
+  /** Aktivierungszeile der Lizenzkarte — Zustand aus auth-state.ts, Zeiten aus dem Heartbeat. */
+  function describeLease(lic, telemetry) {
+    var lastOk = telemetry && telemetry.lastOkAt ? fmtDate(telemetry.lastOkAt) : null;
+    var limit = lic.leaseServerState === 'activation_limit' && lic.message ? ' — ' + lic.message : '';
+    switch (lic.leaseState) {
+      case 'active': return { text: (lic.leaseOffline ? 'Offline-Lease bis ' : 'Aktiv bis ') + fmtDate(lic.leaseUntil) + limit, blocked: false };
+      case 'grace': return { text: 'Grace bis ' + fmtDate(lic.graceUntil) + ' — WerkWorks nicht erreichbar seit ' + (lastOk || fmtDate(lic.leaseUntil)) + ' (Lease abgelaufen ' + fmtDate(lic.leaseUntil) + ')', blocked: false };
+      case 'blocked': return { text: 'Blockiert: ' + (lic.message || 'Aktivierungslimit erreicht') + ' — Installation übertragen oder alte stilllegen', blocked: true };
+      case 'expired': return { text: 'Abgelaufen — Lease seit ' + fmtDate(lic.leaseUntil) + ' nicht erneuert, Karenz endete ' + fmtDate(lic.graceUntil) + '. Nur Core-Funktionen.', blocked: true };
+      case 'pending': return { text: lic.leaseServerState === 'deactivated' && lic.message ? lic.message : 'Ausstehend — noch nie aktiviert (nur Core-Funktionen)', blocked: true };
+      default: return { text: '—', blocked: false };
+    }
+  }
+
+  function renderLicenseCard(lic, data) {
+    var card = document.getElementById('license-card');
+    var licensed = lic.status === 'valid' || lic.status === 'inactive';
+    card.hidden = !licensed;
+    if (!licensed) return;
+    document.getElementById('lic-licensee').textContent = lic.licensee || '—';
+    document.getElementById('lic-id').textContent = lic.licenseId || '—';
+    document.getElementById('lic-env').textContent = lic.environment || '—';
+    var inst = document.getElementById('lic-inst');
+    var full = lic.installationId || '—';
+    inst.querySelector('.help-term').textContent = full.length > 13 ? full.slice(0, 8) + '…' + full.slice(-4) : full;
+    document.getElementById('lic-inst-full').textContent = full;
+    var lease = describeLease(lic, data.telemetry);
+    var leaseCell = document.getElementById('lic-lease');
+    leaseCell.textContent = lease.text;
+    leaseCell.className = lease.blocked ? 'lease-blocked' : '';
+    document.getElementById('license-pending').className = 'banner' + (lic.leaseState === 'pending' ? ' error' : '');
+    var graceBanner = document.getElementById('license-subscription-grace');
+    graceBanner.hidden = !lic.subscriptionGraceUntil;
+    if (lic.subscriptionGraceUntil) {
+      graceBanner.textContent = 'Lizenz am ' + fmtDate(lic.validUntil) + ' abgelaufen — Enterprise-Funktionen laufen noch bis ' + fmtDate(lic.subscriptionGraceUntil) + '. Bitte Lizenz verlängern.';
+    }
+    document.getElementById('lic-valid').textContent = fmtDate(lic.validUntil);
+    document.getElementById('lic-features').textContent = (lic.features || []).map(function (f) { return featureLabels[f] || f; }).join(', ') || '—';
+    var available = Boolean(data.leaseAvailable);
+    document.getElementById('license-refresh').disabled = !available;
+    document.getElementById('activation-request-download').disabled = !available;
+    document.getElementById('license-lease-save').disabled = !available;
+    // Stilllegen ist nur dem initialen Admin vorbehalten (Server erzwingt es ohnehin, code initial_admin_required).
+    var deactivateButton = document.getElementById('license-deactivate');
+    var canManageInstallations = Boolean(adminMe && adminMe.role === 'initial');
+    deactivateButton.disabled = !available || !canManageInstallations;
+    deactivateButton.title = canManageInstallations ? '' : 'Nur der initiale Admin (Token bzw. Admin-Konto) kann stilllegen.';
+  }
+
+  /** Installationen dieser Lizenz — aus der Antwort des letzten (erzwungenen) Heartbeats, nie gespeichert. */
+  function renderInstallations(list) {
+    var box = document.getElementById('license-installations-box');
+    var body = document.getElementById('license-installations-body');
+    body.innerHTML = '';
+    box.hidden = list.length === 0;
+    var ownId = document.getElementById('lic-inst-full').textContent || '';
+    var canManageInstallations = Boolean(adminMe && adminMe.role === 'initial');
+    var hint = document.getElementById('license-installations-hint');
+    var blocked = document.getElementById('lic-lease').className === 'lease-blocked';
+    hint.hidden = !blocked;
+    if (blocked) hint.textContent = 'Eine der folgenden Installationen ersetzen oder dort stilllegen.';
+    list.forEach(function (inst) {
+      var tr = document.createElement('tr');
+      var idCell = document.createElement('td');
+      var full = inst.id || '';
+      var short = full.length > 13 ? full.slice(0, 8) + '…' + full.slice(-4) : full;
+      idCell.textContent = short;
+      if (full) idCell.title = full;
+      tr.appendChild(idCell);
+      var envCell = document.createElement('td'); envCell.textContent = inst.environment || '—'; tr.appendChild(envCell);
+      var urlCell = document.createElement('td'); urlCell.textContent = inst.publicUrl || '—'; tr.appendChild(urlCell);
+      var seenCell = document.createElement('td'); seenCell.textContent = inst.lastSeenAt ? new Date(inst.lastSeenAt).toLocaleString('de-DE') : '—'; tr.appendChild(seenCell);
+      var verCell = document.createElement('td'); verCell.textContent = inst.version || '—'; tr.appendChild(verCell);
+      var offCell = document.createElement('td'); offCell.textContent = inst.offline ? 'Ja' : 'Nein'; tr.appendChild(offCell);
+      var actionCell = document.createElement('td');
+      if (full && full !== ownId) {
+        var btn = document.createElement('button');
+        btn.textContent = 'Diese Installation ersetzen';
+        btn.disabled = !canManageInstallations;
+        btn.title = canManageInstallations ? '' : 'Nur der initiale Admin (Token bzw. Admin-Konto) kann übertragen.';
+        btn.addEventListener('click', function () {
+          if (!window.confirm('Die Installation ' + short + ' verliert ihre Enterprise-Funktionen beim nächsten Heartbeat. Fortfahren?')) return;
+          btn.disabled = true;
+          adminFetch('/license/transfer', jsonRequest('POST', { installationId: full }))
+            .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+            .then(function (result) {
+              if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Übertragen fehlgeschlagen'), 'error'); return; }
+              renderAuth(result.data);
+              showBanner(authBanner, 'Installation übernommen.', 'ok');
+              loadInstallations();
+            })
+            .catch(function () { showBanner(authBanner, 'Übertragen fehlgeschlagen', 'error'); })
+            .then(function () { btn.disabled = !canManageInstallations; });
+        });
+        actionCell.appendChild(btn);
+      }
+      tr.appendChild(actionCell);
+      body.appendChild(tr);
+    });
+  }
+
+  function loadInstallations() {
+    return adminFetch('/license/installations')
+      .then(function (res) { return res.json(); })
+      .then(function (data) { renderInstallations(data.installations || []); })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
 
   function updateOidcVisibility() {
@@ -1066,7 +1301,10 @@ export const adminPageHtml = `<!doctype html>
     if (eff.blockedReason) text += ' — BLOCKIERT: ' + eff.blockedReason;
     authSource.textContent = text;
     authSource.classList.toggle('error', Boolean(eff.blockedReason));
-    licenseSummary.textContent = describeLicenseStatus(eff.license || { status: 'none' }) + (data.stored && data.stored.hasLicense ? ' (aus Admin-UI)' : data.envDefaults && data.envDefaults.hasLicense ? ' (aus Env)' : '');
+    var lic = eff.license || { status: 'none' };
+    licenseSummary.textContent = describeLicenseStatus(lic) + (data.stored && data.stored.hasLicense ? ' (aus Admin-UI)' : data.envDefaults && data.envDefaults.hasLicense ? ' (aus Env)' : '');
+    licenseSummary.classList.toggle('error', lic.status === 'inactive' || lic.status === 'expired' || lic.status === 'invalid');
+    renderLicenseCard(lic, data);
     if (eff.mode === 'none' || eff.mode === 'local' || eff.mode === 'oidc') authMode.value = eff.mode;
     var oidc = (data.stored && data.stored.oidc) || eff.oidc;
     if (oidc) {
@@ -1110,7 +1348,7 @@ export const adminPageHtml = `<!doctype html>
   function loadAuth() {
     return adminFetch('/auth-settings')
       .then(function (res) { return res.json(); })
-      .then(renderAuth)
+      .then(function (data) { renderAuth(data); loadInstallations(); })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
 
@@ -1159,6 +1397,64 @@ export const adminPageHtml = `<!doctype html>
     licenseToken.value = '';
     if (authMode.value === 'oidc') authMode.value = 'local';
     saveAuth({ license: '' });
+  });
+  document.getElementById('license-refresh').addEventListener('click', function () {
+    var button = this;
+    button.disabled = true;
+    adminFetch('/license/refresh', { method: 'POST' })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Aktualisierung fehlgeschlagen'), 'error'); return; }
+        renderAuth(result.data);
+        loadInstallations();
+        showBanner(authBanner, 'Aktivierung aktualisiert.', 'ok');
+      })
+      .catch(function () { showBanner(authBanner, 'Aktualisierung fehlgeschlagen', 'error'); })
+      .then(function () { button.disabled = false; });
+  });
+  document.getElementById('license-deactivate').addEventListener('click', function () {
+    if (!window.confirm('Diese Installation stilllegen? Enterprise-Funktionen enden beim nächsten Heartbeat, der Platz wird sofort frei.')) return;
+    var button = this;
+    button.disabled = true;
+    adminFetch('/license/deactivate', jsonRequest('POST', { confirm: true }))
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Stilllegen fehlgeschlagen'), 'error'); return; }
+        renderAuth(result.data);
+        showBanner(authBanner, 'Installation stillgelegt.', 'ok');
+      })
+      .catch(function () { showBanner(authBanner, 'Stilllegen fehlgeschlagen', 'error'); })
+      .then(function () { button.disabled = false; });
+  });
+  document.getElementById('activation-request-download').addEventListener('click', function () {
+    adminFetch('/license/activation-request')
+      .then(function (res) {
+        if (!res.ok) return res.json().then(function (data) { showBanner(authBanner, errorText(data, 'Anfrage fehlgeschlagen'), 'error'); });
+        return res.blob().then(function (blob) {
+          var href = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = href;
+          a.download = 'ovp-activation-request.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(href);
+        });
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+  });
+  document.getElementById('license-lease-save').addEventListener('click', function () {
+    var lease = document.getElementById('license-lease');
+    if (!lease.value.trim()) { lease.focus(); return; }
+    adminFetch('/license/lease', jsonRequest('PUT', { lease: lease.value.trim() }))
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Lease abgelehnt'), 'error'); return; }
+        lease.value = '';
+        renderAuth(result.data);
+        showBanner(authBanner, 'Lease gespeichert — Installation aktiviert.', 'ok');
+      })
+      .catch(function () { showBanner(authBanner, 'Lease konnte nicht gespeichert werden', 'error'); });
   });
   document.getElementById('reset-auth').addEventListener('click', function () {
     if (!window.confirm('Alle Anmelde-Einstellungen der Admin-UI verwerfen und die Env-Defaults verwenden?')) return;
@@ -1590,6 +1886,264 @@ export const adminPageHtml = `<!doctype html>
       })
         .catch(function () { showBanner(playbooksBanner, 'Löschen fehlgeschlagen. Bitte erneut versuchen.', 'error'); })
         .finally(function () { setPlaybookPending(false); });
+  });
+
+  // ---------- Kennzahlen ----------
+
+  var metricsState = { metrics: [], source: 'default' };
+  var metricsBody = document.getElementById('metrics-body');
+  var metricsSource = document.getElementById('metrics-source');
+  var metricsBanner = document.getElementById('metrics-banner');
+  var metricDialog = document.getElementById('metric-dialog');
+  var metricDialogBanner = document.getElementById('metric-dialog-banner');
+  var metricQuestionsRoot = document.getElementById('metric-questions');
+  var metricEditIndex = -1;
+  var metricDraftQuestions = [];
+
+  function metricsChanged() {
+    showBanner(metricsBanner, 'Ungespeicherte Änderungen.', '');
+    metricsBanner.style.display = 'block';
+  }
+
+  function openMetricDialog(index) {
+    metricEditIndex = index;
+    var metric = index >= 0 ? metricsState.metrics[index] : { id: '', name: '', synonyms: [], definition: '', owner: '', datasource: '', interpretation: '', verifiedQuestions: [] };
+    document.getElementById('metric-dialog-title').textContent = index >= 0 ? 'Kennzahl bearbeiten' : 'Kennzahl anlegen';
+    document.getElementById('metric-id').value = metric.id || '';
+    document.getElementById('metric-name').value = metric.name || '';
+    document.getElementById('metric-synonyms').value = (metric.synonyms || []).join(', ');
+    document.getElementById('metric-definition').value = metric.definition || '';
+    document.getElementById('metric-owner').value = metric.owner || '';
+    document.getElementById('metric-datasource').value = metric.datasource || '';
+    document.getElementById('metric-interpretation').value = metric.interpretation || '';
+    metricDraftQuestions = (metric.verifiedQuestions || []).map(function (q) { return { question: q.question, answerGuidance: q.answerGuidance }; });
+    renderMetricQuestions();
+    ['metric-id', 'metric-name', 'metric-synonyms', 'metric-definition'].forEach(function (id) { metricClearFieldError(document.getElementById(id)); });
+    document.getElementById('metric-id').dataset.auto = metric.id ? '' : '1';
+    showBanner(metricDialogBanner, '', 'ok');
+    metricDialog.showModal();
+    document.getElementById('metric-name').focus();
+  }
+
+  function metricRow(metric, index) {
+    var tr = document.createElement('tr');
+    function textCell(text, cls) {
+      var td = document.createElement('td');
+      if (cls) td.className = cls;
+      td.textContent = text || '';
+      return td;
+    }
+    tr.appendChild(textCell(metric.name));
+    tr.appendChild(textCell((metric.synonyms || []).join(', ')));
+    tr.appendChild(textCell(metric.definition, 'col-desc'));
+    tr.appendChild(textCell(metric.owner));
+    tr.appendChild(textCell(metric.datasource));
+    var actionsTd = document.createElement('td');
+    actionsTd.className = 'col-del';
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.textContent = 'Bearbeiten';
+    editBtn.addEventListener('click', function () { openMetricDialog(index); });
+    actionsTd.appendChild(editBtn);
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    setActionIcon(delBtn, 'remove', 'Kennzahl entfernen');
+    delBtn.addEventListener('click', function () {
+      metricsState.metrics.splice(index, 1);
+      metricsChanged();
+      renderMetrics();
+    });
+    actionsTd.appendChild(delBtn);
+    tr.appendChild(actionsTd);
+    return tr;
+  }
+
+  function renderMetrics() {
+    metricsBody.innerHTML = '';
+    metricsState.metrics.forEach(function (metric, index) { metricsBody.appendChild(metricRow(metric, index)); });
+    metricsSource.textContent =
+      metricsState.source === 'custom'
+        ? 'Aktuell: eigene, gespeicherte Kennzahlen.'
+        : 'Aktuell: kein Katalog gepflegt — der Assistent kennt keine verbindlichen Definitionen.';
+  }
+
+  function loadMetrics() {
+    return adminFetch('/metrics')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        metricsState = { metrics: data.metrics || [], source: data.source };
+        renderMetrics();
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+  }
+
+  function metricFieldError(fieldId) {
+    return fieldId ? document.getElementById(fieldId + '-error') : null;
+  }
+
+  function metricClearFieldError(field) {
+    if (!field) return;
+    field.removeAttribute('aria-invalid');
+    var errorEl = metricFieldError(field.id);
+    if (errorEl) { errorEl.hidden = true; errorEl.textContent = ''; }
+  }
+
+  function metricSetFieldError(fieldId, message) {
+    var field = document.getElementById(fieldId);
+    if (!field) return null;
+    if (!message) { metricClearFieldError(field); return null; }
+    var errorEl = metricFieldError(fieldId);
+    if (errorEl) { errorEl.textContent = message; errorEl.hidden = false; }
+    field.setAttribute('aria-invalid', 'true');
+    return field;
+  }
+
+  // ID aus dem Namen ableiten, solange der Admin sie nicht selbst angefasst hat.
+  function metricSlug(name) {
+    var slug = name.toLowerCase()
+      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+    return /^[a-z]/.test(slug) ? slug : (slug ? 'k-' + slug.slice(0, 38) : '');
+  }
+  document.getElementById('metric-name').addEventListener('input', function () {
+    var idField = document.getElementById('metric-id');
+    if (idField.dataset.auto === '1') { idField.value = metricSlug(this.value); metricClearFieldError(idField); }
+  });
+  document.getElementById('metric-id').addEventListener('input', function () { this.dataset.auto = ''; });
+  ['metric-id', 'metric-name', 'metric-synonyms', 'metric-definition'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () { metricClearFieldError(document.getElementById(id)); });
+  });
+
+  function renderMetricQuestions() {
+    metricQuestionsRoot.innerHTML = '';
+    metricDraftQuestions.forEach(function (question, index) {
+      var row = document.createElement('div');
+      row.className = 'metric-question-row';
+      var qLabel = document.createElement('label');
+      qLabel.textContent = 'Frage';
+      var qInput = document.createElement('input');
+      qInput.type = 'text';
+      qInput.maxLength = 200;
+      qInput.value = question.question || '';
+      qInput.addEventListener('input', function () { question.question = qInput.value; });
+      qLabel.appendChild(qInput);
+      var aLabel = document.createElement('label');
+      aLabel.textContent = 'Antwortlogik';
+      var aInput = document.createElement('textarea');
+      aInput.rows = 2;
+      aInput.maxLength = 500;
+      aInput.value = question.answerGuidance || '';
+      aInput.addEventListener('input', function () { question.answerGuidance = aInput.value; });
+      aLabel.appendChild(aInput);
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'danger';
+      removeBtn.textContent = 'Frage entfernen';
+      removeBtn.addEventListener('click', function () {
+        metricDraftQuestions.splice(index, 1);
+        renderMetricQuestions();
+      });
+      row.appendChild(qLabel);
+      row.appendChild(aLabel);
+      row.appendChild(removeBtn);
+      metricQuestionsRoot.appendChild(row);
+    });
+    document.getElementById('metric-add-question').disabled = metricDraftQuestions.length >= 5;
+  }
+
+  document.getElementById('metric-add-question').addEventListener('click', function () {
+    if (metricDraftQuestions.length >= 5) return;
+    metricDraftQuestions.push({ question: '', answerGuidance: '' });
+    renderMetricQuestions();
+  });
+
+  document.getElementById('add-metric').addEventListener('click', function () { openMetricDialog(-1); });
+  metricDialog.addEventListener('close', function () { document.getElementById('metric-form').reset(); });
+  document.getElementById('metric-dialog-cancel').addEventListener('click', function () { metricDialog.close(); });
+
+  function validateMetricDraft(draft) {
+    var firstInvalid = null;
+    function check(fieldId, message) {
+      var invalid = metricSetFieldError(fieldId, message);
+      if (invalid && !firstInvalid) firstInvalid = invalid;
+    }
+    var idError = '';
+    if (!/^[a-z][a-z0-9-]{0,39}$/.test(draft.id)) {
+      idError = 'Kleinbuchstaben, Ziffern und "-", muss mit einem Buchstaben beginnen, max. 40 Zeichen.';
+    } else if (metricsState.metrics.some(function (m, i) { return i !== metricEditIndex && m.id === draft.id; })) {
+      idError = 'ID bereits vergeben.';
+    }
+    check('metric-id', idError);
+    check('metric-name', draft.name ? '' : 'Name ist erforderlich.');
+    check('metric-definition', draft.definition ? '' : 'Definition ist erforderlich.');
+    var synonymTooLong = draft.synonyms.some(function (s) { return s.length > 40; });
+    check('metric-synonyms', draft.synonyms.length > 10 ? 'Höchstens 10 Synonyme.' : (synonymTooLong ? 'Jedes Synonym höchstens 40 Zeichen.' : ''));
+    var names = [draft.name].concat(draft.synonyms).filter(Boolean).map(function (s) { return s.toLocaleLowerCase(); });
+    var collision = metricsState.metrics.some(function (m, i) {
+      if (i === metricEditIndex) return false;
+      var otherNames = [m.name].concat(m.synonyms || []).map(function (s) { return s.toLocaleLowerCase(); });
+      return names.some(function (n) { return otherNames.indexOf(n) >= 0; });
+    });
+    if (collision) check('metric-name', 'Name oder Synonym ist bei einer anderen Kennzahl bereits vergeben.');
+    return firstInvalid;
+  }
+
+  document.getElementById('metric-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var draft = {
+      id: document.getElementById('metric-id').value.trim(),
+      name: document.getElementById('metric-name').value.trim(),
+      synonyms: document.getElementById('metric-synonyms').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+      definition: document.getElementById('metric-definition').value.trim(),
+      owner: document.getElementById('metric-owner').value.trim(),
+      datasource: document.getElementById('metric-datasource').value.trim(),
+      interpretation: document.getElementById('metric-interpretation').value.trim(),
+      verifiedQuestions: metricDraftQuestions
+        .map(function (q) { return { question: (q.question || '').trim(), answerGuidance: (q.answerGuidance || '').trim() }; })
+        .filter(function (q) { return q.question && q.answerGuidance; }),
+    };
+    var firstInvalid = validateMetricDraft(draft);
+    if (firstInvalid) {
+      showBanner(metricDialogBanner, 'Bitte die markierten Felder korrigieren.', 'error');
+      firstInvalid.focus();
+      return;
+    }
+    if (!draft.owner) delete draft.owner;
+    if (!draft.datasource) delete draft.datasource;
+    if (!draft.interpretation) delete draft.interpretation;
+    if (metricEditIndex >= 0) metricsState.metrics[metricEditIndex] = draft; else metricsState.metrics.push(draft);
+    metricsChanged();
+    renderMetrics();
+    metricDialog.close();
+  });
+
+  document.getElementById('save-metrics').addEventListener('click', function () {
+    showBanner(metricsBanner, '', 'ok');
+    adminFetch('/metrics', jsonRequest('PUT', metricsState.metrics))
+      .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
+      .then(function (result) {
+        if (!result.res.ok) {
+          showBanner(metricsBanner, errorText(result.data, 'Speichern fehlgeschlagen'), 'error');
+          return;
+        }
+        showBanner(metricsBanner, 'Gespeichert.', 'ok');
+        return loadMetrics();
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+  });
+
+  document.getElementById('reset-metrics').addEventListener('click', function () {
+    if (!confirm('Alle Kennzahlen löschen?')) return;
+    adminFetch('/metrics', { method: 'DELETE' })
+      .then(function (res) {
+        if (!res.ok) {
+          showBanner(metricsBanner, 'Zurücksetzen fehlgeschlagen.', 'error');
+          return;
+        }
+        showBanner(metricsBanner, 'Katalog gelöscht.', 'ok');
+        return loadMetrics();
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   });
 
   // ---------- Modell-Katalog ----------

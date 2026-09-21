@@ -3,15 +3,28 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { DEFAULT_LICENSE_KID, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
-import { startMockOidc, type MockOidc } from '../../../ee/test/mock-oidc-server';
+import { DEFAULT_LICENSE_KID, EE_STUB, encodeLicenseToken, LICENSE_FORMAT_VERSION, signLicensePayload } from '@openvizpilot/ee/server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
+import { activated, TEST_LEASE_TRUSTED_KEYS } from './license-helper';
 
 /**
  * Enterprise-Login Ende-zu-Ende: Lizenz-Gating, Auth-Config, Code-Austausch
  * (BFF) gegen den Mock-IdP, geschützte Routen und die verifizierte Nutzer-ID.
+ *
+ * Braucht den Enterprise-Mock-IdP (ee/test/, nur im vollen Baum vorhanden) und
+ * eine echte Lizenzprüfung — im Core-Export (EE_STUB) nie verfügbar. Die
+ * `beforeAll`/`afterAll` hier sind Datei-global (nicht in einem `describe`
+ * geschachtelt) und laufen darum IMMER, auch wenn die Suites unten per
+ * `describe.skipIf(EE_STUB)` übersprungen werden — deshalb der explizite
+ * `EE_STUB`-Guard und der dynamische statt statische Import.
  */
+
+/** Minimale Sicht auf ee/test/mock-oidc-server.ts — das Modul existiert nur im vollen (privaten) Baum. */
+interface MockOidc {
+  issuer: string;
+  close(): Promise<void>;
+}
 
 let idp: MockOidc;
 let licenseEnv: AppConfig['licenseEnv'];
@@ -19,6 +32,11 @@ let licenseTrustedKeys: AppConfig['licenseTrustedKeys'];
 let tmpDirs: string[] = [];
 
 beforeAll(async () => {
+  if (EE_STUB) return;
+  // Dynamischer statt statischer Import: ee/test/ existiert nur im vollen
+  // (privaten) Baum. Wird dank des Guards oben im Core-Export nie erreicht.
+  // @ts-ignore -- nur im vollen Baum vorhanden, siehe Kommentar oben
+  const { startMockOidc } = await import('../../../ee/test/mock-oidc-server');
   idp = await startMockOidc({ clientId: 'ovp-ee-test' });
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const payload = JSON.stringify({
@@ -35,6 +53,7 @@ beforeAll(async () => {
   licenseTrustedKeys = { [DEFAULT_LICENSE_KID]: (publicKey.export({ format: 'jwk' }) as { x: string }).x };
 });
 afterAll(async () => {
+  if (EE_STUB) return;
   await idp.close();
 });
 afterEach(() => {
@@ -71,13 +90,15 @@ function oidcConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
+    environment: 'test',
     licenseEnv,
     licenseTrustedKeys,
+    leaseTrustedKeys: TEST_LEASE_TRUSTED_KEYS,
     ...overrides,
   };
 }
 
-describe('license gating', () => {
+describe.skipIf(EE_STUB)('license gating', () => {
   it('keeps the API closed (503, not open) in OIDC mode without a valid license', async () => {
     const { app } = createApp(oidcConfig({ licenseEnv: {} }));
     const res = await app.request('/api/models');
@@ -91,7 +112,7 @@ describe('license gating', () => {
   });
 
   it('exposes the license status to admins and reports open core without a token', async () => {
-    const { app } = createApp(oidcConfig());
+    const { app } = await activated(createApp(oidcConfig()), { licenseId: 'test' });
     const res = await app.request('/api/admin/auth-settings', { headers: { authorization: 'Bearer geheim' } });
     const body = (await res.json()) as { effective: { mode: string; license: { status: string; licensee: string } } };
     expect(body.effective.license.status).toBe('valid');
@@ -104,9 +125,9 @@ describe('license gating', () => {
   });
 });
 
-describe('OIDC auth flow', () => {
+describe.skipIf(EE_STUB)('OIDC auth flow', () => {
   it('publishes the login config and protects the API until a verified token is presented', async () => {
-    const { app } = createApp(oidcConfig());
+    const { app } = await activated(createApp(oidcConfig()), { licenseId: 'test' });
 
     const cfg = (await (await app.request('/api/auth/config')).json()) as Record<string, string>;
     expect(cfg.mode).toBe('oidc');
@@ -129,7 +150,7 @@ describe('OIDC auth flow', () => {
   });
 
   it('exchanges a PKCE code via the BFF and binds the verified user to memory', async () => {
-    const { app } = createApp(oidcConfig());
+    const { app } = await activated(createApp(oidcConfig()), { licenseId: 'test' });
     const redirectUri = 'https://chat.example.com/auth/callback';
     const verifier = 'v'.repeat(64);
     const challenge = createHash('sha256').update(verifier).digest('base64url');

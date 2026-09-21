@@ -60,6 +60,19 @@ describe('expandSlashCommand', () => {
     expect(expandSlashCommand([], '/vergleich')).toBeNull();
   });
 
+  it('expands the executive brief command with a given audience', () => {
+    const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, '/fuehrungsbericht Vorstand');
+    expect(result?.name).toBe('fuehrungsbericht');
+    expect(result?.prompt).toContain('executive brief of this dashboard for Vorstand');
+  });
+
+  it('falls back to a neutral audience for the executive brief without arguments', () => {
+    const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, '/exec-brief');
+    expect(result?.name).toBe('exec-brief');
+    expect(result?.prompt).toContain('the leadership team');
+    expect(result?.prompt).not.toContain('{{args}}');
+  });
+
   it('every command template is free of unresolved placeholders after expansion', () => {
     for (const c of DEFAULT_SLASH_COMMANDS) {
       const result = expandSlashCommand(DEFAULT_SLASH_COMMANDS, `/${c.name} X Y`);

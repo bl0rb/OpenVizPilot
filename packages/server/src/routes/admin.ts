@@ -4,6 +4,7 @@ import {
   buildTrexManifest,
   createUserSchema,
   DEFAULT_SLASH_COMMANDS,
+  metricCatalogSchema,
   MIN_USER_PASSWORD_CHARS,
   modelCatalogSchema,
   playbookEntrySchema,
@@ -19,7 +20,11 @@ import {
   EE_FEATURE_LABELS,
   hasFeature,
   loadLicenseFromEnv,
+  verifyLease,
   verifyLicense,
+  type HeartbeatAction,
+  type HeartbeatInstallation,
+  type HeartbeatResponseInfo,
   type LicenseStatus,
   type TelemetryStore,
   createMcpAdminRoute,
@@ -171,6 +176,10 @@ export function createAdminRoute(
   telemetryStore: TelemetryStore | null = null,
   mcpStore: McpStore | null = null,
   tableau: TableauService | null = null,
+  /** Sofortiger Lizenz-Heartbeat (neuer Schlüssel, „Jetzt aktualisieren“, Stilllegen/Übertragen); null ohne Datenbank. */
+  refreshLease:
+    | ((options?: { action?: HeartbeatAction; onResponse?: (info: HeartbeatResponseInfo) => void; reactivate?: boolean }) => Promise<'sent' | 'skipped' | 'failed'>)
+    | null = null,
 ): Hono<AdminEnv> {
   const app = new Hono<AdminEnv>();
   const tokenMode = Boolean(config.adminToken);
@@ -374,6 +383,7 @@ export function createAdminRoute(
   };
   app.use('/commands', storeGuard);
   app.use('/models', storeGuard);
+  app.use('/metrics', storeGuard);
   app.use('/playbooks', storeGuard);
   app.use('/stats', storeGuard);
   app.route('/mcp', createMcpAdminRoute(mcpStore, {
@@ -485,6 +495,49 @@ export function createAdminRoute(
     }
   });
 
+  app.get('/metrics', async (c) => {
+    try {
+      const stored = await memoryStore!.getMetricCatalog();
+      if (stored) return c.json({ metrics: stored, source: 'custom' as const });
+      return c.json({ metrics: [], source: 'default' as const });
+    } catch (err) {
+      logger.error('admin metric catalog read failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
+    }
+  });
+
+  app.put(
+    '/metrics',
+    zValidator('json', metricCatalogSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: 'Ungültiger Kennzahlenkatalog', details: result.error.issues }, 400);
+      }
+      return undefined;
+    }),
+    async (c) => {
+      const catalog = c.req.valid('json');
+      try {
+        await memoryStore!.setMetricCatalog(catalog);
+        logger.info('admin metric catalog updated', { count: catalog.length });
+        return c.json({ ok: true });
+      } catch (err) {
+        logger.error('admin metric catalog write failed', { name: err instanceof Error ? err.name : 'unknown' });
+        return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
+      }
+    },
+  );
+
+  app.delete('/metrics', async (c) => {
+    try {
+      await memoryStore!.setMetricCatalog(null);
+      logger.info('admin metric catalog reset');
+      return c.json({ ok: true });
+    } catch (err) {
+      logger.error('admin metric catalog reset failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
+    }
+  });
+
   /**
    * Modell-Lookup für die Admin-UI: rohe, UNGEFILTERTE Liste des Endpunkts
    * (ohne OVP_MODEL_ALLOWLIST) — der Admin sieht alles, was der Endpunkt meldet,
@@ -516,7 +569,7 @@ export function createAdminRoute(
         publicUrl: state.publicUrl,
         /** Exakt die Redirect-URI, die beim IdP registriert werden muss. */
         redirectUri: state.publicUrl ? `${state.publicUrl}/auth/callback` : null,
-        license: describeLicense(state.license),
+        license: describeLicense(state.license, state.lease),
         oidc: state.oidcSettings
           ? { provider: state.oidcSettings.provider, issuer: state.oidcSettings.issuer, clientId: state.oidcSettings.clientId, scopes: state.oidcSettings.scopes }
           : null,
@@ -550,7 +603,32 @@ export function createAdminRoute(
       },
       featureLabels: EE_FEATURE_LABELS,
       storeAvailable: Boolean(memoryStore),
+      /** Ob „Jetzt aktualisieren“ und die Offline-Aktivierung möglich sind (Datenbank vorhanden). */
+      leaseAvailable: Boolean(telemetryStore),
     };
+  };
+
+  /**
+   * Heartbeat sofort auslösen und den Zustand neu lesen — Aktivierung ohne 24 h
+   * Wartezeit, sowie Grundlage für Stilllegen/Übertragen und die Installationsliste.
+   * Wirft nie; ein Fehler bleibt eine Logzeile, der Zustand zeigt ihn.
+   */
+  const runHeartbeat = async (options: { action?: HeartbeatAction; onResponse?: (info: HeartbeatResponseInfo) => void; reactivate?: boolean } = {}): Promise<'sent' | 'skipped' | 'failed'> => {
+    if (!refreshLease) return 'skipped';
+    let result: 'sent' | 'skipped' | 'failed' = 'skipped';
+    try {
+      result = await refreshLease(options);
+    } catch (err) {
+      logger.warn('license heartbeat action failed', { name: err instanceof Error ? err.name : 'unknown' });
+      result = 'failed';
+    }
+    authState.invalidate();
+    return result;
+  };
+
+  /** Ausdrückliche Aktivierung (neuer Schlüssel, „Jetzt aktualisieren“) — darf eine stillgelegte Installation reaktivieren. */
+  const activateNow = async (): Promise<void> => {
+    await runHeartbeat({ reactivate: true });
   };
 
   /** Lizenz- und Anmeldestatus (nur Metadaten, nie Token/Secrets). */
@@ -624,6 +702,8 @@ export function createAdminRoute(
       await memoryStore.setAuthSettings(next);
       authState.invalidate();
       logger.info('auth settings updated', { mode: next.mode, provider: next.oidc?.provider ?? null, license: license.status });
+      // Neuer Lizenzschlüssel: sofort aktivieren statt auf den nächsten Tages-Heartbeat zu warten.
+      if (input.license?.trim() && input.license.trim() !== stored?.license) await activateNow();
       return c.json(await describeAuth());
     } catch (err) {
       logger.error('auth settings write failed', { name: err instanceof Error ? err.name : 'unknown' });
@@ -636,6 +716,113 @@ export function createAdminRoute(
     if (!memoryStore) return c.json({ error: 'Einstellungen benötigen einen Memory-Store' }, 503);
     await memoryStore.setAuthSettings(null);
     authState.invalidate();
+    return c.json(await describeAuth());
+  });
+
+  // ---- Lizenzaktivierung (Lease) ----
+
+  /** „Jetzt aktualisieren“: Heartbeat sofort, Antwort = neuer Stand. */
+  app.post('/license/refresh', async (c) => {
+    if (!refreshLease) return c.json({ error: 'Aktivierung benötigt eine Datenbank' }, 503);
+    try {
+      await activateNow();
+      return c.json(await describeAuth());
+    } catch (err) {
+      logger.error('license refresh failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Aktualisierung fehlgeschlagen' }, 500);
+    }
+  });
+
+  /** Offline-Aktivierung, Schritt 1: Anfrage für den WerkWorks-Lizenzgenerator (Download). */
+  app.get('/license/activation-request', async (c) => {
+    if (!telemetryStore) return c.json({ error: 'Aktivierung benötigt eine Datenbank' }, 503);
+    const state = await authState.get();
+    if (state.verifiedLicense.status !== 'valid') return c.json({ error: 'Offline-Aktivierung braucht eine gültige Lizenz.' }, 400);
+    try {
+      const request = {
+        product: 'openvizpilot',
+        installationId: await telemetryStore.getInstallationId(),
+        licenseId: state.verifiedLicense.license.licenseId,
+        version: config.appVersion,
+        environment: config.environment,
+        requestedAt: new Date().toISOString(),
+      };
+      c.header('Content-Disposition', 'attachment; filename="ovp-activation-request.json"');
+      return c.json(request);
+    } catch (err) {
+      logger.error('activation request failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Aktivierungsanfrage konnte nicht erstellt werden' }, 500);
+    }
+  });
+
+  /** Offline-Aktivierung, Schritt 2: signierte Lease einfügen — muss zu Installation und Lizenz passen. */
+  app.put('/license/lease', zValidator('json', z.object({ lease: z.string().min(1).max(8000) }), (result, c) => {
+      if (!result.success) return c.json({ error: 'Ungültige Lease', details: result.error.issues }, 400);
+    }), async (c) => {
+    if (!telemetryStore) return c.json({ error: 'Aktivierung benötigt eine Datenbank' }, 503);
+    const state = await authState.get();
+    if (state.verifiedLicense.status !== 'valid') return c.json({ error: 'Offline-Aktivierung braucht eine gültige Lizenz.' }, 400);
+    try {
+      const token = c.req.valid('json').lease.trim();
+      const check = verifyLease(token, {
+        installationId: await telemetryStore.getInstallationId(),
+        licenseId: state.verifiedLicense.license.licenseId,
+        keys: config.leaseTrustedKeys,
+      });
+      if (check.status === 'invalid') return c.json({ error: `Lease ungültig: ${check.reason}` }, 400);
+      if (check.status === 'expired') return c.json({ error: `Lease ist am ${check.lease.leaseUntil.slice(0, 10)} abgelaufen.` }, 400);
+      await telemetryStore.saveLease(token);
+      authState.invalidate();
+      logger.info('license lease stored', { offline: Boolean(check.lease.offline), leaseUntil: check.lease.leaseUntil });
+      return c.json(await describeAuth());
+    } catch (err) {
+      logger.error('license lease write failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Lease konnte nicht gespeichert werden' }, 500);
+    }
+  });
+
+  /**
+   * Installationen dieser Lizenz — nur zur Anzeige, aus der Antwort DIESES
+   * Heartbeats, nie gespeichert. Lesen ist allen Admins erlaubt (initial und
+   * delegiert), anders als Stilllegen/Übertragen unten.
+   */
+  app.get('/license/installations', async (c) => {
+    if (!refreshLease || !telemetryStore) return c.json({ error: 'Benötigt eine Datenbank' }, 503);
+    let installations: HeartbeatInstallation[] = [];
+    await runHeartbeat({ onResponse: (info) => { installations = info.installations ?? []; } });
+    return c.json({ installations });
+  });
+
+  /** Stilllegen der eigenen Installation — Platz wird beim nächsten Heartbeat frei. Nur der initiale Admin. */
+  app.post('/license/deactivate', zValidator('json', z.object({ confirm: z.literal(true) }).strict(), (result, c) => {
+      if (!result.success) return c.json({ error: 'Bestätigung erforderlich' }, 400);
+    }), async (c) => {
+    if (c.get('adminPrincipal').role !== 'initial') {
+      return c.json({ error: 'Stilllegen ist nur dem initialen Admin (Token bzw. Admin-Konto) vorbehalten', code: 'initial_admin_required' }, 403);
+    }
+    if (!refreshLease || !telemetryStore) return c.json({ error: 'Stilllegen benötigt eine Datenbank' }, 503);
+    const result = await runHeartbeat({ action: 'deactivate' });
+    if (result !== 'sent') return c.json({ error: 'Stilllegen fehlgeschlagen — Gegenstelle nicht erreichbar' }, 502);
+    logger.info('license installation deactivated by admin');
+    return c.json(await describeAuth());
+  });
+
+  /** Übernehmen: eine andere Installation derselben Lizenz stilllegen und die eigene aktivieren. Nur der initiale Admin. */
+  app.post('/license/transfer', zValidator('json', z.object({ installationId: z.string().min(1).max(200) }).strict(), (result, c) => {
+      if (!result.success) return c.json({ error: 'Ungültige Installation-ID' }, 400);
+    }), async (c) => {
+    if (c.get('adminPrincipal').role !== 'initial') {
+      return c.json({ error: 'Übertragen ist nur dem initialen Admin (Token bzw. Admin-Konto) vorbehalten', code: 'initial_admin_required' }, 403);
+    }
+    if (!refreshLease || !telemetryStore) return c.json({ error: 'Übertragen benötigt eine Datenbank' }, 503);
+    const { installationId } = c.req.valid('json');
+    let errorCode: string | undefined;
+    const result = await runHeartbeat({ action: { transfer: installationId }, onResponse: (info) => { errorCode = info.error; } });
+    if (result !== 'sent') {
+      const unknown = errorCode === 'unknown_installation';
+      return c.json({ error: unknown ? 'Installation nicht gefunden — sie gehört nicht zu dieser Lizenz.' : 'Übertragen fehlgeschlagen — Gegenstelle nicht erreichbar' }, unknown ? 400 : 502);
+    }
+    logger.info('license installation transferred', { installationId });
     return c.json(await describeAuth());
   });
 

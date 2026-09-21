@@ -9,6 +9,15 @@ import type { SlashCommand } from '@openvizpilot/shared';
  * commands; when they are sent, they are expanded again.
  */
 
+/** Neutraler Platzhalter, falls ein Befehl mit {{args}} ohne Argumente aufgerufen wird — je Befehlsname, da die Vorlagen englisch formuliert sind. */
+const FALLBACK_ARGS: Record<string, string> = {
+  compare: 'the relevant comparison groups',
+  'exec-brief': 'the leadership team',
+  fuehrungsbericht: 'the leadership team',
+  herkunft: 'the selected mark or the main KPI',
+  lineage: 'the selected mark or the main KPI',
+};
+
 export interface ExpandedCommand {
   /** What is shown in the chat as a user message (the command itself). */
   display: string;
@@ -36,7 +45,10 @@ export function expandSlashCommand(commands: SlashCommand[], input: string): Exp
   const command = commands.find((c) => c.name === rawName?.toLowerCase());
   if (!command) return null;
   const args = rest.join(' ').trim();
-  const fallbackArgs = command.name === 'compare' ? 'the relevant comparison groups' : 'den relevanten Vergleichsgruppen';
+  // {{args}} kennt kein Inline-Default (z. B. "{{args|Foo}}") — der neutrale
+  // Platzhalter für fehlende Argumente ist deshalb hier pro Befehlsname
+  // hinterlegt statt im Template.
+  const fallbackArgs = FALLBACK_ARGS[command.name] ?? 'den relevanten Vergleichsgruppen';
   const prompt = command.template.split('{{args}}').join(args || fallbackArgs);
   return { display: trimmed, prompt, name: command.name };
 }

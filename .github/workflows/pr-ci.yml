@@ -123,3 +123,37 @@ jobs:
             echo "expected render to fail without llm.apiKey/apiKeySecret"
             exit 1
           fi
+
+      - name: Render Helm chart (Enterprise edition, image.repository derived)
+        run: |
+          helm template test charts/openvizpilot \
+            --set llm.baseUrl=http://litellm:4000 \
+            --set llm.apiKey=ci-render-check \
+            --set app.defaultModel=test-model \
+            --set image.edition=enterprise \
+            --set imagePullSecrets[0].name=ghcr-enterprise \
+            | grep -q 'image: "ghcr.io/bl0rb/openvizpilot-enterprise:' \
+            || { echo "expected enterprise edition to render the enterprise image repository"; exit 1; }
+
+      - name: Render Helm chart fails for Enterprise edition without imagePullSecrets
+        run: |
+          if helm template test charts/openvizpilot \
+               --set llm.baseUrl=http://litellm:4000 \
+               --set llm.apiKey=ci-render-check \
+               --set app.defaultModel=test-model \
+               --set image.edition=enterprise > /dev/null 2>&1; then
+            echo "expected render to fail for image.edition=enterprise without imagePullSecrets"
+            exit 1
+          fi
+
+      - name: Render Helm chart honours explicit image.repository override
+        run: |
+          helm template test charts/openvizpilot \
+            --set llm.baseUrl=http://litellm:4000 \
+            --set llm.apiKey=ci-render-check \
+            --set app.defaultModel=test-model \
+            --set image.edition=enterprise \
+            --set imagePullSecrets[0].name=ghcr-enterprise \
+            --set image.repository=my.registry/openvizpilot \
+            | grep -q 'image: "my.registry/openvizpilot:' \
+            || { echo "expected explicit image.repository to win over the edition default"; exit 1; }

@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { HEARTBEAT_ENDPOINT } from '@openvizpilot/ee/server';
+import { HEARTBEAT_ENDPOINT, OVP_ENVIRONMENTS, type OvpEnvironment } from '@openvizpilot/ee/server';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -102,6 +102,8 @@ const envSchema = z.object({
   /** Produktversion für den Heartbeat (Helm setzt sie aus der Chart-AppVersion). */
   OVP_APP_VERSION: z.string().optional(),
   OVP_LICENSE_PATH: z.string().optional(),
+  /** Umgebung dieser Installation — zählt bei der Lizenzaktivierung (eine produktive je Lizenz, Nicht-Produktion inklusive). */
+  OVP_ENVIRONMENT: emptyAsUnset(z.enum(OVP_ENVIRONMENTS).default('production')),
   /** Schlüssel für im Web gespeicherte Secrets (aktuell: Tableau Connected-App-Secrets), siehe ee/server/src/secrets.ts. Optional — ohne ihn bleiben nur Env-Secret-Referenzen nutzbar. */
   OVP_SECRET_KEY: emptyAsUnset(z.string().min(32, 'OVP_SECRET_KEY muss mindestens 32 Zeichen lang sein').optional()),
 });
@@ -163,6 +165,8 @@ export interface AppConfig {
   telemetryEndpoint: string;
   /** Produktversion, die im Heartbeat gemeldet wird. */
   appVersion: string;
+  /** production | development | test | staging (OVP_ENVIRONMENT) — wird im Heartbeat gemeldet, Default production. */
+  environment: OvpEnvironment;
   licenseEnv: {
     OVP_LICENSE?: string;
     OVP_LICENSE_PATH?: string;
@@ -174,6 +178,8 @@ export interface AppConfig {
    * ee/server/src/license.ts), niemand darf ihn über Env/Datei/DB setzen.
    */
   licenseTrustedKeys?: Record<string, string>;
+  /** Wie licenseTrustedKeys, für Leases (TRUSTED_LEASE_KEYS) — ausschließlich für Tests. */
+  leaseTrustedKeys?: Record<string, string>;
 }
 
 function splitCsv(value: string | undefined): string[] {
@@ -259,6 +265,7 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
         : null,
     telemetryEndpoint: HEARTBEAT_ENDPOINT,
     appVersion: e.OVP_APP_VERSION?.trim() || 'unbekannt',
+    environment: e.OVP_ENVIRONMENT,
     licenseEnv: {
       OVP_LICENSE: e.OVP_LICENSE,
       OVP_LICENSE_PATH: e.OVP_LICENSE_PATH,

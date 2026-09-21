@@ -80,3 +80,35 @@ describe('slashCommandListSchema', () => {
     }
   });
 });
+
+describe('W2 executive brief default command', () => {
+  it('includes the DE/EN executive brief command among the built-in defaults', () => {
+    const names = DEFAULT_SLASH_COMMANDS.map((c) => c.name);
+    expect(names).toContain('fuehrungsbericht');
+    expect(names).toContain('exec-brief');
+  });
+
+  it('mentions the required sections in its template', () => {
+    const command = DEFAULT_SLASH_COMMANDS.find((c) => c.name === 'exec-brief');
+    expect(command).toBeDefined();
+    expect(command?.template).toContain('{{args}}');
+    expect(command?.template).toContain('Key takeaways');
+    expect(command?.template).toContain('Recommended actions');
+    expect(command?.template).toContain('Data basis');
+  });
+});
+
+describe('W4 provenance default command', () => {
+  it('includes the DE/EN provenance command with the fixed chain format', () => {
+    const names = DEFAULT_SLASH_COMMANDS.map((c) => c.name);
+    expect(names).toContain('herkunft');
+    expect(names).toContain('lineage');
+    const command = DEFAULT_SLASH_COMMANDS.find((c) => c.name === 'lineage');
+    expect(command?.template).toContain('{{args}}');
+    for (const step of ['Dashboard', 'Worksheet', 'Field', 'Definition', 'Datasource', 'Tables', 'Filters', 'Certification']) {
+      expect(command?.template).toContain(`**${step}**`);
+    }
+    // Nichts erfinden: Was die APIs nicht liefern, wird als nicht verfügbar markiert.
+    expect(command?.template).toMatch(/not available/);
+  });
+});

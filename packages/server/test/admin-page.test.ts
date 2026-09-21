@@ -28,6 +28,54 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain('type="url" id="trex-url"');
   });
 
+  it('shows the licence card with activation state, refresh and offline activation', () => {
+    expect(adminPageHtml).toContain('<div id="license-card" hidden>');
+    // Ausstehende Aktivierung: deutlicher Hinweis mit beiden Wegen (online / Offline-Lease).
+    expect(adminPageHtml).toMatch(/<p id="license-pending" class="banner" role="alert">[^]*?noch nicht aktiviert[^]*?werkworks\.de[^]*?Offline-Aktivierung[^]*?<\/p>/);
+    expect(adminPageHtml).toContain("'banner' + (lic.leaseState === 'pending' ? ' error' : '')");
+    expect(adminPageHtml).toContain("lic.leaseOffline ? 'Offline-Lease bis ' : 'Aktiv bis '");
+    for (const id of ['lic-licensee', 'lic-id', 'lic-env', 'lic-inst', 'lic-inst-full', 'lic-lease', 'lic-valid', 'lic-features']) {
+      expect(adminPageHtml).toContain(`id="${id}"`);
+    }
+    // Tooltips im bestehenden Muster: Umgebung, Installation-ID (gekürzt, voll im Tooltip), Aktivierung, Lease-Feld.
+    for (const id of ['help-lic-env', 'help-lic-inst', 'help-lic-lease', 'help-lic-lease-paste']) {
+      expect(adminPageHtml).toMatch(new RegExp(`<span role="tooltip" id="${id}" class="help-tip">`));
+    }
+    expect(adminPageHtml).toContain('<button id="license-refresh">Jetzt aktualisieren</button>');
+    expect(adminPageHtml).toContain('<details class="setup-steps" id="offline-activation"');
+    expect(adminPageHtml).toContain('id="activation-request-download"');
+    expect(adminPageHtml).toContain('<textarea id="license-lease"');
+    expect(adminPageHtml).toContain('id="license-lease-save"');
+    expect(adminPageHtml).toContain("adminFetch('/license/refresh', { method: 'POST' })");
+    expect(adminPageHtml).toContain("adminFetch('/license/activation-request')");
+    expect(adminPageHtml).toContain("adminFetch('/license/lease', jsonRequest('PUT'");
+    expect(adminPageHtml).toContain('<code>OVP_ENVIRONMENT</code> (nur per Env)');
+  });
+
+  it('warns during the 7-day subscription grace period after licence expiry, separate from the lease grace banner', () => {
+    expect(adminPageHtml).toContain('<p id="license-subscription-grace" class="banner error" role="status" hidden></p>');
+    expect(adminPageHtml).toContain('graceBanner.hidden = !lic.subscriptionGraceUntil;');
+    expect(adminPageHtml).toContain(
+      "'Lizenz am ' + fmtDate(lic.validUntil) + ' abgelaufen — Enterprise-Funktionen laufen noch bis ' + fmtDate(lic.subscriptionGraceUntil) + '. Bitte Lizenz verlängern.'",
+    );
+  });
+
+  it('offers deactivate/transfer for the installations of this licence and links the offline self-service page', () => {
+    expect(adminPageHtml).toContain('<button id="license-deactivate">Diese Installation stilllegen</button>');
+    expect(adminPageHtml).toContain('id="license-installations-body"');
+    expect(adminPageHtml).toContain('id="license-installations-hint"');
+    expect(adminPageHtml).toContain("adminFetch('/license/installations')");
+    expect(adminPageHtml).toContain("adminFetch('/license/deactivate', jsonRequest('POST', { confirm: true }))");
+    expect(adminPageHtml).toContain("adminFetch('/license/transfer', jsonRequest('POST', { installationId: full }))");
+    // Bestätigungsdialoge vor beiden zerstörerischen Aktionen.
+    expect(adminPageHtml).toMatch(/window\.confirm\('Diese Installation stilllegen\?/);
+    expect(adminPageHtml).toMatch(/window\.confirm\('Die Installation ' \+ short \+ ' verliert ihre Enterprise-Funktionen beim nächsten Heartbeat\. Fortfahren\?'\)/);
+    // Nur der initiale Admin darf stilllegen/übertragen — die UI spiegelt das serverseitige `initial_admin_required`.
+    expect(adminPageHtml).toMatch(/adminMe && adminMe\.role === 'initial'/);
+    // Offline-Aktivierung: Link auf die neue Selbstbedienungsseite von werkworks.de.
+    expect(adminPageHtml).toContain('href="https://werkworks.de/ovp-lizenz/offline.php"');
+  });
+
   it('offers labeled first-run and login forms with matching password limits', () => {
     expect(adminPageHtml).toContain('<form id="gate-setup" hidden>');
     expect(adminPageHtml).toContain('<form id="gate-login" hidden>');
@@ -68,8 +116,8 @@ describe('admin presentation', () => {
     // Abschnitte verweisen (z. B. „SSO im Abschnitt Anmeldung einrichten“).
     const nav = adminPageHtml.match(/<nav aria-label="Administration">[\s\S]*?<\/nav>/)?.[0] ?? '';
     const targets = [...nav.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
-    expect(targets).toHaveLength(9);
-    expect(new Set(targets).size).toBe(9);
+    expect(targets).toHaveLength(10);
+    expect(new Set(targets).size).toBe(10);
     for (const target of targets) {
       expect(adminPageHtml.split(`id="${target}"`)).toHaveLength(2);
       expect(adminPageHtml).toContain(`value="${target}"`);

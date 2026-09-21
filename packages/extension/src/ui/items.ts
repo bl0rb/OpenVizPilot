@@ -3,7 +3,14 @@ import type { Suggestions } from '@openvizpilot/shared';
 /** UI-Modell des Chat-Verlaufs (nicht identisch mit der LLM-Historie). */
 export type ChatItem =
   | { kind: 'user'; id: number; text: string }
-  | { kind: 'assistant'; id: number; text: string; streaming: boolean }
+  | {
+      kind: 'assistant';
+      id: number;
+      text: string;
+      streaming: boolean;
+      /** Namen der Kennzahlen, die in dieser Antwort per lookup_metric bestätigt wurden (W1 Trust Layer, leer/undefined = kein Treffer). */
+      verifiedMetrics?: string[];
+    }
   | {
       kind: 'tool';
       id: number;
@@ -39,4 +46,17 @@ export function summarizeToolArgs(argsJson: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * W2 Executive Brief: Datei für den „Als Markdown herunterladen"-Button an
+ * Assistant-Antworten (MessageList.tsx) — reine Funktion, damit sie ohne DOM
+ * testbar ist; der eigentliche Blob-Download bleibt dort.
+ */
+export function buildMarkdownExport(
+  item: Extract<ChatItem, { kind: 'assistant' }>,
+  now: Date = new Date(),
+): { filename: string; content: string } {
+  const date = now.toISOString().slice(0, 10);
+  return { filename: `openvizpilot-${date}.md`, content: item.text };
 }

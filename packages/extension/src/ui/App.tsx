@@ -2,6 +2,7 @@ import {
   DEFAULT_SLASH_COMMANDS,
   MAX_DASHBOARD_KEY_CHARS,
   t,
+  type ChatMode,
   type DashboardAction,
   type SlashCommand,
   type ToolCall,
@@ -43,10 +44,31 @@ import { LoginGate } from './LoginGate';
 /** Ladezustand der Dashboard-Präferenzen — siehe Kommentar bei useState unten. */
 type PrefsState = DashboardPrefs | null | 'loading' | 'unavailable' | 'error';
 
+/** localStorage-Key für den zuletzt gewählten Chat-Modus (Fragen/Untersuchen, W3). */
+const MODE_STORAGE_KEY = 'openvizpilot.chatMode';
+
 export function App(props: { dashboard: Dashboard }) {
   const { dashboard } = props;
   const [items, dispatch] = useReducer(reducer, []);
   const [busy, setBusy] = useState(false);
+  // Fragen vs. Untersuchen (W3) — Session-Zustand, optional über localStorage
+  // gemerkt (wie andere reine Viewer-Präferenzen); scheitert das (privates
+  // Fenster, deaktiviertes Storage), gilt einfach der Default 'ask'.
+  const [mode, setModeState] = useState<ChatMode>(() => {
+    try {
+      return localStorage.getItem(MODE_STORAGE_KEY) === 'investigate' ? 'investigate' : 'ask';
+    } catch {
+      return 'ask';
+    }
+  });
+  const setMode = useCallback((next: ChatMode) => {
+    setModeState(next);
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, next);
+    } catch {
+      // localStorage nicht verfügbar — Modus gilt nur für diese Sitzung.
+    }
+  }, []);
   const [settings, setSettings] = useState<ExtensionSettings>(() => loadSettings());
   // Enterprise-Login (OIDC): Auth-Modus der Middleware und die aktuelle
   // Sitzung (ID-Token, nur im sessionStorage) — siehe ee/extension.
@@ -372,12 +394,13 @@ export function App(props: { dashboard: Dashboard }) {
             authorContext,
             answerFocus,
             dashboardKey: dashboardKey || undefined,
+            mode,
             getContext,
             executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field'].includes(call.function.name)
               ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined })
               : call.function.name.startsWith('mcp__')
                 ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
-                : executeToolCall(call, dashboard),
+                : executeToolCall(call, dashboard, { baseUrl, apiToken: apiToken || undefined }),
           },
           {
             onRoundStart: () => dispatch({ type: 'round-start' }),
@@ -416,7 +439,7 @@ export function App(props: { dashboard: Dashboard }) {
         )
         .finally(() => setBusy(false));
     },
-    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, getContext, dashboard, logout, features.actions, authReady],
+    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, mode, getContext, dashboard, logout, features.actions, authReady],
   );
 
   const send = useCallback(
@@ -735,7 +758,15 @@ export function App(props: { dashboard: Dashboard }) {
               </button>
             </div>
           )}
-          <Composer busy={busy} disabled={false} commands={commands} onSend={send} onStop={stop} />
+          <Composer
+            busy={busy}
+            disabled={false}
+            commands={commands}
+            mode={mode}
+            onModeChange={setMode}
+            onSend={send}
+            onStop={stop}
+          />
         </>
       )}
     </div>

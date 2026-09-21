@@ -1,4 +1,4 @@
-import type { AuthSettings, DashboardRegistration, RegisteredDashboard, DashboardPlaybook, ModelOption, SlashCommand } from '@openvizpilot/shared';
+import type { AuthSettings, DashboardRegistration, RegisteredDashboard, DashboardPlaybook, Metric, ModelOption, SlashCommand } from '@openvizpilot/shared';
 import { createHash } from 'node:crypto';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
@@ -107,6 +107,15 @@ export interface MemoryStore {
   getModelCatalog(): Promise<ModelOption[] | null>;
   /** Ersetzt den Modell-Katalog komplett (Singleton-Zeile); null setzt zurück. */
   setModelCatalog(catalog: ModelOption[] | null): Promise<void>;
+  /**
+   * Admin-verwalteter Kennzahlenkatalog (Trust Layer, siehe
+   * @openvizpilot/shared/metrics.ts) — null, wenn nie konfiguriert (dann gilt
+   * ein leerer Katalog: kein <metric_catalog>-Block, kein lookup_metric-Tool)
+   * ODER wenn der gespeicherte Wert nicht mehr dem Schema entspricht.
+   */
+  getMetricCatalog(): Promise<Metric[] | null>;
+  /** Ersetzt den Kennzahlenkatalog komplett (Singleton-Zeile); null löscht ihn. */
+  setMetricCatalog(catalog: Metric[] | null): Promise<void>;
   /** Playbook (Starter + Slash-Befehle) eines Dashboards — null, wenn keins/ungültig. */
   getPlaybook(dashboardKey: string): Promise<DashboardPlaybook | null>;
   /** Ersetzt das Playbook eines Dashboards; null löscht es. */

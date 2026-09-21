@@ -5,6 +5,7 @@ export * from './sse-protocol';
 export * from './suggestions';
 export * from './tools';
 export * from './markdown';
+export * from './metrics';
 export * from './models';
 export * from './playbooks';
 export * from './prefs';

@@ -12,9 +12,17 @@ const captured: Array<{ backendUrl: string; request: Record<string, unknown>; ap
 /** true = der nächste gemockte Stream bricht mit einem retryable error ab. */
 let failNext = false;
 let mixedToolsNext = false;
+/**
+ * true = der Stream liefert in JEDER Runde einen Tool-Call, solange
+ * request.toolChoice nicht 'none' ist — simuliert ein Modell, das das
+ * Rundenbudget ausschöpft (siehe Budget-Test unten). Danach (toolChoice
+ * 'none', vom Loop selbst erzwungen) liefert er eine normale Textantwort.
+ */
+let toolLoopActive = false;
 const localCall = { id: 'local-call', type: 'function', function: { name: 'get_selected_marks', arguments: '{"worksheet":"Map"}' } };
 const externalCall = { id: 'external-call', type: 'function', function: { name: 'mcp__web__search', arguments: '{"query":"Berlin"}' } };
 const approval = { ticket: 'signed-ticket', destination: 'https://search.example/mcp' };
+const loopCall = { id: 'loop-call', type: 'function', function: { name: 'get_filters', arguments: '{}' } };
 
 vi.mock('../src/chat/sse-client', () => ({
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -31,12 +39,23 @@ vi.mock('../src/chat/sse-client', () => ({
       yield { event: 'done', data: { finishReason: 'tool_calls' } };
       return;
     }
+    if (toolLoopActive) {
+      if (request.toolChoice === 'none') {
+        yield { event: 'delta', data: { content: 'Fazit' } };
+        yield { event: 'done', data: { finishReason: 'stop' } };
+        return;
+      }
+      yield { event: 'tool_calls', data: { toolCalls: [loopCall] } };
+      yield { event: 'done', data: { finishReason: 'tool_calls' } };
+      return;
+    }
     yield { event: 'delta', data: { content: 'ok' } };
     yield { event: 'done', data: { finishReason: 'stop' } };
   },
 }));
 
-const { ChatSession } = await import('../src/chat/agent-loop');
+const { ChatSession, TOOL_ROUNDS_BY_MODE } = await import('../src/chat/agent-loop');
+const { t } = await import('@openvizpilot/shared');
 
 describe('ChatSession request contract', () => {
   it('routes mixed Tableau and external calls with matching grants and completes every tool pair', async () => {
@@ -136,5 +155,90 @@ describe('ChatSession request contract', () => {
     expect(captured[0]!.request.retry).toBeUndefined();
     expect(captured[1]!.request.retry).toBe(true);
     expect(captured[1]!.request.messages).toEqual(captured[0]!.request.messages);
+  });
+
+  it('sends the requested mode in every round (W3 Untersuchungsmodus)', async () => {
+    captured.length = 0;
+    const session = new ChatSession();
+    const cb = {
+      onRoundStart: vi.fn(),
+      onAssistantDelta: vi.fn(),
+      onAssistantFinal: vi.fn(),
+      onSuggestions: vi.fn(),
+      onToolRun: vi.fn(),
+      onNotice: vi.fn(),
+      onError: vi.fn(),
+      onDone: vi.fn(),
+    };
+    await session.runTurn(
+      'Warum ist die Marge gesunken?',
+      { backendUrl: '', mode: 'investigate', getContext: async () => '# ctx', executeTool: async () => 'ok' },
+      cb,
+    );
+    expect(captured).toHaveLength(1);
+    expect(captured[0]!.request.mode).toBe('investigate');
+  });
+
+  it('omits mode when not set (server defaults to "ask")', async () => {
+    captured.length = 0;
+    const session = new ChatSession();
+    const cb = {
+      onRoundStart: vi.fn(),
+      onAssistantDelta: vi.fn(),
+      onAssistantFinal: vi.fn(),
+      onSuggestions: vi.fn(),
+      onToolRun: vi.fn(),
+      onNotice: vi.fn(),
+      onError: vi.fn(),
+      onDone: vi.fn(),
+    };
+    await session.runTurn('Hallo', { backendUrl: '', getContext: async () => '# ctx', executeTool: async () => 'ok' }, cb);
+    expect(captured[0]!.request.mode).toBeUndefined();
+  });
+
+  it('uses the mode-specific tool-round budget and notice text (ask: 5, investigate: 12)', async () => {
+    toolLoopActive = true;
+    try {
+      captured.length = 0;
+      const askSession = new ChatSession();
+      const executeTool = vi.fn().mockResolvedValue('ok');
+      const askCb = {
+        onRoundStart: vi.fn(),
+        onAssistantDelta: vi.fn(),
+        onAssistantFinal: vi.fn(),
+        onSuggestions: vi.fn(),
+        onToolRun: vi.fn(),
+        onNotice: vi.fn(),
+        onError: vi.fn(),
+        onDone: vi.fn(),
+      };
+      await askSession.runTurn('Warum?', { backendUrl: '', getContext: async () => '# ctx', executeTool }, askCb);
+      // TOOL_ROUNDS_BY_MODE.ask Tool-Runden + eine abschließende Textrunde (toolChoice 'none').
+      expect(captured).toHaveLength(TOOL_ROUNDS_BY_MODE.ask + 1);
+      expect(askCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReached'));
+      expect(askCb.onDone).toHaveBeenCalledWith({ finishReason: 'stop' });
+
+      captured.length = 0;
+      const investigateSession = new ChatSession();
+      const investigateCb = {
+        onRoundStart: vi.fn(),
+        onAssistantDelta: vi.fn(),
+        onAssistantFinal: vi.fn(),
+        onSuggestions: vi.fn(),
+        onToolRun: vi.fn(),
+        onNotice: vi.fn(),
+        onError: vi.fn(),
+        onDone: vi.fn(),
+      };
+      await investigateSession.runTurn(
+        'Warum?',
+        { backendUrl: '', mode: 'investigate', getContext: async () => '# ctx', executeTool },
+        investigateCb,
+      );
+      expect(captured).toHaveLength(TOOL_ROUNDS_BY_MODE.investigate + 1);
+      expect(investigateCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReachedInvestigate'));
+    } finally {
+      toolLoopActive = false;
+    }
   });
 });

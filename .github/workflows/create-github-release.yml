@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   release:
+    # Nur im öffentlichen Repo: der Export-Workflow des privaten Repos legt
+    # den Tag im öffentlichen Repo selbst an, dessen Push diesen Workflow dort auslöst.
+    if: github.repository == 'bl0rb/OpenVizPilot'
     runs-on: ubuntu-latest
 
     env:

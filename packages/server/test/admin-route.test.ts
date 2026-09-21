@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { EE_STUB } from '@openvizpilot/ee/server';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/env';
+import { activated, signTestLease, testLicenseEnv } from './license-helper';
+import { userAccessId } from '../src/memory/store';
 
 /**
  * Route-Tests für die Admin-API (/api/admin/*, /api/commands, /api/stats)
@@ -34,6 +37,7 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     // Tests senden nie nach außen.
     telemetryEndpoint: '',
     appVersion: 'test',
+    environment: 'test',
     licenseEnv: {},
     ...overrides,
   };
@@ -310,5 +314,126 @@ describe('GET /api/admin/trex', () => {
     const res = await app.request('/api/admin/trex?url=' + encodeURIComponent('http://localhost:3000'), auth);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('<url>http://localhost:3000/</url>');
+  });
+});
+
+// Braucht eine echte Lizenz-/Lease-Prüfung (testLicenseEnv(['sso']) + signTestLease)
+// — im Core-Export (EE_STUB) ist jede Lizenz 'none', diese Suite läuft nur im vollen Baum.
+describe.skipIf(EE_STUB)('licence activation (lease)', () => {
+  const auth = { authorization: 'Bearer geheim' };
+
+  it('serves the activation request and accepts a matching offline lease, rejecting foreign ones', async () => {
+    const { app } = createApp(testConfig({ adminToken: 'geheim', memoryDbPath: tmpDbPath(), ...testLicenseEnv(['sso']), environment: 'staging' }));
+
+    const before = (await (await app.request('/api/admin/auth-settings', { headers: auth })).json()) as { effective: { license: Record<string, unknown> }; leaseAvailable: boolean };
+    expect(before.leaseAvailable).toBe(true);
+    // Noch nie eine Lease: pending, Lizenz 'inactive', nur Core.
+    expect(before.effective.license).toMatchObject({ status: 'inactive', leaseState: 'pending', environment: 'staging', licensee: 'Test GmbH' });
+    expect(typeof before.effective.license.installationId).toBe('string');
+
+    const req = await app.request('/api/admin/license/activation-request', { headers: auth });
+    expect(req.status).toBe(200);
+    expect(req.headers.get('content-disposition')).toMatch(/ovp-activation-request\.json/);
+    const request = (await req.json()) as { installationId: string; requestedAt: string };
+    expect(request).toMatchObject({ product: 'openvizpilot', licenseId: 'test-license', environment: 'staging', version: 'test' });
+    expect(request.installationId).toBe(before.effective.license.installationId);
+    expect(Date.parse(request.requestedAt)).not.toBeNaN();
+
+    const foreign = signTestLease({ installationId: 'someone-else', offline: true });
+    const rejected = await app.request('/api/admin/license/lease', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ lease: foreign }) });
+    expect(rejected.status).toBe(400);
+    expect(((await rejected.json()) as { error: string }).error).toMatch(/anderen Installation/);
+
+    const expired = signTestLease({ installationId: request.installationId, leaseUntil: new Date(Date.now() - 1000).toISOString(), offline: true });
+    expect((await app.request('/api/admin/license/lease', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ lease: expired }) })).status).toBe(400);
+
+    const leaseUntil = new Date(Date.now() + 200 * 86_400_000).toISOString();
+    const offline = signTestLease({ installationId: request.installationId, leaseUntil, offline: true });
+    const accepted = await app.request('/api/admin/license/lease', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ lease: offline }) });
+    expect(accepted.status).toBe(200);
+    const after = (await accepted.json()) as { effective: { license: Record<string, unknown> } };
+    // Erste Aktivierung schaltet die Enterprise-Funktionen frei — ohne Neustart.
+    expect(after.effective.license).toMatchObject({ status: 'valid', leaseState: 'active', leaseOffline: true, leaseUntil });
+  });
+
+  it('refreshes on demand and needs a database and a valid licence', async () => {
+    const instance = createApp(testConfig({ adminToken: 'geheim', memoryDbPath: tmpDbPath(), ...testLicenseEnv(['sso']) }));
+    // Ohne Endpunkt (Tests) wird nichts gesendet — die Route antwortet trotzdem mit dem Stand.
+    const res = await instance.app.request('/api/admin/license/refresh', { method: 'POST', headers: auth });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { effective: { license: { leaseState: string } } }).effective.license.leaseState).toBe('pending');
+    await activated(instance);
+    const again = await instance.app.request('/api/admin/license/refresh', { method: 'POST', headers: auth });
+    expect(((await again.json()) as { effective: { license: { leaseState: string } } }).effective.license.leaseState).toBe('active');
+
+    const core = createApp(testConfig({ adminToken: 'geheim', memoryDbPath: tmpDbPath() }));
+    expect((await core.app.request('/api/admin/license/activation-request', { headers: auth })).status).toBe(400);
+    expect((await core.app.request('/api/admin/license/lease', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ lease: 'x.y' }) })).status).toBe(400);
+
+    const noDb = createApp(testConfig({ adminToken: 'geheim', ...testLicenseEnv(['sso']) }));
+    expect((await noDb.app.request('/api/admin/license/refresh', { method: 'POST', headers: auth })).status).toBe(503);
+    expect((await noDb.app.request('/api/admin/license/activation-request', { headers: auth })).status).toBe(503);
+    // Ohne Anmeldung: kein Zugriff auf die Aktivierung.
+    expect((await instance.app.request('/api/admin/license/activation-request')).status).toBe(401);
+  });
+});
+
+describe('stilllegen / übertragen (L3)', () => {
+  const auth = { authorization: 'Bearer geheim' };
+  const json = { ...auth, 'content-type': 'application/json' };
+
+  /** Legt einen zweiten, delegierten Admin (lokales Konto mit admin: true) neben dem Token-Admin an. */
+  async function delegatedAdmin(app: ReturnType<typeof createApp>['app']) {
+    await app.request('/api/admin/users', { method: 'POST', headers: json, body: JSON.stringify({ username: 'anna', displayName: 'Anna', password: 'sehr-geheimes-passwort' }) });
+    const login = await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'anna', password: 'sehr-geheimes-passwort' }) });
+    const token = ((await login.json()) as { token: string }).token;
+    const id = userAccessId({ provider: 'local', issuer: '', subject: 'anna' });
+    await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, admin: true }) });
+    return { authorization: `Bearer ${token}` };
+  }
+
+  it('rejects deactivate/transfer from a delegated admin but lets any admin read the installation list', async () => {
+    const { app } = createApp(testConfig({ adminToken: 'geheim', authMode: 'local', memoryDbPath: tmpDbPath() }));
+    const delegated = { ...(await delegatedAdmin(app)), 'content-type': 'application/json' };
+
+    const deactivate = await app.request('/api/admin/license/deactivate', { method: 'POST', headers: delegated, body: JSON.stringify({ confirm: true }) });
+    expect(deactivate.status).toBe(403);
+    expect(((await deactivate.json()) as { code: string }).code).toBe('initial_admin_required');
+
+    const transfer = await app.request('/api/admin/license/transfer', { method: 'POST', headers: delegated, body: JSON.stringify({ installationId: 'other-installation' }) });
+    expect(transfer.status).toBe(403);
+    expect(((await transfer.json()) as { code: string }).code).toBe('initial_admin_required');
+
+    // Lesen ist beiden Admin-Rollen erlaubt.
+    const list = await app.request('/api/admin/license/installations', { headers: { authorization: delegated.authorization } });
+    expect(list.status).toBe(200);
+    expect(await list.json()).toEqual({ installations: [] });
+
+    // Der initiale Admin kommt an der Rollenprüfung vorbei (scheitert danach nur am fehlenden Endpunkt der Testumgebung).
+    const initialDeactivate = await app.request('/api/admin/license/deactivate', { method: 'POST', headers: json, body: JSON.stringify({ confirm: true }) });
+    expect(initialDeactivate.status).not.toBe(403);
+    const initialTransfer = await app.request('/api/admin/license/transfer', { method: 'POST', headers: json, body: JSON.stringify({ installationId: 'other-installation' }) });
+    expect(initialTransfer.status).not.toBe(403);
+  });
+
+  it('requires an explicit confirmation flag and a non-empty installation id', async () => {
+    const { app } = createApp(testConfig({ adminToken: 'geheim', memoryDbPath: tmpDbPath() }));
+    for (const body of [{}, { confirm: false }, { confirm: 'true' }]) {
+      const res = await app.request('/api/admin/license/deactivate', { method: 'POST', headers: json, body: JSON.stringify(body) });
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    for (const body of [{}, { installationId: '' }]) {
+      const res = await app.request('/api/admin/license/transfer', { method: 'POST', headers: json, body: JSON.stringify(body) });
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    // Ohne Anmeldung: kein Zugriff.
+    expect((await app.request('/api/admin/license/deactivate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: true }) })).status).toBe(401);
+  });
+
+  it('needs a database for all three routes', async () => {
+    const { app } = createApp(testConfig({ adminToken: 'geheim' }));
+    expect((await app.request('/api/admin/license/deactivate', { method: 'POST', headers: json, body: JSON.stringify({ confirm: true }) })).status).toBe(503);
+    expect((await app.request('/api/admin/license/transfer', { method: 'POST', headers: json, body: JSON.stringify({ installationId: 'x' }) })).status).toBe(503);
+    expect((await app.request('/api/admin/license/installations', { headers: auth })).status).toBe(503);
   });
 });

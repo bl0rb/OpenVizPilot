@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { chatRequestSchema, toolDefinitions, type ModelOption } from '@openvizpilot/shared';
+import { chatRequestSchema, LOOKUP_METRIC_TOOL, renderMetricCatalogForPrompt, toolDefinitions, type ModelOption } from '@openvizpilot/shared';
 import type { AuthVariables } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -23,7 +23,7 @@ import {
   TABLEAU_METADATA_PROMPT_SECTION,
 } from '@openvizpilot/ee/server';
 import type { MemoryStore } from '../memory/store';
-import { buildSystemPrompt } from '../system-prompt';
+import { buildSystemPrompt, INVESTIGATE_PROMPT_SECTION, PROVENANCE_PROMPT_SECTION } from '../system-prompt';
 
 const HEARTBEAT_MS = 15_000;
 
@@ -128,6 +128,9 @@ export function createChatRoute(
       const authUser = c.get('authUser');
       const oidcUser = c.get('oidcUser');
       const req = authUser ? { ...parsedReq, userId: authUser } : parsedReq;
+      // Untersuchungsmodus (W3): steuert nur den zusätzlichen Prompt-Abschnitt
+      // unten — das Rundenbudget verwaltet ausschließlich die Extension.
+      const mode = req.mode ?? 'ask';
       let tableauServerEnabled = false;
       if (tableau && c.get('userAccess')?.tableauApi) {
         try {
@@ -270,6 +273,21 @@ export function createChatRoute(
 
           const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
           const tableauTools = tableauServerEnabled ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS] : [];
+          // Trust Layer (Kennzahlenkatalog, siehe shared/metrics.ts): Block und
+          // Tool erscheinen nur, wenn der Admin tatsächlich Kennzahlen gepflegt
+          // hat — ein leerer/nicht konfigurierter Katalog ändert nichts am Chat.
+          let metricCatalogText = '';
+          if (memoryStore) {
+            try {
+              const metrics = await memoryStore.getMetricCatalog();
+              if (metrics && metrics.length > 0) metricCatalogText = renderMetricCatalogForPrompt(metrics);
+            } catch (err) {
+              logger.warn('metric catalog read failed — chat continues without it', {
+                name: err instanceof Error ? err.name : 'unknown',
+              });
+            }
+          }
+          const metricTools = metricCatalogText ? [LOOKUP_METRIC_TOOL] : [];
           // Dashboard-Aktionen (Filter, Parameter, Markieren, Bereich) sind
           // Enterprise (Feature "actions") — ohne Lizenz kennt das Modell die
           // Aktionssyntax gar nicht (siehe system-prompt.ts).
@@ -287,8 +305,11 @@ export function createChatRoute(
                     personalizationPromptSection({ facts: memoryFacts, answerFocus }),
                     req.authorContext,
                     actionsLicensed,
+                    metricCatalogText,
                   ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : '')
-                    + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION : ''),
+                    + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION : '')
+                    + (mode === 'investigate' ? INVESTIGATE_PROMPT_SECTION : '')
+                    + PROVENANCE_PROMPT_SECTION,
                 },
                 ...req.messages,
               ],
@@ -297,7 +318,7 @@ export function createChatRoute(
               // Tools werden IMMER mitgesendet (auch bei toolChoice "none"):
               // die Historie kann tool-Messages enthalten, die manche Provider
               // ohne Tool-Definitionen ablehnen. "none" verbietet nur neue Calls.
-              tools: [...toolDefinitions, ...tableauTools, ...externalTools],
+              tools: [...toolDefinitions, ...tableauTools, ...metricTools, ...externalTools],
               tool_choice: req.toolChoice === 'none' ? 'none' : 'auto',
             },
             { signal: abortSignal },

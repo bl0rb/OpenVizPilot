@@ -157,3 +157,46 @@ export async function readAllSummaryPages(
     }
   }
 }
+
+/**
+ * Löst Feldnamen zu Spaltenindizes auf oder wirft einen selbstkorrigierenden
+ * Fehler mit den verfügbaren Spalten (wie findWorksheet) — genutzt von
+ * breakdown_by/compare_periods (Untersuchungsmodus, W3).
+ */
+export function resolveColumnIndices(worksheetName: string, columns: Column[], wanted: string[]): number[] {
+  const indexOf = (name: string): number => columns.find((c) => c.fieldName === name)?.index ?? -1;
+  const missing = new Set<string>();
+  const indices = wanted.map((name) => {
+    const idx = indexOf(name);
+    if (idx === -1) missing.add(name);
+    return idx;
+  });
+  if (missing.size > 0) {
+    const available = columns.map((c) => `"${c.fieldName}"`).join(', ');
+    const wantedText = [...missing].map((m) => `"${m}"`).join(', ');
+    throw new Error(`Spalte(n) ${wantedText} nicht gefunden in "${worksheetName}". Verfügbare Spalten: ${available}`);
+  }
+  return indices;
+}
+
+/**
+ * Datumsparsing für compare_periods (Untersuchungsmodus, W3): tolerant
+ * gegenüber Date-Objekten (wie sie der reale Tableau-Reader für date/
+ * date-time-Spalten liefert), ISO-Strings und "YYYY-MM-DD". Zeitzonen werden
+ * nicht umgerechnet — es zählt, was Date.parse daraus macht. null bei einem
+ * nicht interpretierbaren Wert.
+ */
+export function parseTolerantDate(input: unknown): Date | null {
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+  if (typeof input === 'number') {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof input === 'string' && input.trim() !== '') {
+    const d = new Date(input.trim());
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}

@@ -1,10 +1,19 @@
 image:
-  # Publiziert vom GitHub-Workflow publish-ghcr-images.yml; alternativ ECR.
-  repository: ghcr.io/bl0rb/openvizpilot
+  # core | enterprise. Bestimmt das abgeleitete Repository (s. u.), sofern
+  # image.repository nicht explizit gesetzt ist.
+  edition: core
+  # leer = abgeleitet aus image.edition: core → ghcr.io/bl0rb/openvizpilot,
+  # enterprise → ghcr.io/bl0rb/openvizpilot-enterprise (publiziert von
+  # publish-ghcr-images.yml bzw. enterprise-publish-image.yml). Explizit
+  # gesetzt (z. B. eigene Registry-Spiegelung) hat Vorrang vor der Ableitung.
+  repository: ""
   # leer = .Chart.appVersion
   tag: ""
   pullPolicy: IfNotPresent
 
+# Pflicht bei image.edition=enterprise: das Enterprise-Image ist ein privates
+# GHCR-Paket, das Cluster braucht ein Pull-Secret mit dem Kunden-Lese-Token
+# (siehe docs/enterprise.md, Abschnitt "Bezug des Enterprise-Images").
 imagePullSecrets: []
 mcp:
   secretRefs: []
@@ -79,6 +88,10 @@ app:
   scopeModel: ""
   # Öffentlicher Origin der Middleware (für die OIDC-Redirect-URI); leer = aus dem Request.
   publicUrl: ""
+  # Umgebung dieser Installation für die Lizenzaktivierung (OVP_ENVIRONMENT):
+  # production | development | test | staging. Eine Lizenz erlaubt eine
+  # produktive Installation; Entwicklung, Test und Staging sind inklusive.
+  environment: production
 
   # Shared-Token für /api/* (Extension trägt ihn in den Einstellungen ein).
   # Leer = offen; dann MUSS der Zugriff über NetworkPolicy/Ingress beschränkt werden.

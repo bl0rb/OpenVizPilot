@@ -237,6 +237,43 @@ body {
   color: #222;
 }
 
+/* Wrapper aus Antwort-Bubble + Download-Button/Badge-Zeile (W1/W2) — die
+   Bubble behält ihre 92%-Breitenbegrenzung über die Zeile, siehe .msg-row-user. */
+.assistant-group {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  gap: 4px;
+  max-width: 92%;
+}
+
+.assistant-group .msg-assistant {
+  max-width: none;
+}
+
+.assistant-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-download {
+  font-size: 11px;
+  border: 1px solid #d5d9dd;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.verified-metric {
+  font-size: 11px;
+  color: #2e7d32;
+  background: #eaf6ec;
+  border: 1px solid #cfe8d2;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
 .thinking {
   color: #666;
 }
@@ -370,11 +407,58 @@ body {
 
 .composer {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 12px 15px;
   border-top: 1px solid #e0e0e0;
   flex: 0 0 auto;
   position: relative;
+}
+
+.composer-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-switch {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid #b6c6d2;
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+/* Höhere Spezifität als ".composer button" (border-radius/padding), damit die
+   Segmented-Control kompakt bleibt statt die generische Send/Stop-Button-Form
+   zu erben. */
+.mode-switch .mode-option {
+  border: none;
+  background: transparent;
+  color: #666;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mode-switch .mode-option:hover:not(:disabled) {
+  background: #eef4f8;
+}
+
+.mode-switch .mode-option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mode-switch .mode-option-active {
+  background: #1a699e;
+  color: #fff;
+}
+
+.mode-switch .mode-option-active:hover:not(:disabled) {
+  background: #1a699e;
 }
 
 .slash-menu {

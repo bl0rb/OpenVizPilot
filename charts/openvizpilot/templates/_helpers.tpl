@@ -51,3 +51,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "openvizpilot.checkLegacyLitellmValues" -}}
 {{- if .Values.litellm }}{{ fail "litellm.* wurde in llm.* umbenannt (siehe README, Configuration from a vault)" }}{{ end }}
 {{- end -}}
+
+{{/* image.repository: explizit gesetzt hat Vorrang, sonst abgeleitet aus
+     image.edition (core|enterprise). */}}
+{{- define "openvizpilot.imageRepository" -}}
+{{- if .Values.image.repository -}}
+{{- .Values.image.repository -}}
+{{- else if eq .Values.image.edition "core" -}}
+ghcr.io/bl0rb/openvizpilot
+{{- else if eq .Values.image.edition "enterprise" -}}
+ghcr.io/bl0rb/openvizpilot-enterprise
+{{- else -}}
+{{ fail (printf "image.edition muss 'core' oder 'enterprise' sein, ist: %q" .Values.image.edition) }}
+{{- end -}}
+{{- end -}}
+
+{{/* Das Enterprise-Image ist ein privates GHCR-Paket: ohne imagePullSecrets
+     zieht Kubernetes es nicht. Am Anfang von deployment.yaml aufrufen. */}}
+{{- define "openvizpilot.checkEnterpriseImagePullSecret" -}}
+{{- if and (eq .Values.image.edition "enterprise") (not .Values.imagePullSecrets) -}}
+{{ fail "Enterprise-Image ist privat: imagePullSecrets mit dem WerkWorks-Registry-Token setzen" }}
+{{- end -}}
+{{- end -}}

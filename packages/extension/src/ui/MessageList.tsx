@@ -1,6 +1,6 @@
 import { describeAction, t, type DashboardAction } from '@openvizpilot/shared';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { ChatItem } from './items';
+import { buildMarkdownExport, type ChatItem } from './items';
 import { renderMarkdown } from './markdown';
 
 /** Ab welchem Abstand zum unteren Rand (px) automatisches Folgen aktiv bleibt (P1 Nr. 1). */
@@ -24,11 +24,34 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   get_selected_marks: 'message.tool.get_selected_marks',
   get_datasource_info: 'message.tool.get_datasource_info',
   aggregate_summary_data: 'message.tool.aggregate_summary_data',
+  lookup_metric: 'message.tool.lookup_metric',
+  breakdown_by: 'message.tool.breakdown_by',
+  compare_periods: 'message.tool.compare_periods',
+  tableau_server_search: 'message.tool.tableau_server_search',
+  tableau_metadata_search: 'message.tool.tableau_metadata_search',
+  tableau_metadata_field: 'message.tool.tableau_metadata_field',
 };
 
 export function toolStepLabel(name: string): string {
   const key = TOOL_LABEL_KEYS[name];
   return key ? t(key) : name;
+}
+
+/** Löst einen Blob-Download im Browser aus — keine reine Funktion, daher ungetestet (siehe buildMarkdownExport in items.ts). */
+function downloadMarkdown(filename: string, content: string): void {
+  try {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    /* Download in dieser Umgebung nicht möglich — kein Absturz. */
+  }
 }
 
 type AssistantItem = Extract<ChatItem, { kind: 'assistant' }>;
@@ -191,22 +214,45 @@ export function MessageList(props: {
                 )}
               </div>
             );
-          case 'assistant':
+          case 'assistant': {
             if (item.text === '' && !item.streaming) return null;
+            const finished = !item.streaming && item.text !== '';
             return (
-              <div key={item.id} class="msg msg-assistant">
-                {item.text === '' ? (
-                 <span class="thinking" role="status" aria-live="polite">{t('message.thinking')}</span>
-                ) : (
-                  <div
-                    class="markdown"
-                    // eslint-disable-next-line react/no-danger — Output läuft durch DOMPurify
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }}
-                  />
+              <div key={item.id} class="assistant-group">
+                <div class="msg msg-assistant">
+                  {item.text === '' ? (
+                   <span class="thinking" role="status" aria-live="polite">{t('message.thinking')}</span>
+                  ) : (
+                    <div
+                      class="markdown"
+                      // eslint-disable-next-line react/no-danger — Output läuft durch DOMPurify
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }}
+                    />
+                  )}
+                  {item.streaming && <span class="cursor">▌</span>}
+                </div>
+                {finished && (
+                  <div class="assistant-footer">
+                    <button
+                      type="button"
+                      class="btn-icon btn-download"
+                      onClick={() => {
+                        const { filename, content } = buildMarkdownExport(item);
+                        downloadMarkdown(filename, content);
+                      }}
+                    >
+                      {t('message.downloadMarkdown')}
+                    </button>
+                    {item.verifiedMetrics?.map((name) => (
+                      <span key={name} class="verified-metric" role="note">
+                        ✓ {t('message.verifiedMetric')}: {name}
+                      </span>
+                    ))}
+                  </div>
                 )}
-                {item.streaming && <span class="cursor">▌</span>}
               </div>
             );
+          }
           case 'tool':
             return (
               <details key={item.id} class={`tool-chip tool-${item.status}`}>

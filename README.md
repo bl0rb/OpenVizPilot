@@ -65,8 +65,11 @@ Everything below happens inside the open dashboard, in the viewer's own Tableau 
 | “What have I selected right now?” | Reads the selected marks — and if nothing is selected but something is highlighted (highlighter, legend, highlight action), it uses that and says so. |
 | “Where do I change the region?” | Names the actual control on the dashboard (“Region”, filter control) instead of guessing a field, because the context knows the dashboard's zones. |
 | “What does ‘Order details’ show?” | If Tableau reports that view's zone as hidden, the assistant says so instead of describing something the user cannot see — and offers to show it as a chip. |
-| “Where does this number come from?” | Names the data source behind a worksheet, its connection type where Tableau provides one, and the fields of that source. No server addresses leave the browser. |
+| “Where does this number come from?” or `/lineage Revenue` | Answers with a fixed provenance chain: dashboard → worksheet → field (formula if Tableau Server metadata is available) → catalogue definition → data source and connection → upstream tables → active filters and parameters → certification status. Nothing is invented: what the APIs do not provide is marked “not available”. No server addresses leave the browser. |
+| Switch the composer to **Investigate** and ask “Why did margin drop in the South?” | The assistant first writes a 3–6 step analysis plan, works through it with more tool rounds (`breakdown_by` for shares and concentration, `compare_periods` for period-over-period differences, aggregations), and closes with **Main cause**, **Evidence** and **Sources** — every claim backed by a tool result shown in the trail. |
 | “What does contribution margin II mean?” | Answers from the glossary the workbook author maintains — house definitions instead of textbook knowledge. |
+| “How high is our DB II?” | If the admin maintains the metric in the company-wide catalogue (`/admin` → “Kennzahlen”: definition, synonyms, owner, data source, verified questions), the assistant looks it up before answering and the answer carries a “✓ Verified definition: Deckungsbeitrag II” note — shown only when the lookup actually happened. |
+| `/exec-brief for the board` | Produces a management summary with a fixed structure: key statements, main metrics with change, anomalies, up to three recommendations, data basis (worksheets, filters, as-of). Every answer can be downloaded as Markdown. |
 | `/` in the input box | Opens the playbook menu: summary, findings, comparison, top-N, recommendations, report, data quality — admins can replace them and add their own per dashboard. |
 | “Remember: numbers should always be presented as a table.” | With an Enterprise license and Tableau 2023.2 or newer, remembers the preference for this user; every stored fact stays visible and deletable in the settings panel. |
 | “Write me a poem about cats.” | Declined with a short fixed message. The assistant answers dashboard questions only — the scope guard runs server-side, before the model sees the question. |
@@ -179,6 +182,7 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_SECRET_KEY` | `app.secretKeySecret.{existingSecret,key}` | secrets entered in the admin UI | ≥ 32 characters (`openssl rand -hex 32`); encrypts Tableau Connected-App secrets at rest (AES-256-GCM) |
 | `OVP_TABLEAU_<NAME>` | `tableau.secretRefs[]` (`env`, `secretName`, `key`) | env-referenced site secrets | Connected-App secret per Tableau site, referenced by name in the admin UI instead of storing it in the DB |
 | `OVP_MCP_<NAME>` | `mcp.secretRefs[]` (`env`, `secretName`, `key`) | MCP servers with tokens | Bearer token per MCP server, referenced by name in the admin UI |
+| registry pull credentials | `imagePullSecrets` (list of `{ name }`) | `image.edition=enterprise` | `kubernetes.io/dockerconfigjson` secret with the customer's GHCR read token for the private `ghcr.io/bl0rb/openvizpilot-enterprise` package (`kubectl create secret docker-registry …`, see [docs/enterprise.md](docs/enterprise.md)) |
 
 **Plain configuration — `values.yaml`, no vault needed**
 
@@ -187,6 +191,7 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_LLM_BASE_URL` | `llm.baseUrl` | LLM endpoint (required) |
 | `OVP_DEFAULT_MODEL`, `OVP_MODEL_ALLOWLIST` | `app.defaultModel`, `app.modelAllowlist` | Default model (required) and optional allow-list |
 | `OVP_PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
+| `OVP_ENVIRONMENT` | `app.environment` | `production` (default) \| `development` \| `test` \| `staging` — counted during licence activation |
 | `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
 | `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
 | `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
@@ -238,7 +243,7 @@ spec:
 
 ## Editions
 
-OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the [PolyForm Noncommercial license](LICENSE) — free for any noncommercial purpose; commercial use, including running it inside a company, requires an agreement. The Enterprise Edition in [`ee/`](ee/) is proprietary (see [ee/LICENSE](ee/LICENSE)) and, unlocked per feature by a signed license key entered in the admin UI, adds Single Sign-On (OIDC), user memory, saved queries, MCP sources, dashboard actions and the Tableau Server integration. Setup and feature details: [docs/enterprise.md](docs/enterprise.md).
+OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the [PolyForm Noncommercial license](LICENSE) — free for any noncommercial purpose; commercial use, including running it inside a company, requires an agreement. The Enterprise Edition — Single Sign-On (OIDC), user memory, saved queries, MCP sources, dashboard actions, the Tableau Server integration and license activation — lives in a private repository and is available to customers for source review under contract/NDA; **`ee/` in this (public) repository is a stub** with the same package name and exports but no-op implementations, so the Core Edition builds and runs standalone. The Enterprise image is published as `ghcr.io/bl0rb/openvizpilot-enterprise`, a private GHCR package — customers receive a read-only token to pull it (`imagePullSecrets` in the chart, see [docs/enterprise.md](docs/enterprise.md)). One licence covers one production installation; development, test and staging installations (`OVP_ENVIRONMENT`) are included. Enterprise features switch on once the installation has activated itself against WerkWorks (immediately at startup, or via an offline lease); after that, an unreachable service does not switch anything off for 30 days after the lease expires. Setup and feature details: [docs/enterprise.md](docs/enterprise.md).
 
 ## Manual test script
 

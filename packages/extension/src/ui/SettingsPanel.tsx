@@ -1,5 +1,5 @@
 import { EXTENSION_VERSION, MAX_AUTHOR_CONTEXT_CHARS, t, type ModelOption } from '@openvizpilot/shared';
-import { MemoryFactsPanel, SavedQueriesPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
+import { MemoryFactsPanel, SavedQueriesPanel, WatchSettingsPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
 import { useState } from 'preact/hooks';
 import { isAllowedBackendUrl, type ExtensionSettings } from '../settings';
 import type { EeFeatures } from '../chat/features-client';
@@ -212,6 +212,10 @@ export function SettingsPanel(props: {
       {props.userId && props.features.savedQueries && (
         <SavedQueriesPanel prefs={props.prefs} onSavePrefs={props.onSavePrefs} onReloadPrefs={props.onReloadPrefs} />
       )}
+
+      {/* OpenViz Watch (W6): an das angemeldete Konto gebunden (Bearer/Session),
+          nicht an die Tableau-Anwenderkennung — deshalb unabhängig von userId. */}
+      {props.features.watch && <WatchSettingsPanel backendUrl={props.backendUrl} apiToken={props.apiToken} />}
 
       {/* Ohne Anwenderkennung gibt es keine Personalisierung. Das passiert auf
           Tableau-Versionen vor 2023.2 (Extensions API 1.11), die das Manifest

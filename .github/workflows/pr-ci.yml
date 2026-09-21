@@ -73,7 +73,7 @@ jobs:
           done
           docker logs tchat
           [ "$ok" = "1" ]
-          curl -sf http://localhost:3000/api/session | python3 -c 'import json, sys; s = json.load(sys.stdin); assert s == {"user": None, "access": {"ai": False, "tableauApi": False}}, s'
+          curl -sf http://localhost:3000/api/session | python3 -c 'import json, sys; s = json.load(sys.stdin); assert s == {"user": None, "access": {"ai": False, "tableauApi": False, "serverData": False}}, s'
           # A supplied Tableau header must not bypass the per-user AI approval.
           status=$(curl -sS -o /tmp/memory-response.json -w '%{http_code}' -H 'x-tableau-user: ci' http://localhost:3000/api/memory)
           cat /tmp/memory-response.json

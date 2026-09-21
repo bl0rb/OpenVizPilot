@@ -1,6 +1,15 @@
 import { MAX_MESSAGE_CHARS, t, type ChatMode, type SlashCommand } from '@openvizpilot/shared';
 import { useMemo, useRef, useState } from 'preact/hooks';
-import { CHAT_MODE_ORDER, modeLabelKey, nextChatMode, placeholderKeyForMode } from '../chat/composer-mode';
+import {
+  CHAT_MODE_ORDER,
+  ESTATE_SCOPE_ORDER,
+  isInvestigateMode,
+  modeLabelKey,
+  nextChatMode,
+  nextEstateScope,
+  placeholderKeyForMode,
+  scopeLabelKey,
+} from '../chat/composer-mode';
 import { matchSlashCommands } from '../chat/slash-commands';
 
 export function Composer(props: {
@@ -11,6 +20,8 @@ export function Composer(props: {
   /** Fragen vs. Untersuchen (W3) — Zustand liegt in App.tsx (Session). */
   mode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
+  /** Nur mit Lizenz + Freigabe (features.serverData) zeigt Untersuchen den Umfangs-Umschalter (W7 Punkt 6). */
+  serverDataAvailable?: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
 }) {
@@ -21,6 +32,8 @@ export function Composer(props: {
   // Pfeiltasten müssen den DOM-Fokus auf die neu ausgewählte Option verschieben
   // (WAI-ARIA-Radiogroup-Pattern), sonst laufen Checked-Status und Fokus auseinander.
   const modeButtonRefs = useRef<Partial<Record<ChatMode, HTMLButtonElement>>>({});
+  // Gleiches Roving-tabindex-Muster für den Umfangs-Umschalter (W7 Punkt 6).
+  const scopeButtonRefs = useRef<Partial<Record<ChatMode, HTMLButtonElement>>>({});
 
   // Slash-Menü: sichtbar, solange nur der Befehlsname getippt wird
   // (bis zum ersten Leerzeichen) und es passende Befehle gibt.
@@ -71,33 +84,76 @@ export function Composer(props: {
         </div>
       )}
       <div class="mode-switch" role="radiogroup" aria-label={t('composer.modeLabel')}>
-        {CHAT_MODE_ORDER.map((m) => (
-          <button
-            key={m}
-            type="button"
-            role="radio"
-            aria-checked={props.mode === m}
-            tabIndex={props.mode === m ? 0 : -1}
-            disabled={props.disabled}
-            class={`mode-option${props.mode === m ? ' mode-option-active' : ''}`}
-            title={m === 'investigate' ? t('composer.mode.investigateTooltip') : undefined}
-            ref={(el: HTMLButtonElement | null) => {
-              if (el) modeButtonRefs.current[m] = el;
-            }}
-            onClick={() => props.onModeChange(m)}
-            onKeyDown={(e) => {
-              const next = nextChatMode(props.mode, e.key);
-              if (next) {
-                e.preventDefault();
-                props.onModeChange(next);
-                modeButtonRefs.current[next]?.focus();
-              }
-            }}
-          >
-            {t(modeLabelKey(m))}
-          </button>
-        ))}
+        {CHAT_MODE_ORDER.map((m) => {
+          // 'investigate-estate' zählt für die primäre Control als 'investigate'
+          // (der Umfang wird im zweiten Umschalter darunter gewählt) — ein Klick
+          // auf die bereits aktive Untersuchen-Option darf den Umfang deshalb
+          // nicht stillschweigend auf "Nur dieses Dashboard" zurücksetzen.
+          const checked = m === 'investigate' ? isInvestigateMode(props.mode) : props.mode === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              tabIndex={checked ? 0 : -1}
+              disabled={props.disabled}
+              class={`mode-option${checked ? ' mode-option-active' : ''}`}
+              title={m === 'investigate' ? t('composer.mode.investigateTooltip') : undefined}
+              ref={(el: HTMLButtonElement | null) => {
+                if (el) modeButtonRefs.current[m] = el;
+              }}
+              onClick={() => {
+                if (m === 'investigate' && isInvestigateMode(props.mode)) return;
+                props.onModeChange(m);
+              }}
+              onKeyDown={(e) => {
+                const next = nextChatMode(props.mode, e.key);
+                if (next) {
+                  e.preventDefault();
+                  props.onModeChange(next);
+                  modeButtonRefs.current[next]?.focus();
+                }
+              }}
+            >
+              {t(modeLabelKey(m))}
+            </button>
+          );
+        })}
       </div>
+      {isInvestigateMode(props.mode) && props.serverDataAvailable && (
+        // Untersuchungs-Umfang (W7 Punkt 6): nur sichtbar mit Lizenz + Freigabe
+        // (features.serverData) — Auswahl setzt den Modus direkt auf
+        // 'investigate' bzw. 'investigate-estate'.
+        <div class="mode-switch scope-switch" role="radiogroup" aria-label={t('composer.scopeLabel')}>
+          {ESTATE_SCOPE_ORDER.map((scope) => (
+            <button
+              key={scope}
+              type="button"
+              role="radio"
+              aria-checked={props.mode === scope}
+              tabIndex={props.mode === scope ? 0 : -1}
+              disabled={props.disabled}
+              class={`mode-option${props.mode === scope ? ' mode-option-active' : ''}`}
+              title={scope === 'investigate-estate' ? t('composer.scope.estateTooltip') : undefined}
+              ref={(el: HTMLButtonElement | null) => {
+                if (el) scopeButtonRefs.current[scope] = el;
+              }}
+              onClick={() => props.onModeChange(scope)}
+              onKeyDown={(e) => {
+                const next = nextEstateScope(props.mode, e.key);
+                if (next) {
+                  e.preventDefault();
+                  props.onModeChange(next);
+                  scopeButtonRefs.current[next]?.focus();
+                }
+              }}
+            >
+              {t(scopeLabelKey(scope))}
+            </button>
+          ))}
+        </div>
+      )}
       <div class="composer-input-row">
         <textarea
           value={text}

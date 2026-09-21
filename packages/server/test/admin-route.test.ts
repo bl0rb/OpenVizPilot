@@ -39,6 +39,9 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'test',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }
@@ -388,7 +391,7 @@ describe('stilllegen / übertragen (L3)', () => {
     const login = await app.request('/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'anna', password: 'sehr-geheimes-passwort' }) });
     const token = ((await login.json()) as { token: string }).token;
     const id = userAccessId({ provider: 'local', issuer: '', subject: 'anna' });
-    await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, admin: true }) });
+    await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, serverData: false, admin: true }) });
     return { authorization: `Bearer ${token}` };
   }
 
@@ -435,5 +438,27 @@ describe('stilllegen / übertragen (L3)', () => {
     expect((await app.request('/api/admin/license/deactivate', { method: 'POST', headers: json, body: JSON.stringify({ confirm: true }) })).status).toBe(503);
     expect((await app.request('/api/admin/license/transfer', { method: 'POST', headers: json, body: JSON.stringify({ installationId: 'x' }) })).status).toBe(503);
     expect((await app.request('/api/admin/license/installations', { headers: auth })).status).toBe(503);
+  });
+});
+
+describe('PUT /api/admin/user-access/:id — Serverdaten (W5)', () => {
+  const auth = { authorization: 'Bearer geheim' };
+  const json = { ...auth, 'content-type': 'application/json' };
+
+  it('lets every admin set serverData and clears a stored consent when it is revoked', async () => {
+    const instance = createApp(testConfig({ adminToken: 'geheim', authMode: 'local', memoryDbPath: tmpDbPath() }));
+    const { app, memoryStore } = instance;
+    await app.request('/api/admin/users', { method: 'POST', headers: json, body: JSON.stringify({ username: 'anna', displayName: 'Anna', password: 'sehr-geheimes-passwort' }) });
+    const id = userAccessId({ provider: 'local', issuer: '', subject: 'anna' });
+
+    expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, serverData: true }) })).status).toBe(200);
+    expect((await memoryStore!.getUserAccess(id))?.serverData).toBe(true);
+    await memoryStore!.setServerDataConsent(id, new Date());
+    expect(await memoryStore!.getServerDataConsent(id)).not.toBeNull();
+
+    // Widerruf: Freigabe abschalten löscht zusätzlich die bereits erteilte Einwilligung.
+    expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, serverData: false }) })).status).toBe(200);
+    expect((await memoryStore!.getUserAccess(id))?.serverData).toBe(false);
+    expect(await memoryStore!.getServerDataConsent(id)).toBeNull();
   });
 });

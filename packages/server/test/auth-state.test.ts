@@ -39,6 +39,9 @@ function config(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'production',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }

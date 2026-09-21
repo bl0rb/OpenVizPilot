@@ -12,9 +12,13 @@ export interface EeFeatures {
   memory: boolean;
   savedQueries: boolean;
   actions: boolean;
+  /** OpenViz Watch (W6): Dashboards beobachten und bei Auffälligkeiten melden — setzt serverData voraus. */
+  watch: boolean;
+  /** Serverseitiger Datenzugriff (W5) je Person freigegeben + lizenziert — schaltet u. a. den Untersuchen-Umfang „Gesamte Tableau-Umgebung" frei (W7). */
+  serverData: boolean;
 }
 
-export const NO_EE_FEATURES: EeFeatures = { sso: false, memory: false, savedQueries: false, actions: false };
+export const NO_EE_FEATURES: EeFeatures = { sso: false, memory: false, savedQueries: false, actions: false, watch: false, serverData: false };
 
 export async function fetchFeatures(baseUrl: string, apiToken?: string): Promise<EeFeatures> {
   try {
@@ -28,6 +32,8 @@ export async function fetchFeatures(baseUrl: string, apiToken?: string): Promise
       memory: data.features?.memory === true,
       savedQueries: data.features?.savedQueries === true,
       actions: data.features?.actions === true,
+      watch: data.features?.watch === true,
+      serverData: data.features?.serverData === true,
     };
   } catch {
     // Nicht erreichbar: wie "keine Lizenz" behandeln — der Chat selbst läuft weiter.

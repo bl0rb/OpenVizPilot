@@ -49,6 +49,9 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'test',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }

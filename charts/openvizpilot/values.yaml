@@ -115,6 +115,18 @@ app:
   secretKeySecret:
     existingSecret: ""
     key: OVP_SECRET_KEY
+  # Globaler Schalter für die Watch-Engine (Enterprise, Feature "watch");
+  # zusätzlich zur Lizenz und zur Admin-Einstellung „global an/aus". Default an.
+  watchEnabled: true
+
+# SMTP für Watch-E-Mail-Alerts (Enterprise, Feature "watch" + "serverData").
+# Ohne urlSecret bleibt der E-Mail-Kanal nicht konfiguriert (Webhook/Teams
+# funktionieren unabhängig davon).
+smtp:
+  urlSecret:
+    existingSecret: ""
+    key: OVP_SMTP_URL
+  from: ""
 
 # User-Memory: persönliche Fakten pro Nutzer (Name, Gewohnheiten) in Postgres.
 # Datenbank der Middleware: Admin-Konto, Anmeldung, Befehle, Playbooks und

@@ -116,8 +116,8 @@ describe('admin presentation', () => {
     // Abschnitte verweisen (z. B. „SSO im Abschnitt Anmeldung einrichten“).
     const nav = adminPageHtml.match(/<nav aria-label="Administration">[\s\S]*?<\/nav>/)?.[0] ?? '';
     const targets = [...nav.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
-    expect(targets).toHaveLength(10);
-    expect(new Set(targets).size).toBe(10);
+    expect(targets).toHaveLength(11);
+    expect(new Set(targets).size).toBe(11);
     for (const target of targets) {
       expect(adminPageHtml.split(`id="${target}"`)).toHaveLength(2);
       expect(adminPageHtml).toContain(`value="${target}"`);
@@ -166,7 +166,7 @@ describe('admin page inline script', () => {
     expect(adminPageHtml).toContain('id="user-access-refresh"');
     expect(adminPageHtml).toContain("adminFetch('/user-access')");
     expect(adminPageHtml).toContain("adminFetch('/user-access/' + encodeURIComponent(u.id)");
-    expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked, admin: adminInput.checked }");
+    expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked, serverData: serverDataInput.checked, admin: adminInput.checked }");
     expect(adminPageHtml).toContain("'SSO · ' + (u.issuer || 'Issuer unbekannt') + ' · subject: '");
     expect(adminPageHtml).toContain("'Lokal · ' + (u.subject || u.id)");
     expect(adminPageHtml).toContain("status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend'");
@@ -184,6 +184,14 @@ describe('admin page inline script', () => {
     expect(adminPageHtml).toContain("'Angemeldet als ' + me.name");
     expect(adminPageHtml).toContain("data.code === 'not_admin'");
     expect(adminPageHtml).toContain("showGate('Dieses Konto hat keine Admin-Rolle.')");
+  });
+
+  it('adds a Serverdaten switch column (W5) enabled for every admin, unlike the Admin role switch', () => {
+    expect(adminPageHtml).toContain('<span class="help-term">Serverdaten</span><span role="tooltip" id="help-access-serverdata" class="help-tip">Erlaubt der Middleware, im Namen dieser Person Summary-Daten von Tableau-Views zu lesen — nur mit Site-Schalter und Einwilligung der Person; jede Abfrage steht im Audit unter Tableau Server.</span>');
+    expect(adminPageHtml).toContain("serverDataInput.setAttribute('role', 'switch');");
+    expect(adminPageHtml).toContain("serverDataInput.checked = u.serverData === true;");
+    // Anders als der Admin-Schalter bleibt Serverdaten für jeden Admin bedienbar.
+    expect(adminPageHtml).not.toContain('serverDataInput.disabled = !canGrantAdmin');
   });
 });
 

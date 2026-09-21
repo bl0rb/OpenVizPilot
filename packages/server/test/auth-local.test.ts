@@ -51,6 +51,9 @@ function localConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     telemetryEndpoint: '',
     appVersion: 'test',
     environment: 'test',
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...testLicenseEnv(['savedQueries']),
     ...overrides,
   };

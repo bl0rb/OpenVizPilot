@@ -237,6 +237,30 @@ describe('ChatSession request contract', () => {
       );
       expect(captured).toHaveLength(TOOL_ROUNDS_BY_MODE.investigate + 1);
       expect(investigateCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReachedInvestigate'));
+
+      // W7 Punkt 9: Umgebungsweite Untersuchung bekommt ein noch größeres
+      // Rundenbudget (16) — bis zu 5 fremde Views serverseitig lesen und
+      // aggregieren braucht mehr Schritte als eine reine Dashboard-Untersuchung.
+      captured.length = 0;
+      const estateSession = new ChatSession();
+      const estateCb = {
+        onRoundStart: vi.fn(),
+        onAssistantDelta: vi.fn(),
+        onAssistantFinal: vi.fn(),
+        onSuggestions: vi.fn(),
+        onToolRun: vi.fn(),
+        onNotice: vi.fn(),
+        onError: vi.fn(),
+        onDone: vi.fn(),
+      };
+      await estateSession.runTurn(
+        'Warum sinkt unser Umsatz über alle Workbooks?',
+        { backendUrl: '', mode: 'investigate-estate', getContext: async () => '# ctx', executeTool },
+        estateCb,
+      );
+      expect(TOOL_ROUNDS_BY_MODE['investigate-estate']).toBe(16);
+      expect(captured).toHaveLength(TOOL_ROUNDS_BY_MODE['investigate-estate'] + 1);
+      expect(estateCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReachedInvestigate'));
     } finally {
       toolLoopActive = false;
     }

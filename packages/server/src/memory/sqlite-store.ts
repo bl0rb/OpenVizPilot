@@ -133,6 +133,8 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       ai INTEGER NOT NULL DEFAULT 0,
       tableau_api INTEGER NOT NULL DEFAULT 0,
       admin INTEGER NOT NULL DEFAULT 0,
+      server_data INTEGER NOT NULL DEFAULT 0,
+      server_data_consent_at TEXT,
       UNIQUE (provider, issuer, subject)
     );
     CREATE TABLE IF NOT EXISTS user_sessions (
@@ -147,10 +149,16 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
-  // Kein Migrations-Framework: Spalte `admin` bei älteren Datenbanken idempotent nachziehen.
+  // Kein Migrations-Framework: Spalten bei älteren Datenbanken idempotent nachziehen.
   const accessColumns = db.prepare('PRAGMA table_info(user_access)').all() as Array<{ name: string }>;
   if (!accessColumns.some((column) => column.name === 'admin')) {
     db.exec('ALTER TABLE user_access ADD COLUMN admin INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!accessColumns.some((column) => column.name === 'server_data')) {
+    db.exec('ALTER TABLE user_access ADD COLUMN server_data INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!accessColumns.some((column) => column.name === 'server_data_consent_at')) {
+    db.exec('ALTER TABLE user_access ADD COLUMN server_data_consent_at TEXT');
   }
   const localUsers = db.prepare('SELECT username, display_name FROM users').all() as Array<{ username: string; display_name: string }>;
   for (const user of localUsers) {
@@ -449,7 +457,7 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       db.prepare(
         `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email, ai = 0, tableau_api = 0`
+         ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email, ai = 0, tableau_api = 0, server_data = 0, server_data_consent_at = NULL`
       ).run(userAccessId(identity), identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
       db.exec('COMMIT');
       return true;
@@ -492,25 +500,46 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email`
       ).run(id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
       const row = rows[0]!;
-      return { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 };
+      return { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1, serverData: Number(row.server_data) === 1 };
     },
 
     async getUserAccess(id: string): Promise<UserAccess | null> {
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
       const row = rows[0];
-      return row ? { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 } : null;
+      return row ? { id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1, serverData: Number(row.server_data) === 1 } : null;
     },
 
     async listUserAccess(): Promise<UserAccess[]> {
-      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access ORDER BY id').all() as Array<Record<string, string | number>>;
-      return rows.map((row) => ({ id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1 }));
+      const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access ORDER BY id').all() as Array<Record<string, string | number>>;
+      return rows.map((row) => ({ id: row.id as string, provider: row.provider as UserAccess['provider'], issuer: row.issuer as string, subject: row.subject as string, displayName: row.display_name as string, email: row.email as string, ai: Number(row.ai) === 1, tableauApi: Number(row.tableau_api) === 1, admin: Number(row.admin) === 1, serverData: Number(row.server_data) === 1 }));
     },
 
     async setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean> {
-      return Number(db.prepare('UPDATE user_access SET ai = ?, tableau_api = ?, admin = COALESCE(?, admin) WHERE id = ?')
-        .run(grants.ai ? 1 : 0, grants.tableauApi ? 1 : 0, grants.admin === undefined ? null : grants.admin ? 1 : 0, id).changes) === 1;
+      // `serverData` weggelassen = unverändert (wie `admin`); explizit auf false gesetzt löscht
+      // zusätzlich die Einwilligung — die Person muss nach einem Widerruf neu zustimmen.
+      return Number(db.prepare(
+        `UPDATE user_access SET ai = ?, tableau_api = ?,
+         server_data = COALESCE(?, server_data),
+         server_data_consent_at = CASE WHEN ? = 1 THEN NULL ELSE server_data_consent_at END,
+         admin = COALESCE(?, admin) WHERE id = ?`,
+      ).run(
+        grants.ai ? 1 : 0, grants.tableauApi ? 1 : 0,
+        grants.serverData === undefined ? null : grants.serverData ? 1 : 0,
+        grants.serverData === false ? 1 : 0,
+        grants.admin === undefined ? null : grants.admin ? 1 : 0, id,
+      ).changes) === 1;
+    },
+
+    async getServerDataConsent(id: string): Promise<Date | null> {
+      const rows = db.prepare('SELECT server_data_consent_at FROM user_access WHERE id = ?').all(id) as Array<{ server_data_consent_at: string | null }>;
+      const at = rows[0]?.server_data_consent_at;
+      return at ? new Date(at) : null;
+    },
+
+    async setServerDataConsent(id: string, at: Date): Promise<void> {
+      db.prepare('UPDATE user_access SET server_data_consent_at = ? WHERE id = ?').run(at.toISOString(), id);
     },
 
     async registerFailedUserLogin(username: string, nowMs: number, windowMs: number): Promise<number> {

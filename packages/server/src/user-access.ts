@@ -27,19 +27,38 @@ export async function resolveUserAccess(
   });
 }
 
+/** Kein aufgelöster Nutzer: Einwilligung ist serverseitig nie erteilt, nichts zu speichern. */
+const noConsent = { get: async () => null, set: async () => undefined };
+
+/**
+ * Vollständiges Access-Objekt im Hono-Kontext (`c.get('userAccess')`) — die
+ * EE-Tableau-Server-Routen (W5) lesen `serverData` und rufen `consent.get/set`
+ * mit der `UserAccess.id` auf, ohne den Core-Store direkt zu kennen.
+ */
+export interface RequestUserAccess {
+  ai: boolean;
+  tableauApi: boolean;
+  serverData: boolean;
+  id?: string;
+  consent: { get(userId: string): Promise<Date | null>; set(userId: string, at: Date): Promise<void> };
+}
+
 /** Authentication identifies the user; only persisted admin grants authorize usage. */
 export function requireUserAccess(store: MemoryStore | null, logger: Logger): MiddlewareHandler<AuthVariables> {
   return async (c, next) => {
     if (pathWithin(c.req.path, '/api/admin') || pathWithin(c.req.path, '/api/auth')) return next();
     const oidc = c.get('oidcUser');
     const username = c.get('authUser');
-    let access = { ai: false, tableauApi: false };
+    let access: RequestUserAccess = { ai: false, tableauApi: false, serverData: false, consent: noConsent };
     try {
       if (oidc || username) {
         if (!store) throw new Error('User access store unavailable');
         const record = await resolveUserAccess(store, { oidc, username });
         if (!record) return c.json({ error: 'Anmeldung erforderlich', code: 'auth_required' }, 401);
-        access = { ai: record.ai, tableauApi: record.tableauApi };
+        access = {
+          ai: record.ai, tableauApi: record.tableauApi, serverData: record.serverData, id: record.id,
+          consent: { get: (id) => store.getServerDataConsent(id), set: (id, at) => store.setServerDataConsent(id, at) },
+        };
       }
     } catch {
       logger.error('user access unavailable');

@@ -8,8 +8,8 @@
  * jedem Request als "Authorization: Bearer <token>" an /api/admin/* gesendet
  * — nie in der URL (siehe Datenschutz-Regel: keine Secrets in URLs/Logs).
  */
-import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles } from '@openvizpilot/ee/server';
-import { ChartNoAxesCombined, Download, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Ruler, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
+import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles, watchAdminScript, watchAdminSection, watchAdminStyles } from '@openvizpilot/ee/server';
+import { ChartNoAxesCombined, Download, Eye, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Ruler, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
 import { adminFont } from './admin-font';
 
 const adminLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -192,6 +192,7 @@ export const adminPageHtml = `<!doctype html>
   #app { display: none; }
   ${mcpAdminStyles}
   ${tableauAdminStyles}
+  ${watchAdminStyles}
   [hidden] { display: none !important; }
   .ui-icon { flex: 0 0 18px; vertical-align: middle; }
   .masthead { height: 72px; padding: 0 2rem; background: var(--graphite); color: #e7e9f2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -339,11 +340,12 @@ export const adminPageHtml = `<!doctype html>
         <p class="nav-group">Betrieb</p>
         <a href="#extension-admin">${adminIcon(Download)}Tableau-Extension</a>
         <a href="#usage-admin">${adminIcon(ChartNoAxesCombined)}Nutzung</a>
+        <a href="#watch-admin">${adminIcon(Eye)}Watch <span class="nav-ee">EE</span></a>
       </nav>
       <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
         <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="tableau-server-admin">Tableau Server</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="metrics-admin">Kennzahlen</option><option value="models-admin">Modelle</option></optgroup>
         <optgroup label="Zugriff"><option value="auth-admin">Anmeldung &amp; Lizenz</option><option value="users-admin">Benutzerkonten</option></optgroup>
-        <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option></optgroup>
+        <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option><option value="watch-admin">Watch</option></optgroup>
       </select>
       <button id="logout" title="Abmelden" aria-label="Abmelden">${adminIcon(LogOut)}<span>Abmelden</span></button>
     </aside>
@@ -352,6 +354,7 @@ export const adminPageHtml = `<!doctype html>
 
     ${mcpAdminSection}
     ${tableauAdminSection}
+    ${watchAdminSection}
 
     <section class="card" id="commands-admin" hidden>
       <h2>Slash-Befehle</h2>
@@ -572,7 +575,7 @@ export const adminPageHtml = `<!doctype html>
         </div>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
-            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span></th><th class="col-save"></th></tr></thead>
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Serverdaten</span><span role="tooltip" id="help-access-serverdata" class="help-tip">Erlaubt der Middleware, im Namen dieser Person Summary-Daten von Tableau-Views zu lesen — nur mit Site-Schalter und Einwilligung der Person; jede Abfrage steht im Audit unter Tableau Server.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span></th><th class="col-save"></th></tr></thead>
             <tbody id="user-access-body"></tbody>
           </table>
         </div>
@@ -960,6 +963,7 @@ export const adminPageHtml = `<!doctype html>
     loadMetrics();
     loadModels();
     loadStats();
+    loadWatch();
   }
 
   function selectAdminView(focus) {
@@ -1010,6 +1014,7 @@ export const adminPageHtml = `<!doctype html>
 
   ${mcpAdminScript}
   ${tableauAdminScript}
+  ${watchAdminScript}
 
   // ---------- Slash-Befehle ----------
 
@@ -1476,7 +1481,7 @@ export const adminPageHtml = `<!doctype html>
     if (users.length === 0) {
       var empty = document.createElement('tr');
       var emptyCell = document.createElement('td');
-      emptyCell.colSpan = 7;
+      emptyCell.colSpan = 8;
       emptyCell.className = 'hint';
       emptyCell.textContent = 'Keine Identitäten gefunden.';
       empty.appendChild(emptyCell);
@@ -1520,6 +1525,17 @@ export const adminPageHtml = `<!doctype html>
       tableauInput.setAttribute('aria-label', 'Tableau API für ' + (u.displayName || u.email || u.id));
       tableauLabel.appendChild(tableauInput);
       tableau.appendChild(tableauLabel);
+      var serverData = document.createElement('td');
+      serverData.className = 'col-access';
+      var serverDataLabel = document.createElement('label');
+      serverDataLabel.className = 'user-access-checkbox';
+      var serverDataInput = document.createElement('input');
+      serverDataInput.type = 'checkbox';
+      serverDataInput.setAttribute('role', 'switch');
+      serverDataInput.checked = u.serverData === true;
+      serverDataInput.setAttribute('aria-label', 'Serverdaten für ' + (u.displayName || u.email || u.id));
+      serverDataLabel.appendChild(serverDataInput);
+      serverData.appendChild(serverDataLabel);
       var adminCell = document.createElement('td');
       adminCell.className = 'col-access';
       var adminLabel = document.createElement('label');
@@ -1544,8 +1560,9 @@ export const adminPageHtml = `<!doctype html>
         save.disabled = true;
         aiInput.disabled = true;
         tableauInput.disabled = true;
+        serverDataInput.disabled = true;
         adminInput.disabled = true;
-        adminFetch('/user-access/' + encodeURIComponent(u.id), jsonRequest('PUT', { ai: aiInput.checked, tableauApi: tableauInput.checked, admin: adminInput.checked }))
+        adminFetch('/user-access/' + encodeURIComponent(u.id), jsonRequest('PUT', { ai: aiInput.checked, tableauApi: tableauInput.checked, serverData: serverDataInput.checked, admin: adminInput.checked }))
           .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
           .then(function (result) {
             if (!result.ok) throw new Error(errorText(result.data, 'Zugriff konnte nicht gespeichert werden.'));
@@ -1553,7 +1570,7 @@ export const adminPageHtml = `<!doctype html>
             status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
           })
           .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriff konnte nicht gespeichert werden.', 'error'); })
-          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; adminInput.disabled = !canGrantAdmin; });
+          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; serverDataInput.disabled = false; adminInput.disabled = !canGrantAdmin; });
       });
       actions.appendChild(save);
       tr.appendChild(identity);
@@ -1561,6 +1578,7 @@ export const adminPageHtml = `<!doctype html>
       tr.appendChild(status);
       tr.appendChild(ai);
       tr.appendChild(tableau);
+      tr.appendChild(serverData);
       tr.appendChild(adminCell);
       tr.appendChild(actions);
       userAccessBody.appendChild(tr);

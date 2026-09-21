@@ -1,4 +1,5 @@
 import { describeAction, t, type DashboardAction } from '@openvizpilot/shared';
+import { WatchProposalCard, type WatchRuleProposal } from '@openvizpilot/ee/extension';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { buildMarkdownExport, type ChatItem } from './items';
 import { renderMarkdown } from './markdown';
@@ -30,6 +31,8 @@ const TOOL_LABEL_KEYS: Record<string, string> = {
   tableau_server_search: 'message.tool.tableau_server_search',
   tableau_metadata_search: 'message.tool.tableau_metadata_search',
   tableau_metadata_field: 'message.tool.tableau_metadata_field',
+  tableau_view_data: 'message.tool.tableau_view_data',
+  propose_watch_rule: 'message.tool.propose_watch_rule',
 };
 
 export function toolStepLabel(name: string): string {
@@ -107,6 +110,12 @@ export function MessageList(props: {
   onAction: (action: DashboardAction) => void;
   /** Speichert eine User-Frage als Standardfrage (☆-Button); undefined = kein Button (keine User-ID). */
   onSaveStandard?: (text: string) => void;
+  /** OpenViz Watch (W6): nur gesetzt, wenn das Feature lizenziert ist (Defense in Depth zum Server-Gate) — sonst erscheint nie eine Karte. */
+  watch?: {
+    signedInEmail?: string;
+    onCreate: (proposal: WatchRuleProposal, itemId: number) => Promise<{ ok: boolean; message?: string }>;
+    onDiscard: (itemId: number) => void;
+  };
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // Nur automatisch ans Ende folgen, solange der Nutzer nahe am unteren Rand
@@ -249,6 +258,14 @@ export function MessageList(props: {
                       </span>
                     ))}
                   </div>
+                )}
+                {item.watchProposal && props.watch && (
+                  <WatchProposalCard
+                    proposal={item.watchProposal}
+                    signedInEmail={props.watch.signedInEmail}
+                    onCreate={(proposal) => props.watch!.onCreate(proposal, item.id)}
+                    onDismiss={() => props.watch!.onDiscard(item.id)}
+                  />
                 )}
               </div>
             );

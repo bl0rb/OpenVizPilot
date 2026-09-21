@@ -73,10 +73,15 @@ export const chatRequestSchema = z.object({
   /**
    * Untersuchungsmodus (W3): 'investigate' hängt einen zusätzlichen
    * Prompt-Abschnitt an (INVESTIGATE_PROMPT_SECTION, siehe system-prompt.ts)
-   * und lässt die Extension mehr Tool-Runden zulassen. Default 'ask'
-   * (bestehendes Verhalten) bei fehlendem Feld.
+   * und lässt die Extension mehr Tool-Runden zulassen. 'investigate-estate'
+   * (W7, Cross-Dashboard) erweitert das um die gesamte freigegebene
+   * Tableau-Umgebung — der Server hängt dafür zusätzlich
+   * INVESTIGATE_ESTATE_PROMPT_SECTION an, aber NUR wenn Lizenz-Feature
+   * `serverData` und die Freigabe der Person vorliegen; sonst wird
+   * serverseitig auf 'investigate' zurückgestuft (siehe routes/chat.ts).
+   * Default 'ask' (bestehendes Verhalten) bei fehlendem Feld.
    */
-  mode: z.enum(['ask', 'investigate']).optional(),
+  mode: z.enum(['ask', 'investigate', 'investigate-estate']).optional(),
 });
 
 export type ToolCall = z.infer<typeof toolCallSchema>;

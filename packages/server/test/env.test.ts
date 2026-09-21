@@ -126,6 +126,31 @@ describe('removed license public-key override', () => {
   });
 });
 
+describe('Watch (W6): SMTP env and enable switch', () => {
+  it('defaults SMTP to unset and the watch switch to enabled', () => {
+    const config = loadEnv(baseEnv());
+    expect(config.smtpUrl).toBeNull();
+    expect(config.smtpFrom).toBeNull();
+    expect(config.watchEnabled).toBe(true);
+  });
+
+  it('reads OVP_SMTP_URL and OVP_SMTP_FROM when set', () => {
+    const config = loadEnv(baseEnv({ OVP_SMTP_URL: 'smtps://user:pass@mail.example.com:465', OVP_SMTP_FROM: 'alerts@example.com' }));
+    expect(config.smtpUrl).toBe('smtps://user:pass@mail.example.com:465');
+    expect(config.smtpFrom).toBe('alerts@example.com');
+  });
+
+  it('rejects an OVP_SMTP_URL that is not a valid URL', () => {
+    expect(() => loadEnv(baseEnv({ OVP_SMTP_URL: 'not-a-url' }))).toThrow(/OVP_SMTP_URL/);
+  });
+
+  it('treats OVP_WATCH_ENABLED=false as disabled and an empty value as unset (default on)', () => {
+    expect(loadEnv(baseEnv({ OVP_WATCH_ENABLED: 'false' })).watchEnabled).toBe(false);
+    expect(loadEnv(baseEnv({ OVP_WATCH_ENABLED: 'true' })).watchEnabled).toBe(true);
+    expect(loadEnv(baseEnv({ OVP_WATCH_ENABLED: '' })).watchEnabled).toBe(true);
+  });
+});
+
 describe('OVP_ENVIRONMENT', () => {
   it('defaults to production, treats an empty value as unset and accepts only the four environments', () => {
     expect(loadEnv(baseEnv()).environment).toBe('production');

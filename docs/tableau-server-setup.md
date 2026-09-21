@@ -10,7 +10,9 @@ Diese Anleitung beschreibt die Einrichtung der Tableau-Server-Integration. Was d
 - Der gewählte Claim muss vom IdP administrativ kontrolliert und für die Zielgruppe stabil gepflegt werden. OpenVizPilot verändert weder Domain noch Groß-/Kleinschreibung und verwendet keine Ersatzidentität.
 - Je Tableau-**Site** eine eigene Tableau Connected App — entweder **Direct Trust** (Client-ID, Secret-ID,
   Secret-Wert) oder **OAuth 2.0 Trust** (Issuer-URL, JWKS; das Schlüsselpaar erzeugt die Middleware selbst und
-  bedient alle Sites gemeinsam). Der JWT-Scope bleibt in beiden Fällen ausschließlich `tableau:content:read`.
+  bedient alle Sites gemeinsam). Der JWT-Scope ist in beiden Fällen `tableau:content:read` — nur mit dem Site-Schalter
+  „Serverseitige Daten erlauben“ (siehe unten) zusätzlich `tableau:views:download`.
+- Für den serverseitigen Datenzugriff (`tableau_view_data`, W5) zusätzlich Enterprise-Lizenz mit `serverData`.
 - Optional: `OVP_SECRET_KEY` (mindestens 32 Zeichen, z. B. `openssl rand -hex 32`), damit Direct-Trust-Secrets
   verschlüsselt im Web gespeichert werden können, statt nur per Umgebungsvariable. Ohne diesen Schlüssel sind die
   Secret-Felder in der Admin-UI deaktiviert und nur Env-Secret-Referenzen (`OVP_TABLEAU_...`) nutzbar.
@@ -92,9 +94,25 @@ Der persönliche Check ruft danach `/api/tableau-server/check` auf. Der Server p
 
 Das Ergebnis nennt Versionen und einzelne Probe-Status. Erfolg wird nur bei `stage: "connection"`, `ok: true` und ausschließlich erfolgreichen Probes angezeigt.
 
+## Serverseitiger Datenzugriff aktivieren (W5)
+
+Für `tableau_view_data` (Summary-Daten einer View außerhalb des aktuellen Dashboards) zusätzlich je
+Site den Schalter **„Serverseitige Daten erlauben“** aktivieren. Das bewirkt zwei Dinge:
+
+1. Die Connected App dieser Site muss zusätzlich zu `tableau:content:read` den Scope
+   `tableau:views:download` erlauben (Direct Trust und OAuth 2.0 Trust gleichermaßen).
+2. Der jeweilige Tableau-Nutzer braucht auf der betroffenen View die Tableau-Berechtigung
+   **„Zusammenfassungsdaten herunterladen“** — ohne sie schlägt der Lesezugriff serverseitig fehl,
+   unabhängig von den übrigen Freigaben.
+
+Zusätzlich nötig, jeweils serverseitig geprüft: Enterprise-Lizenz mit `serverData`, die Freigabe
+**„Serverdaten“** je Person unter „Benutzerzugriff“ und die einmalige Einwilligung der Person in der
+Extension. Details zu Fehlercodes, Endpunkten und dem Audit-Log stehen in
+[tableau-server.md](tableau-server.md#serverseitiger-datenzugriff-w5).
+
 ## Suche und Chat
 
-Die Chat-Tools (`tableau_server_search`, `tableau_metadata_search`, `tableau_metadata_field`), ihre Parameter und die geltenden Such-/Metadaten-Limits stehen in [tableau-server.md](tableau-server.md). Voraussetzung ist die per-Nutzer-Freigabe **Tableau-API** (siehe [user-approvals.md](user-approvals.md)) zusätzlich zu Lizenz, OIDC-Mapping und Site-Zuordnung.
+Die Chat-Tools (`tableau_server_search`, `tableau_metadata_search`, `tableau_metadata_field`, `tableau_view_data`), ihre Parameter und die geltenden Such-/Metadaten-Limits stehen in [tableau-server.md](tableau-server.md). Voraussetzung ist die per-Nutzer-Freigabe **Tableau-API** (siehe [user-approvals.md](user-approvals.md)) zusätzlich zu Lizenz, OIDC-Mapping und Site-Zuordnung.
 
 Suchtreffer und Metadaten werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter übermittelt (Content-Namen, Tags, Owner-/Projektangaben, Quelllinks, Formeln). Das ist bei der Freigabe des Anbieters und seiner Datenverarbeitung zu berücksichtigen. Tableau-Tokens und Connected-App-Secrets werden nicht mitgesendet.
 

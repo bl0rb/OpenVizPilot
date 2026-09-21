@@ -21,6 +21,12 @@ import {
   TABLEAU_PROMPT_SECTION,
   TABLEAU_METADATA_TOOLS,
   TABLEAU_METADATA_PROMPT_SECTION,
+  TABLEAU_VIEW_DATA_TOOL,
+  TABLEAU_VIEW_DATA_PROMPT_SECTION,
+  INVESTIGATE_ESTATE_PROMPT_SECTION,
+  INVESTIGATE_ESTATE_DOWNGRADE_NOTICE,
+  WATCH_PROPOSE_TOOL,
+  WATCH_PROMPT_SECTION,
 } from '@openvizpilot/ee/server';
 import type { MemoryStore } from '../memory/store';
 import { buildSystemPrompt, INVESTIGATE_PROMPT_SECTION, PROVENANCE_PROMPT_SECTION } from '../system-prompt';
@@ -130,7 +136,7 @@ export function createChatRoute(
       const req = authUser ? { ...parsedReq, userId: authUser } : parsedReq;
       // Untersuchungsmodus (W3): steuert nur den zusätzlichen Prompt-Abschnitt
       // unten — das Rundenbudget verwaltet ausschließlich die Extension.
-      const mode = req.mode ?? 'ask';
+      const requestedMode = req.mode ?? 'ask';
       let tableauServerEnabled = false;
       if (tableau && c.get('userAccess')?.tableauApi) {
         try {
@@ -139,6 +145,23 @@ export function createChatRoute(
           tableauServerEnabled = false;
         }
       }
+      // Serverseitiger Datenzugriff (W5): zusätzlich zur Tableau-Server-Freigabe nötig sind
+      // die separate Freigabe „Serverdaten" der Person UND das Lizenz-Feature `serverData`
+      // (die Site selbst prüft der Server bei der eigentlichen Abfrage). Ohne beides sieht
+      // das Modell das Tool nicht — kein Hinweis auf eine ggf. nicht lizenzierte Funktion.
+      const serverDataEnabled = tableauServerEnabled
+        && Boolean(c.get('userAccess')?.serverData)
+        && (await hasEeFeature('serverData'));
+      // Watch (W6): Regel-Vorschlag im Chat braucht zusätzlich das Lizenz-Feature `watch` —
+      // dieselbe Gate wie serverDataEnabled plus diese eine zusätzliche Prüfung.
+      const watchEnabled = serverDataEnabled && (await hasEeFeature('watch'));
+      // Umgebungsweite Untersuchung (W7, Cross-Dashboard): braucht denselben Serverdaten-Zugriff
+      // wie tableau_view_data (Lizenz `serverData` + Freigabe der Person). Ohne beides wird der
+      // Modus serverseitig sauber auf 'investigate' zurückgestuft — es gibt kein eigenes SSE-Event
+      // dafür (siehe sse-protocol.ts), also hängt der Hinweis stattdessen im System-Prompt und
+      // erscheint als normaler Text am Anfang der Modellantwort.
+      const estateDowngraded = requestedMode === 'investigate-estate' && !serverDataEnabled;
+      const mode = estateDowngraded ? 'investigate' : requestedMode;
 
       // Modellwahl über den Admin-Katalog (Admin-UI → „Modelle") — Regeln
       // und Fail-Closed-Verhalten in resolveModel() oben.
@@ -272,7 +295,9 @@ export function createChatRoute(
           }
 
           const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
-          const tableauTools = tableauServerEnabled ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS] : [];
+          const tableauTools = tableauServerEnabled
+            ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS, ...(serverDataEnabled ? [TABLEAU_VIEW_DATA_TOOL] : []), ...(watchEnabled ? [WATCH_PROPOSE_TOOL] : [])]
+            : [];
           // Trust Layer (Kennzahlenkatalog, siehe shared/metrics.ts): Block und
           // Tool erscheinen nur, wenn der Admin tatsächlich Kennzahlen gepflegt
           // hat — ein leerer/nicht konfigurierter Katalog ändert nichts am Chat.
@@ -308,7 +333,11 @@ export function createChatRoute(
                     metricCatalogText,
                   ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : '')
                     + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION : '')
-                    + (mode === 'investigate' ? INVESTIGATE_PROMPT_SECTION : '')
+                    + (serverDataEnabled ? TABLEAU_VIEW_DATA_PROMPT_SECTION : '')
+                    + (watchEnabled ? WATCH_PROMPT_SECTION : '')
+                    + (mode === 'investigate' || mode === 'investigate-estate' ? INVESTIGATE_PROMPT_SECTION : '')
+                    + (mode === 'investigate-estate' ? INVESTIGATE_ESTATE_PROMPT_SECTION : '')
+                    + (estateDowngraded ? INVESTIGATE_ESTATE_DOWNGRADE_NOTICE : '')
                     + PROVENANCE_PROMPT_SECTION,
                 },
                 ...req.messages,

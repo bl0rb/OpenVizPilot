@@ -30,6 +30,7 @@ describe('toolStepLabel', () => {
   it('returns a readable label for known tool names', () => {
     expect(toolStepLabel('list_worksheets')).toBe('Listing worksheets');
     expect(toolStepLabel('get_filters')).toBe('Reading active filters');
+    expect(toolStepLabel('tableau_view_data')).toBe('View data read server-side');
   });
 
   it('falls back to the raw name for unknown tools', () => {

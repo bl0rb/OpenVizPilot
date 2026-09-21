@@ -12,10 +12,15 @@ import {
 } from '@openvizpilot/shared';
 import { streamChat } from './sse-client';
 
-/** Rundenbudget je Modus (W3 Untersuchungsmodus: mehr Schritte für Plan + Belege). */
+/**
+ * Rundenbudget je Modus (W3 Untersuchungsmodus: mehr Schritte für Plan +
+ * Belege; W7 Umgebungsweite Untersuchung: noch mehr Schritte, da bis zu 5
+ * fremde Views serverseitig gelesen und aggregiert werden müssen).
+ */
 export const TOOL_ROUNDS_BY_MODE: Record<ChatMode, number> = {
   ask: 5,
   investigate: 12,
+  'investigate-estate': 16,
 };
 
 /** @deprecated Beibehalten für externe Referenzen — Budget ist jetzt modusabhängig, siehe TOOL_ROUNDS_BY_MODE. */
@@ -203,7 +208,7 @@ export class ChatSession {
           if (round >= maxRounds) {
             toolChoice = 'none';
             cb.onNotice(
-              deps.mode === 'investigate'
+              deps.mode === 'investigate' || deps.mode === 'investigate-estate'
                 ? t('app.chat.toolBudgetReachedInvestigate')
                 : t('app.chat.toolBudgetReached'),
             );

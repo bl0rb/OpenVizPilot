@@ -1,4 +1,5 @@
 import type { Suggestions } from '@openvizpilot/shared';
+import type { WatchRuleProposal } from '@openvizpilot/ee/extension';
 
 /** UI-Modell des Chat-Verlaufs (nicht identisch mit der LLM-Historie). */
 export type ChatItem =
@@ -10,6 +11,8 @@ export type ChatItem =
       streaming: boolean;
       /** Namen der Kennzahlen, die in dieser Antwort per lookup_metric bestätigt wurden (W1 Trust Layer, leer/undefined = kein Treffer). */
       verifiedMetrics?: string[];
+      /** OpenViz Watch (W6): Vorschlag aus einem abgeschlossenen `propose_watch_rule`-Aufruf seit der letzten User-Frage — zeigt die Bestätigungskarte, bis sie angelegt/verworfen wurde. */
+      watchProposal?: WatchRuleProposal;
     }
   | {
       kind: 'tool';

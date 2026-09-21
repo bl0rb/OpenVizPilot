@@ -1,3 +1,4 @@
+import { EE_STUB } from '@openvizpilot/ee/extension';
 import { t } from '@openvizpilot/shared';
 import { describe, expect, it } from 'vitest';
 import { reducer } from '../src/ui/chat-reducer';
@@ -110,5 +111,72 @@ describe('chat-reducer verifiedMetrics badge derivation', () => {
     items = reducer(items, { type: 'round-start' });
     items = reducer(items, { type: 'finalize', text: 'Der Umsatz beträgt …' });
     expect(lastAssistant(items)?.verifiedMetrics).toBeUndefined();
+  });
+});
+
+// OpenViz Watch (W6): die Bestätigungskarte wird deterministisch aus einem
+// abgeschlossenen propose_watch_rule-Aufruf seit der letzten User-Frage
+// abgeleitet — analog zu den verifizierten Kennzahlen oben. Im Core-Export
+// (EE_STUB) liefert parseWatchProposal immer null — dort entsteht nie eine Karte.
+describe.skipIf(EE_STUB)('chat-reducer watch proposal derivation', () => {
+  const proposalJson = JSON.stringify({
+    proposal: {
+      name: 'Marge unter 20 %',
+      viewId: '11111111-1111-4111-8111-111111111111',
+      viewName: 'Marge-Dashboard',
+      measure: { column: 'Marge', aggregate: 'avg' },
+      condition: { type: 'below', threshold: 20 },
+      schedule: { every: '1h', timezone: 'Europe/Berlin' },
+      channel: { type: 'email', target: '' },
+    },
+  });
+
+  it('attaches the parsed proposal from a done propose_watch_rule tool call', () => {
+    let items: ChatItem[] = [];
+    items = reducer(items, { type: 'user', text: 'Sag mir Bescheid, wenn die Marge unter 20% fällt.' });
+    items = reducer(items, { type: 'round-start' });
+    items = reducer(items, { type: 'tool', callId: 'c1', name: 'propose_watch_rule', status: 'done', preview: proposalJson });
+    items = reducer(items, { type: 'finalize', text: 'Hier ist ein Vorschlag.' });
+    expect(lastAssistant(items)?.watchProposal).toMatchObject({ name: 'Marge unter 20 %', viewId: '11111111-1111-4111-8111-111111111111' });
+  });
+
+  it('does not attach a proposal while the tool call is still running or on a malformed result', () => {
+    let items: ChatItem[] = [];
+    items = reducer(items, { type: 'user', text: 'Beobachte das Dashboard.' });
+    items = reducer(items, { type: 'round-start' });
+    items = reducer(items, { type: 'tool', callId: 'c1', name: 'propose_watch_rule', status: 'running' });
+    items = reducer(items, { type: 'finalize', text: 'Einen Moment …' });
+    expect(lastAssistant(items)?.watchProposal).toBeUndefined();
+
+    let items2: ChatItem[] = [];
+    items2 = reducer(items2, { type: 'user', text: 'Beobachte das Dashboard.' });
+    items2 = reducer(items2, { type: 'round-start' });
+    items2 = reducer(items2, { type: 'tool', callId: 'c1', name: 'propose_watch_rule', status: 'done', preview: '{"error":"kaputt"}' });
+    items2 = reducer(items2, { type: 'finalize', text: 'Das hat nicht geklappt.' });
+    expect(lastAssistant(items2)?.watchProposal).toBeUndefined();
+  });
+
+  it('ignores a propose_watch_rule call from an earlier user turn', () => {
+    let items: ChatItem[] = [];
+    items = reducer(items, { type: 'user', text: 'Beobachte das Dashboard.' });
+    items = reducer(items, { type: 'round-start' });
+    items = reducer(items, { type: 'tool', callId: 'c1', name: 'propose_watch_rule', status: 'done', preview: proposalJson });
+    items = reducer(items, { type: 'finalize', text: 'Hier ist ein Vorschlag.' });
+    items = reducer(items, { type: 'user', text: 'Und der Umsatz?' });
+    items = reducer(items, { type: 'round-start' });
+    items = reducer(items, { type: 'finalize', text: 'Der Umsatz beträgt …' });
+    expect(lastAssistant(items)?.watchProposal).toBeUndefined();
+  });
+
+  it('removes the proposal once handled (created or discarded)', () => {
+    let items: ChatItem[] = [];
+    items = reducer(items, { type: 'user', text: 'Beobachte das Dashboard.' });
+    items = reducer(items, { type: 'round-start' });
+    items = reducer(items, { type: 'tool', callId: 'c1', name: 'propose_watch_rule', status: 'done', preview: proposalJson });
+    items = reducer(items, { type: 'finalize', text: 'Hier ist ein Vorschlag.' });
+    const id = lastAssistant(items)!.id;
+    expect(lastAssistant(items)?.watchProposal).toBeDefined();
+    items = reducer(items, { type: 'watch-proposal-handled', id });
+    expect(lastAssistant(items)?.watchProposal).toBeUndefined();
   });
 });

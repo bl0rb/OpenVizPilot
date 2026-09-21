@@ -30,6 +30,8 @@ import {
   createMcpAdminRoute,
   type McpStore,
   createTableauAdminRoute,
+  createWatchAdminRoute,
+  type WatchStore,
   OidcError,
   type TableauService,
   type VerifiedUser,
@@ -176,6 +178,8 @@ export function createAdminRoute(
   telemetryStore: TelemetryStore | null = null,
   mcpStore: McpStore | null = null,
   tableau: TableauService | null = null,
+  /** Speicher der Watch-Beobachtungsregeln (W6, ee/) — für die Admin-Übersicht/-Verwaltung. */
+  watchStore: WatchStore | null = null,
   /** Sofortiger Lizenz-Heartbeat (neuer Schlüssel, „Jetzt aktualisieren“, Stilllegen/Übertragen); null ohne Datenbank. */
   refreshLease:
     | ((options?: { action?: HeartbeatAction; onResponse?: (info: HeartbeatResponseInfo) => void; reactivate?: boolean }) => Promise<'sent' | 'skipped' | 'failed'>)
@@ -391,6 +395,7 @@ export function createAdminRoute(
     listUsers: () => memoryStore!.listUsers(),
   }, logger, async (feature) => hasFeature((await authState.get()).license, feature)));
   app.route('/tableau-server', createTableauAdminRoute(tableau, logger));
+  app.route('/watch', createWatchAdminRoute({ store: watchStore, hasFeature: async (feature) => hasFeature((await authState.get()).license, feature), logger }));
 
   /**
    * Manifest-Download für Tableau: liefert das .trex mit der angegebenen
@@ -835,7 +840,7 @@ export function createAdminRoute(
     }
   });
 
-  app.put('/user-access/:id', zValidator('json', z.object({ ai: z.boolean(), tableauApi: z.boolean(), admin: z.boolean().optional() }).strict(), (result, c) => {
+  app.put('/user-access/:id', zValidator('json', z.object({ ai: z.boolean(), tableauApi: z.boolean(), serverData: z.boolean().optional(), admin: z.boolean().optional() }).strict(), (result, c) => {
     if (!result.success) return c.json({ error: 'Ungültige Freigaben' }, 400);
   }), async (c) => {
     if (!memoryStore) return c.json({ error: 'Freigaben benötigen einen Memory-Store' }, 503);

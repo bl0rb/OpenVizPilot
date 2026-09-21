@@ -54,6 +54,9 @@ function passwordModeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'test',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }
@@ -194,7 +197,7 @@ describe('first-run admin setup (password mode)', () => {
     expect(((await me.json()) as { code: string }).code).toBe('not_admin');
 
     const id = userAccessId({ provider: 'local', issuer: '', subject: 'anna' });
-    expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: initial, body: JSON.stringify({ ai: false, tableauApi: false, admin: true }) })).status).toBe(200);
+    expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: initial, body: JSON.stringify({ ai: false, tableauApi: false, serverData: false, admin: true }) })).status).toBe(200);
     expect(await (await app.request('/api/admin/me', { headers: user })).json()).toEqual({ role: 'delegated', name: 'Anna', provider: 'local' });
     expect((await app.request('/api/admin/commands', { headers: user })).status).toBe(200);
     // Ungültiges Token bleibt 401 — auch im Passwort-Modus.

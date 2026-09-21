@@ -13,10 +13,12 @@ import {
 import {
   addStandardQuestion,
   completeRedirectLogin,
+  createWatchRule,
   FOCUS_PRESETS,
   loadPrefs,
   savePrefs,
   type DashboardPrefs,
+  type WatchRuleProposal,
 } from '@openvizpilot/ee/extension';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ChatSession } from '../chat/agent-loop';
@@ -29,7 +31,7 @@ import { getTableau, type Dashboard } from '../tableau/api';
 import { buildContextSnapshot } from '../tableau/context-snapshot';
 import { describeContextChange, registerContextInvalidation } from '../tableau/events';
 import { executeToolCall } from '../tools/registry';
-import { executeMcpTool, executeTableauTool } from '@openvizpilot/ee/extension';
+import { createServerDataConsentGate, executeMcpTool, executeTableauTool, ServerDataConsentDialog } from '@openvizpilot/ee/extension';
 import { setConfigureHandler } from '../main';
 import { reducer } from './chat-reducer';
 import { Composer } from './Composer';
@@ -56,7 +58,10 @@ export function App(props: { dashboard: Dashboard }) {
   // Fenster, deaktiviertes Storage), gilt einfach der Default 'ask'.
   const [mode, setModeState] = useState<ChatMode>(() => {
     try {
-      return localStorage.getItem(MODE_STORAGE_KEY) === 'investigate' ? 'investigate' : 'ask';
+      const stored = localStorage.getItem(MODE_STORAGE_KEY);
+      // 'investigate-estate' (W7) braucht bei jedem Start erneut features.serverData —
+      // die Prüfung passiert weiter unten (siehe Effekt bei geladenen features).
+      return stored === 'investigate' || stored === 'investigate-estate' ? stored : 'ask';
     } catch {
       return 'ask';
     }
@@ -84,6 +89,15 @@ export function App(props: { dashboard: Dashboard }) {
   const [selectionIn, setSelectionIn] = useState<string | null>(null);
   /** Merkt sich, dass die nächste Markierung von einem eigenen Action-Chip stammt. */
   const ownSelectionRef = useRef(false);
+  // Einwilligung „Serverseitiger Datenzugriff" (tableau_view_data, W5): der
+  // Dialog wird höchstens einmal je Sitzung gezeigt (siehe ServerDataConsent),
+  // auch wenn mehrere Tool-Aufrufe im selben Turn dieselbe Zustimmung brauchen.
+  const [consentPrompt, setConsentPrompt] = useState<{ message: string; resolve: (accepted: boolean) => void } | null>(null);
+  const showServerDataConsentDialog = useCallback(
+    (message: string) => new Promise<boolean>((resolve) => setConsentPrompt({ message, resolve })),
+    [],
+  );
+  const consentGateRef = useRef(createServerDataConsentGate(showServerDataConsentDialog));
   // Zentral (Admin-UI) verwaltete Slash-Befehle — Fallback: eingebaute
   // Defaults, solange der Server nicht erreichbar ist oder nichts
   // konfiguriert hat (siehe commands-client.ts).
@@ -169,6 +183,11 @@ export function App(props: { dashboard: Dashboard }) {
   const needsLogin = (authConfig?.mode === 'oidc' || authConfig?.mode === 'local') && !authSession;
   // Freigeschaltete Enterprise-Funktionen (User-Memory, eigene Abfragen).
   const [features, setFeatures] = useState<EeFeatures>(NO_EE_FEATURES);
+  // Solange die Enterprise-Features noch nicht geladen sind, ist `features.serverData`
+  // vorläufig `false` (Default) — ohne dieses Flag würde der Downgrade-Effekt unten ein
+  // persistiertes 'investigate-estate' bei jedem Start fälschlich zurückstufen, bevor der
+  // Feature-Fetch überhaupt geantwortet hat.
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [accessState, setAccessState] = useState<{ key: string; value?: UserAccess; error?: string } | null>(null);
   const [accessReload, setAccessReload] = useState(0);
   const accessKey = JSON.stringify([baseUrl, apiToken]);
@@ -181,12 +200,23 @@ export function App(props: { dashboard: Dashboard }) {
     if (!authReady) return;
     let cancelled = false;
     void fetchFeatures(baseUrl, apiToken || undefined).then((next) => {
-      if (!cancelled) setFeatures(next);
+      if (!cancelled) {
+        setFeatures(next);
+        setFeaturesLoaded(true);
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [baseUrl, apiToken, authReady, access?.tableauApi]);
+
+  // Umgebungsweite Untersuchung (W7) braucht features.serverData — fällt die
+  // Freigabe/Lizenz zwischen Sitzungen weg, aber ein alter localStorage-Wert
+  // steht noch auf 'investigate-estate', sonst würde jede Runde serverseitig
+  // zurückgestuft, ohne dass die Umschalter-UI das je anzeigt.
+  useEffect(() => {
+    if (featuresLoaded && mode === 'investigate-estate' && !features.serverData) setMode('investigate');
+  }, [mode, features.serverData, featuresLoaded, setMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,8 +426,8 @@ export function App(props: { dashboard: Dashboard }) {
             dashboardKey: dashboardKey || undefined,
             mode,
             getContext,
-            executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field'].includes(call.function.name)
-              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined })
+            executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field', 'tableau_view_data', 'propose_watch_rule'].includes(call.function.name)
+              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined, consent: consentGateRef.current })
               : call.function.name.startsWith('mcp__')
                 ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
                 : executeToolCall(call, dashboard, { baseUrl, apiToken: apiToken || undefined }),
@@ -494,6 +524,25 @@ export function App(props: { dashboard: Dashboard }) {
     },
     [busy, dashboard, baseUrl, apiToken, features.actions],
   );
+
+  // OpenViz Watch (W6): „AI proposes, human approves" — legt die Regel erst
+  // nach explizitem Klick auf die Bestätigungskarte an (WatchProposalCard).
+  // Erfolg entfernt die Karte (dispatch) und zeigt eine Notice; ein Fehler
+  // bleibt in der Karte selbst sichtbar (siehe deren Rückgabewert).
+  const onCreateWatchRule = useCallback(
+    async (proposal: WatchRuleProposal, itemId: number) => {
+      const result = await createWatchRule(baseUrl, apiToken || undefined, proposal, consentGateRef.current);
+      if (!result.ok) return { ok: false, message: result.message };
+      dispatch({ type: 'watch-proposal-handled', id: itemId });
+      dispatch({ type: 'notice', text: t('watch.proposal.created') });
+      return { ok: true };
+    },
+    [baseUrl, apiToken],
+  );
+
+  const onDiscardWatchProposal = useCallback((itemId: number) => {
+    dispatch({ type: 'watch-proposal-handled', id: itemId });
+  }, []);
 
   // Vorschlagsfragen für den leeren Zustand — client-seitig, ohne LLM-Call.
   // Reihenfolge: vom User gespeicherte Standardfragen (★-Präfix), dann die
@@ -736,6 +785,11 @@ export function App(props: { dashboard: Dashboard }) {
             onSend={send}
             onAction={runDashboardAction}
             onSaveStandard={onSaveStandard}
+            watch={
+              features.watch
+                ? { signedInEmail: authSession?.user.email, onCreate: onCreateWatchRule, onDiscard: onDiscardWatchProposal }
+                : undefined
+            }
           />
           {selectionIn && !busy && (
             // Der Anwender hat im Dashboard etwas markiert. Statt still
@@ -764,11 +818,26 @@ export function App(props: { dashboard: Dashboard }) {
             commands={commands}
             mode={mode}
             onModeChange={setMode}
+            serverDataAvailable={features.serverData}
             onSend={send}
             onStop={stop}
           />
         </>
       )}
+      <ServerDataConsentDialog
+        open={consentPrompt !== null}
+        message={consentPrompt?.message ?? ''}
+        onAccept={() => {
+          const resolve = consentPrompt?.resolve;
+          setConsentPrompt(null);
+          resolve?.(true);
+        }}
+        onDecline={() => {
+          const resolve = consentPrompt?.resolve;
+          setConsentPrompt(null);
+          resolve?.(false);
+        }}
+      />
     </div>
   );
 }

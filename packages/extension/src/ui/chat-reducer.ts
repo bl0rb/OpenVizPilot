@@ -1,4 +1,5 @@
 import { t, type Suggestions } from '@openvizpilot/shared';
+import { parseWatchProposal } from '@openvizpilot/ee/extension';
 import type { ChatItem } from './items';
 
 // Ausgelagert aus App.tsx, damit der Chatverlauf-Reducer ohne Tableau-/DOM-
@@ -23,7 +24,9 @@ export type Action =
   | { type: 'notice'; text: string }
   | { type: 'error'; text: string; retryable: boolean }
   | { type: 'done' }
-  | { type: 'clear' };
+  | { type: 'clear' }
+  /** OpenViz Watch (W6): die Bestätigungskarte einer Assistant-Message wurde angelegt oder verworfen — entfernt sie. */
+  | { type: 'watch-proposal-handled'; id: number };
 
 export function reducer(items: ChatItem[], action: Action): ChatItem[] {
   switch (action.type) {
@@ -78,6 +81,7 @@ export function reducer(items: ChatItem[], action: Action): ChatItem[] {
             text: action.text,
             streaming: false,
             verifiedMetrics: verifiedMetrics.length > 0 ? verifiedMetrics : undefined,
+            watchProposal: watchProposalSince(withoutRetrying),
           };
           return updated;
         }
@@ -127,6 +131,8 @@ export function reducer(items: ChatItem[], action: Action): ChatItem[] {
       return finalizeStreaming(items);
     case 'clear':
       return [];
+    case 'watch-proposal-handled':
+      return items.map((i) => (i.kind === 'assistant' && i.id === action.id ? { ...i, watchProposal: undefined } : i));
   }
 }
 
@@ -158,4 +164,31 @@ function verifiedMetricsSince(items: ChatItem[]): string[] {
     if (name && name !== 'none' && !names.includes(name)) names.push(name);
   }
   return names;
+}
+
+/**
+ * OpenViz Watch (W6): der zuletzt vorgeschlagene Vorschlag aus einem
+ * abgeschlossenen `propose_watch_rule`-Aufruf seit der letzten User-Frage —
+ * dieselbe deterministische Ableitung aus dem Tool-Ergebnis wie bei den
+ * verifizierten Kennzahlen oben. `parseWatchProposal` liefert `null` bei
+ * einem unerwarteten/verstümmelten Ergebnis (z. B. wegen der
+ * Vorschau-Kappung auf 1500 Zeichen im Agenten-Loop) — dann bleibt die Karte
+ * einfach aus, statt mit falschen Werten zu erscheinen.
+ */
+function watchProposalSince(items: ChatItem[]) {
+  let start = 0;
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]?.kind === 'user') {
+      start = i;
+      break;
+    }
+  }
+  let found: ReturnType<typeof parseWatchProposal> | undefined;
+  for (let i = start; i < items.length; i++) {
+    const it = items[i];
+    if (it?.kind !== 'tool' || it.name !== 'propose_watch_rule' || it.status !== 'done' || !it.preview) continue;
+    const proposal = parseWatchProposal(it.preview);
+    if (proposal) found = proposal;
+  }
+  return found ?? undefined;
 }

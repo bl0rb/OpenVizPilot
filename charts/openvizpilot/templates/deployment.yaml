@@ -158,6 +158,21 @@ spec:
                   name: {{ . }}
                   key: {{ $.Values.app.secretKeySecret.key }}
             {{- end }}
+            {{- if not .Values.app.watchEnabled }}
+            - name: OVP_WATCH_ENABLED
+              value: "false"
+            {{- end }}
+            {{- with .Values.smtp.urlSecret.existingSecret }}
+            - name: OVP_SMTP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.smtp.urlSecret.key }}
+            {{- end }}
+            {{- with .Values.smtp.from }}
+            - name: OVP_SMTP_FROM
+              value: {{ . | quote }}
+            {{- end }}
             {{- range .Values.tableau.secretRefs }}
             {{- if not (regexMatch "^OVP_TABLEAU_[A-Z0-9_]+$" .env) }}
             {{- fail "Tableau secretRefs.env muss mit OVP_TABLEAU_ beginnen und nur A-Z, 0-9, _ enthalten" }}

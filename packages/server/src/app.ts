@@ -20,6 +20,8 @@ import {
   createTableauRoute,
   createTableauEasRoute,
   EAS_PATH,
+  WatchEngine,
+  createWatchRoute,
 } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -91,13 +93,31 @@ export function createApp(config: AppConfig): {
     const state = await authState.get();
     return {
       licensed: hasFeature(state.license, 'tableauServer') && hasFeature(state.license, 'sso'),
+      // W5: serverseitiger Datenzugriff braucht zusätzlich das Feature `serverData` — geprüft in TableauService.viewData.
+      serverDataLicensed: hasFeature(state.license, 'serverData') && hasFeature(state.license, 'tableauServer') && hasFeature(state.license, 'sso'),
       oidcReady: state.mode === 'oidc' && Boolean(state.oidc) && !state.blockedReason,
       issuer: state.oidcSettings?.issuer ?? null,
       identityRevision: createHash('sha256').update(JSON.stringify([state.mode, state.oidcSettings])).digest('hex'),
       // Grundlage der EAS-Issuer-URL im oauth2-trust-Modus — dieselbe Public URL wie für die SSO-Redirect-URI.
       publicUrl: state.publicUrl,
     };
-  }, logger, () => backend.store.getUsageSalt()) : null;
+  }, logger, () => backend.store.getUsageSalt(), { audit: backend.serverDataAudit }) : null;
+
+  /**
+   * Watch (W6, ee/): wertet Beobachtungsregeln nach Zeitplan im Namen der jeweiligen
+   * Person aus (derselbe Lesepfad wie `tableau.viewData`) und stellt Alerts zu. Läuft
+   * nur mit Datenbank UND Tableau-Integration; `start()` nur mit Lizenz `watch` und
+   * `OVP_WATCH_ENABLED` (Default an) — die Engine selbst prüft Lizenz/Freigabe/
+   * Einwilligung erneut bei jedem Lauf.
+   */
+  const watchEngine = backend && tableau
+    ? new WatchEngine({ store: backend.watch, tableau, users: memoryStore!, hasFeature: licensedFeature, logger })
+    : null;
+  if (watchEngine) {
+    void authState.get().then((state) => {
+      if (config.watchEnabled && hasFeature(state.license, 'watch')) watchEngine.start();
+    });
+  }
 
   /**
    * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft, und
@@ -237,7 +257,14 @@ export function createApp(config: AppConfig): {
   // Sitzungs-Check der Extension beim Start: läuft durch den Guard oben, liefert
   // also 401, wenn das gespeicherte Token (nach Moduswechsel, Ablauf, Sperre)
   // nicht mehr gilt — die Extension zeigt dann sofort das Login-Gate.
-  app.get('/api/session', (c) => c.json({ user: c.get('authUser') ?? null, access: c.get('userAccess') }));
+  app.get('/api/session', (c) => {
+    // Nur die Freigabe-Flags nach außen — `consent` hält Store-Funktionen, `id` ist intern.
+    const access = c.get('userAccess');
+    return c.json({
+      user: c.get('authUser') ?? null,
+      access: { ai: Boolean(access?.ai), tableauApi: Boolean(access?.tableauApi), serverData: Boolean(access?.serverData) },
+    });
+  });
 
   // Welche Enterprise-Funktionen die Lizenz gerade freischaltet — die Extension
   // blendet danach Memory- und Abfragen-Bereiche ein oder aus, statt sie
@@ -246,7 +273,11 @@ export function createApp(config: AppConfig): {
     const { license } = await authState.get();
     return c.json({
       features: Object.fromEntries(EE_FEATURES.map((feature) => [feature, hasFeature(license, feature)
-        && (feature === 'tableauServer' ? Boolean(c.get('userAccess')?.tableauApi) : Boolean(c.get('userAccess')?.ai))])),
+        && (feature === 'tableauServer' ? Boolean(c.get('userAccess')?.tableauApi)
+          : feature === 'serverData' ? Boolean(c.get('userAccess')?.serverData)
+          // Watch braucht zusätzlich serverData (Lizenz UND Freigabe der Person) — dieselbe Gate wie beim Chat-Tool.
+          : feature === 'watch' ? Boolean(c.get('userAccess')?.serverData) && hasFeature(license, 'serverData')
+          : Boolean(c.get('userAccess')?.ai))])),
     });
   });
 
@@ -255,6 +286,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature, mcp, tableau));
   app.route('/api/mcp', createMcpRoute(mcp, logger, licensedFeature));
   app.route('/api/tableau-server', createTableauRoute(tableau));
+  app.route('/api/watch', createWatchRoute({ store: backend?.watch ?? null, engine: watchEngine, tableau, hasFeature: licensedFeature, logger }));
   // Personalisierung (User-Memory, eigene Abfragen) liegt in ee/ und ist
   // lizenzpflichtig — der Pfad bleibt /api/memory, damit ältere Extensions
   // weiter funktionieren.
@@ -263,7 +295,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/metrics', createMetricsRoute(memoryStore, logger));
   app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau, refreshLease));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau, backend?.watch ?? null, refreshLease));
 
   // Admin-UI: erreichbar mit statischem OVP_ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert
@@ -276,5 +308,5 @@ export function createApp(config: AppConfig): {
     app.use('*', serveStatic({ root: config.serveStaticDir }));
   }
 
-  return { app, logger, memoryStore, authState, telemetryStore, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); } };
+  return { app, logger, memoryStore, authState, telemetryStore, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); watchEngine?.stop(); } };
 }

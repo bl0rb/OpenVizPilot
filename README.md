@@ -67,11 +67,13 @@ Everything below happens inside the open dashboard, in the viewer's own Tableau 
 | “What does ‘Order details’ show?” | If Tableau reports that view's zone as hidden, the assistant says so instead of describing something the user cannot see — and offers to show it as a chip. |
 | “Where does this number come from?” or `/lineage Revenue` | Answers with a fixed provenance chain: dashboard → worksheet → field (formula if Tableau Server metadata is available) → catalogue definition → data source and connection → upstream tables → active filters and parameters → certification status. Nothing is invented: what the APIs do not provide is marked “not available”. No server addresses leave the browser. |
 | Switch the composer to **Investigate** and ask “Why did margin drop in the South?” | The assistant first writes a 3–6 step analysis plan, works through it with more tool rounds (`breakdown_by` for shares and concentration, `compare_periods` for period-over-period differences, aggregations), and closes with **Main cause**, **Evidence** and **Sources** — every claim backed by a tool result shown in the trail. |
+| “Why is our revenue dropping? — across all workbooks” | With an Enterprise license (`serverData`) and scope switched to **Entire Tableau environment**, the assistant searches other workbooks/views (`tableau_server_search`), reads at most 5 of them server-side on the user's behalf, prefers a server-side aggregation over raw rows, and closes with **Main cause**, **Evidence** and **Sources** (workbook · view · link per source). Without the license or the per-person grant it explains that plainly and investigates only the open dashboard instead. |
 | “What does contribution margin II mean?” | Answers from the glossary the workbook author maintains — house definitions instead of textbook knowledge. |
 | “How high is our DB II?” | If the admin maintains the metric in the company-wide catalogue (`/admin` → “Kennzahlen”: definition, synonyms, owner, data source, verified questions), the assistant looks it up before answering and the answer carries a “✓ Verified definition: Deckungsbeitrag II” note — shown only when the lookup actually happened. |
 | `/exec-brief for the board` | Produces a management summary with a fixed structure: key statements, main metrics with change, anomalies, up to three recommendations, data basis (worksheets, filters, as-of). Every answer can be downloaded as Markdown. |
 | `/` in the input box | Opens the playbook menu: summary, findings, comparison, top-N, recommendations, report, data quality — admins can replace them and add their own per dashboard. |
 | “Remember: numbers should always be presented as a table.” | With an Enterprise license and Tableau 2023.2 or newer, remembers the preference for this user; every stored fact stays visible and deletable in the settings panel. |
+| “Let me know when margin drops below 20%.” | With an Enterprise license (`watch`, needs `serverData`), proposes a rule as a confirmation card (view, threshold, schedule, delivery channel) — nothing is created until the user confirms it. Once running, the middleware re-checks every guardrail on each evaluation and delivers a short message (webhook, Microsoft Teams or email) only on a state change. |
 | “Write me a poem about cats.” | Declined with a short fixed message. The assistant answers dashboard questions only — the scope guard runs server-side, before the model sees the question. |
 
 Every answer keeps its analysis trail: which tools ran on which worksheet, expandable down to the raw tool result — so a figure can be traced instead of believed.
@@ -112,7 +114,7 @@ Saved queries are the second half: the answer focus a user picks for a dashboard
 
 ## Data isolation
 
-Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application.
+Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application. Planned Watch/Cross-Dashboard functionality needs its own explicit opt-in (site switch, per-person grant, user consent — see [docs/admin-deployment.md](docs/admin-deployment.md#serverseitiger-datenzugriff-tableau-views-außerhalb-des-dashboards)) for a bounded serverside read of another view's summary data; without it, everything stays in the browser as described above.
 
 ## Packages
 
@@ -151,7 +153,7 @@ The middleware runs stateless on EKS and scales horizontally (HPA) and verticall
 helm install openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot -f my-values.yaml
 ```
 
-Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). Release images are signed keyless with Sigstore cosign (GitHub OIDC) and carry an SPDX SBOM attestation, so you can check that an image was built by this repository's release workflow before deploying it:
+Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). Release images are signed keyless with Sigstore cosign (GitHub OIDC) and carry an SPDX SBOM attestation (signature and attestation are stored as Sigstore bundles next to the image, so use cosign 3.x), so you can check that an image was built by this repository's release workflow before deploying it:
 
 ```bash
 cosign verify ghcr.io/bl0rb/openvizpilot:1.4.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/bl0rb/OpenVizPilot/'
@@ -180,6 +182,7 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_LICENSE` | `license.{existingSecret,key}` | Enterprise | Signed licence key |
 | `OVP_DATABASE_URL` | `memory.database.external.{existingSecret,key}` | `memory.database.mode=external` | Postgres URI (`postgresql://user:pass@host:5432/db`); with `mode=cnpg` the operator's `<release>-db-app`/`uri` is used |
 | `OVP_SECRET_KEY` | `app.secretKeySecret.{existingSecret,key}` | secrets entered in the admin UI | ≥ 32 characters (`openssl rand -hex 32`); encrypts Tableau Connected-App secrets at rest (AES-256-GCM) |
+| `OVP_SMTP_URL` | `smtp.urlSecret.{existingSecret,key}` | Watch email channel | SMTP URL for Watch alert emails, e.g. `smtps://user:pass@mail.example.com:465` |
 | `OVP_TABLEAU_<NAME>` | `tableau.secretRefs[]` (`env`, `secretName`, `key`) | env-referenced site secrets | Connected-App secret per Tableau site, referenced by name in the admin UI instead of storing it in the DB |
 | `OVP_MCP_<NAME>` | `mcp.secretRefs[]` (`env`, `secretName`, `key`) | MCP servers with tokens | Bearer token per MCP server, referenced by name in the admin UI |
 | registry pull credentials | `imagePullSecrets` (list of `{ name }`) | `image.edition=enterprise` | `kubernetes.io/dockerconfigjson` secret with the customer's GHCR read token for the private `ghcr.io/bl0rb/openvizpilot-enterprise` package (`kubectl create secret docker-registry …`, see [docs/enterprise.md](docs/enterprise.md)) |
@@ -194,6 +197,8 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_ENVIRONMENT` | `app.environment` | `production` (default) \| `development` \| `test` \| `staging` — counted during licence activation |
 | `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
 | `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
+| `OVP_SMTP_FROM` | `smtp.from` | Sender address for Watch alert emails (Enterprise) |
+| `OVP_WATCH_ENABLED` | `app.watchEnabled` | Global switch for the Watch engine (default on; Enterprise) |
 | `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
 | `OVP_SCOPE_GUARD`, `OVP_SCOPE_MODEL` | `app.scopeGuard`, `app.scopeModel` | Off-topic guard and its model |
 | `OVP_LOG_LEVEL`, `PORT` | `app.logLevel`, `containerPort` | Logging and container port |

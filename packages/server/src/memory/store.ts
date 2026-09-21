@@ -15,6 +15,12 @@ import {
   createPgTableauStore,
   createSqliteTableauStore,
   type TableauStore,
+  createPgServerDataAuditStore,
+  createSqliteServerDataAuditStore,
+  type ServerDataAuditStore,
+  createPgWatchStore,
+  createSqliteWatchStore,
+  type WatchStore,
 } from '@openvizpilot/ee/server';
 import { createPgMemoryStore, openPgPool } from './pg-store';
 import { createSqliteMemoryStore, openSqliteDatabase } from './sqlite-store';
@@ -73,10 +79,17 @@ export interface UserAccess extends UserAccessIdentity {
   tableauApi: boolean;
   /** Delegierter Admin: darf /admin bedienen, aber die Admin-Rolle nicht vergeben. */
   admin: boolean;
+  /**
+   * Freigabe „Serverdaten" (W5): erlaubt der Middleware, im Namen dieser
+   * Person Summary-Daten von Tableau-Views serverseitig zu lesen — setzt
+   * zusätzlich den Site-Schalter und die Einwilligung der Person voraus.
+   * Jeder Admin darf dies setzen (anders als `admin`).
+   */
+  serverData: boolean;
 }
 
-/** `admin` weglassen = unverändert lassen (delegierte Admins dürfen es nie setzen). */
-export type UserAccessGrants = { ai: boolean; tableauApi: boolean; admin?: boolean };
+/** `admin`/`serverData` weglassen = unverändert lassen (die Admin-Route sendet `serverData` trotzdem immer). */
+export type UserAccessGrants = { ai: boolean; tableauApi: boolean; serverData?: boolean; admin?: boolean };
 
 export function userAccessId(identity: Pick<UserAccessIdentity, 'provider' | 'issuer' | 'subject'>): string {
   return createHash('sha256').update(JSON.stringify([identity.provider, identity.issuer, identity.subject])).digest('hex');
@@ -190,6 +203,10 @@ export interface MemoryStore {
   getUserAccess(id: string): Promise<UserAccess | null>;
   listUserAccess(): Promise<UserAccess[]>;
   setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean>;
+  /** Zeitpunkt der Einwilligung zur serverseitigen Datenabfrage (W5) — null, wenn nie erteilt oder widerrufen. */
+  getServerDataConsent(id: string): Promise<Date | null>;
+  /** Speichert die Einwilligung. Widerruf (Freigabe abschalten) läuft über `setUserAccess`, nicht hierüber. */
+  setServerDataConsent(id: string, at: Date): Promise<void>;
   // --- Admin-Einstellungen: Anmeldung/OIDC/Lizenz (überschreiben Env) ---
   getAuthSettings(): Promise<AuthSettings | null>;
   setAuthSettings(settings: AuthSettings | null): Promise<void>;
@@ -210,6 +227,10 @@ export interface MemoryBackend {
   personalization: PersonalizationStore;
   /** Zustand des Lizenz-Heartbeats (ee/), ebenfalls auf derselben Verbindung. */
   telemetry: TelemetryStore;
+  /** Audit-Log des serverseitigen Datenzugriffs (W5, ee/) — an TableauService (Option `audit`) übergeben. */
+  serverDataAudit: ServerDataAuditStore;
+  /** Beobachtungsregeln von Watch (W6, ee/), ebenfalls auf derselben Verbindung. */
+  watch: WatchStore;
   /**
    * Schließt die gemeinsame Verbindung — danach sind BEIDE Stores tot. Der
    * einzige richtige Weg, das Backend zu beenden; `store.close()` direkt
@@ -228,24 +249,31 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
   if (config.memoryDatabaseUrl) {
     const pool = openPgPool(config.memoryDatabaseUrl);
     const store = createPgMemoryStore(pool, logger);
+    const telemetry = createPgTelemetryStore(pool, logger);
     return {
       store,
       mcp: createPgMcpStore(pool),
       tableau: createPgTableauStore(pool),
       personalization: createPgPersonalizationStore(pool, logger),
-      telemetry: createPgTelemetryStore(pool, logger),
+      telemetry,
+      // Installations-ID (Pseudonym-Grundlage) kommt vom Telemetry-Store — dieselbe Verbindung.
+      serverDataAudit: createPgServerDataAuditStore(pool, telemetry, logger),
+      watch: createPgWatchStore(pool, logger),
       close: () => store.close(),
     };
   }
   if (config.memoryDbPath) {
     const db = openSqliteDatabase(config.memoryDbPath);
     const store = createSqliteMemoryStore(db, logger);
+    const telemetry = createSqliteTelemetryStore(db);
     return {
       store,
       mcp: createSqliteMcpStore(db),
       tableau: createSqliteTableauStore(db),
       personalization: createSqlitePersonalizationStore(db),
-      telemetry: createSqliteTelemetryStore(db),
+      telemetry,
+      serverDataAudit: createSqliteServerDataAuditStore(db, telemetry),
+      watch: createSqliteWatchStore(db),
       close: () => store.close(),
     };
   }

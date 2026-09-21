@@ -49,6 +49,7 @@ type UserAccessRow = {
   ai: boolean;
   tableau_api: boolean;
   admin: boolean;
+  server_data: boolean;
 };
 
 function toUserAccess(row: UserAccessRow): UserAccess {
@@ -62,6 +63,7 @@ function toUserAccess(row: UserAccessRow): UserAccess {
     ai: Boolean(row.ai),
     tableauApi: Boolean(row.tableau_api),
     admin: Boolean(row.admin),
+    serverData: Boolean(row.server_data),
   };
 }
 
@@ -142,9 +144,13 @@ const SCHEMA_SQL = `
     ai BOOLEAN NOT NULL DEFAULT false,
     tableau_api BOOLEAN NOT NULL DEFAULT false,
     admin BOOLEAN NOT NULL DEFAULT false,
+    server_data BOOLEAN NOT NULL DEFAULT false,
+    server_data_consent_at TIMESTAMPTZ,
     UNIQUE (provider, issuer, subject)
   );
   ALTER TABLE user_access ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE user_access ADD COLUMN IF NOT EXISTS server_data BOOLEAN NOT NULL DEFAULT false;
+  ALTER TABLE user_access ADD COLUMN IF NOT EXISTS server_data_consent_at TIMESTAMPTZ;
   CREATE TABLE IF NOT EXISTS user_sessions (
     token_hash TEXT PRIMARY KEY,
     username TEXT NOT NULL,
@@ -544,7 +550,7 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
            INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
            SELECT $4, $5, $6, $1, $2, $7
            FROM inserted_user
-           ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email, ai = FALSE, tableau_api = FALSE
+           ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email, ai = FALSE, tableau_api = FALSE, server_data = FALSE, server_data_consent_at = NULL
            RETURNING id`,
           [username, displayName, passwordHash, id, identity.provider, identity.issuer, identity.email],
         );
@@ -605,26 +611,46 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
          ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email`,
         [id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email],
       );
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = $1', [id]);
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = $1', [id]);
       return toUserAccess(result.rows[0] as UserAccessRow);
     },
 
     async getUserAccess(id: string): Promise<UserAccess | null> {
       await ensureSchema();
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access WHERE id = $1', [id]);
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = $1', [id]);
       return result.rows[0] ? toUserAccess(result.rows[0] as UserAccessRow) : null;
     },
 
     async listUserAccess(): Promise<UserAccess[]> {
       await ensureSchema();
-      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin FROM user_access ORDER BY id');
+      const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access ORDER BY id');
       return (result.rows as UserAccessRow[]).map(toUserAccess);
     },
 
     async setUserAccess(id: string, grants: UserAccessGrants): Promise<boolean> {
       await ensureSchema();
-      const result = await pool.query('UPDATE user_access SET ai = $1, tableau_api = $2, admin = COALESCE($3::boolean, admin) WHERE id = $4', [grants.ai, grants.tableauApi, grants.admin ?? null, id]);
+      // `serverData` weggelassen = unverändert (wie `admin`); explizit auf false gesetzt löscht
+      // zusätzlich die Einwilligung — die Person muss nach einem Widerruf neu zustimmen.
+      const result = await pool.query(
+        `UPDATE user_access SET ai = $1, tableau_api = $2,
+         server_data = COALESCE($3::boolean, server_data),
+         server_data_consent_at = CASE WHEN $4 THEN NULL ELSE server_data_consent_at END,
+         admin = COALESCE($5::boolean, admin) WHERE id = $6`,
+        [grants.ai, grants.tableauApi, grants.serverData ?? null, grants.serverData === false, grants.admin ?? null, id],
+      );
       return (result.rowCount ?? 0) === 1;
+    },
+
+    async getServerDataConsent(id: string): Promise<Date | null> {
+      await ensureSchema();
+      const result = await pool.query('SELECT server_data_consent_at FROM user_access WHERE id = $1', [id]);
+      const at = (result.rows[0] as { server_data_consent_at: Date | string | null } | undefined)?.server_data_consent_at;
+      return at ? new Date(at) : null;
+    },
+
+    async setServerDataConsent(id: string, at: Date): Promise<void> {
+      await ensureSchema();
+      await pool.query('UPDATE user_access SET server_data_consent_at = $1 WHERE id = $2', [at.toISOString(), id]);
     },
 
     async registerFailedUserLogin(username: string, nowMs: number, windowMs: number): Promise<number> {

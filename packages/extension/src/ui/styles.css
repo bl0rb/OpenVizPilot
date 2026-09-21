@@ -706,6 +706,66 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* OpenViz Watch (W6): Bestätigungskarte für propose_watch_rule (im Chat, unter
+   der Assistant-Bubble) — Formularlayout analog zu .settings-panel. */
+.watch-proposal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #d5d9dd;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fafbfc;
+  font-size: 12px;
+  max-width: 92%;
+}
+
+.watch-proposal-card h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.watch-proposal-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.watch-proposal-card input,
+.watch-proposal-card select {
+  font: inherit;
+  font-weight: 400;
+  padding: 5px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.watch-rule-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.watch-rule-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f7f7f7;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.watch-rule-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
 /* Enterprise: Login-Gate (OIDC) */
 .login-panel {
   padding: 24px 16px;
@@ -763,4 +823,43 @@ body {
 .selection-hint .chip {
   flex: 1 1 auto;
   text-align: left;
+}
+
+/* Enterprise: Einwilligung „Serverseitiger Datenzugriff" (W5, tableau_view_data) */
+.server-data-consent {
+  max-width: 320px;
+  border: none;
+  border-radius: 8px;
+  padding: 16px;
+  font: inherit;
+  color: inherit;
+}
+.server-data-consent::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.server-data-consent h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.server-data-consent p {
+  margin: 0 0 14px;
+  white-space: pre-wrap;
+}
+.server-data-consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.server-data-consent-actions button {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #dde1e6;
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+.server-data-consent-actions button:first-child {
+  border-color: var(--accent, #1a699e);
+  background: var(--accent, #1a699e);
+  color: #fff;
 }

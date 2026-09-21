@@ -105,6 +105,105 @@ export async function executeMcpTool(_input: {
 }
 
 /** Der Tableau-Server-Connector ist eine Enterprise-Funktion — kein Aufruf an die Middleware. */
-export async function executeTableauTool(_input: { call: unknown; baseUrl: string; apiToken?: string; dashboardKey?: string; signal?: AbortSignal }): Promise<string> {
+export async function executeTableauTool(_input: { call: unknown; baseUrl: string; apiToken?: string; dashboardKey?: string; signal?: AbortSignal; consent?: ServerDataConsentGate }): Promise<string> {
   return 'Nicht verfügbar in der Core-Edition.';
+}
+
+/** Einwilligung „Serverseitiger Datenzugriff“ (W5) — in der Core-Edition gibt es keinen serverseitigen Datenzugriff. */
+export interface ServerDataConsentGate {
+  requestConsent(input: { message: string; baseUrl: string; apiToken?: string; fetchImpl?: typeof fetch }): Promise<boolean>;
+}
+
+export function createServerDataConsentGate(_showDialog: (message: string) => Promise<boolean>): ServerDataConsentGate {
+  return { async requestConsent() { return false; } };
+}
+
+export function ServerDataConsentDialog(_props: { open: boolean; message: string; onAccept: () => void; onDecline: () => void }) {
+  return null;
+}
+
+// ------------------------------------------------------------ OpenViz Watch (W6)
+// Beobachtungsregeln sind eine Enterprise-Funktion — Typen wie ee/extension/src/watch/types.ts,
+// Komponenten zeigen nichts, der Client legt nichts an.
+
+export interface WatchMeasure { column: string; aggregate: 'sum' | 'avg' | 'min' | 'max' | 'count' | 'last' }
+export interface WatchFilter { column: string; equals: string }
+export interface WatchCondition { type: 'below' | 'above' | 'change_pct'; threshold: number; window?: 'previous_run' }
+export interface WatchSchedule { every: '15m' | '1h' | '6h' | '24h' | 'weekly'; weekday?: number; hour?: number; timezone: string }
+export interface WatchChannel { type: 'webhook' | 'teams' | 'email'; target: string }
+export interface WatchRuleProposal {
+  name: string;
+  siteId?: string;
+  dashboardKey?: string;
+  viewId: string;
+  viewName: string;
+  viewUrl?: string;
+  measure: WatchMeasure;
+  filter?: WatchFilter;
+  condition: WatchCondition;
+  schedule: WatchSchedule;
+  channel: WatchChannel;
+}
+export interface WatchRuleState {
+  lastRunAt?: string | null;
+  lastValue?: number | null;
+  breached: boolean;
+  lastAlertAt?: string | null;
+  lastError?: string | null;
+  consecutiveErrors: number;
+  disabledReason?: string | null;
+}
+export interface WatchRule extends WatchRuleProposal {
+  id: string;
+  ownerId: string;
+  ownerUsername: string;
+  ownerEmail?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  state: WatchRuleState;
+}
+export type CreateWatchRuleResult = { ok: true; rule: WatchRule } | { ok: false; code?: string; message: string };
+export interface WatchTestResult { value?: number; breached?: boolean; error?: string }
+
+/** Ohne Lizenz gibt es kein Tool-Ergebnis `propose_watch_rule` — es entsteht nie eine Karte. */
+export function parseWatchProposal(_raw: string): WatchRuleProposal | null {
+  return null;
+}
+
+export function withDefaultChannelTarget(proposal: WatchRuleProposal, _signedInEmail?: string): WatchRuleProposal {
+  return proposal;
+}
+
+export function WatchProposalCard(_props: {
+  proposal: WatchRuleProposal;
+  signedInEmail?: string;
+  onCreate: (proposal: WatchRuleProposal) => Promise<{ ok: boolean; message?: string }>;
+  onDismiss: () => void;
+}) {
+  return null;
+}
+
+export function WatchSettingsPanel(_props: { backendUrl: string; apiToken: string }) {
+  return null;
+}
+
+export async function createWatchRule(_baseUrl: string, _apiToken: string | undefined, _proposal: WatchRuleProposal, _consent?: ServerDataConsentGate): Promise<CreateWatchRuleResult> {
+  return { ok: false, message: 'Nicht verfügbar in der Core-Edition.' };
+}
+
+export async function listWatchRules(_baseUrl: string, _apiToken: string | undefined): Promise<WatchRule[]> {
+  return [];
+}
+
+export async function updateWatchRule(_baseUrl: string, _apiToken: string | undefined, _id: string, _patch: { enabled: boolean }): Promise<WatchRule> {
+  throw new Error('Nicht verfügbar in der Core-Edition.');
+}
+
+export async function deleteWatchRule(_baseUrl: string, _apiToken: string | undefined, _id: string): Promise<void> {
+  /* no-op */
+}
+
+export async function testWatchRule(_baseUrl: string, _apiToken: string | undefined, _id: string): Promise<WatchTestResult> {
+  return { error: 'Nicht verfügbar in der Core-Edition.' };
 }

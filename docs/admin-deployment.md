@@ -76,6 +76,52 @@ Test: `https://chat.example.com/healthz` → `{"ok":true}`; `https://chat.exampl
 - **Vertrauensgrenze**: In den Modi `none` und `token` ist die Nutzer-ID client-asserted (Header/Request-Feld). Innerhalb des per `OVP_API_AUTH_TOKEN`/Netzwerk geschützten Kreises könnte ein technisch versierter Nutzer dann eine fremde ID angeben und deren *Personalisierungs-Fakten* lesen oder löschen — **nicht** deren Dashboard-Daten (die holt weiterhin nur der jeweilige Browser in der eigenen Tableau-Session). In den Modi `local` und `oidc` ersetzt die verifizierte Anmeldung die client-asserted ID für Memory, Präferenzen und Statistik; die Enterprise-Funktionen Memory und gespeicherte Abfragen sind dann an die angemeldete Identität gebunden.
 - Backups/Retention der Memory-Datenbank nach euren Datenschutz-Vorgaben konfigurieren (CNPG `backup`-Spec bzw. RDS-Policies).
 
+## Serverseitiger Datenzugriff (Tableau-Views außerhalb des Dashboards)
+
+> **Enterprise:** Lizenz-Feature `serverData`, zusätzlich zu `tableauServer` und `sso` (siehe
+> [docs/enterprise.md](enterprise.md)). Grundlage für Watch (siehe unten) und künftige
+> Cross-Dashboard-Funktionen.
+
+Das Chat-Tool `tableau_view_data` liest Summary-Daten einer Tableau-View, die **nicht** im gerade
+geöffneten Dashboard liegt, serverseitig im Namen des angemeldeten Nutzers und mit dessen
+Tableau-Berechtigungen (Connected-App-JWT mit zusätzlichem Scope `tableau:views:download`). Anders
+als der übliche clientseitige Zugriff über die Extensions API prüft die Middleware dafür bei jeder
+Abfrage drei Hürden:
+
+1. **Site-Schalter** „Serverseitige Daten erlauben“ (Admin → Tableau Server → Site) — sonst bricht die Abfrage mit `server_data_disabled` ab.
+2. **Freigabe „Serverdaten“** je Person unter „Benutzerzugriff“ — sonst `server_data_not_granted`.
+3. **Einwilligung** der Person (einmalig, über die Extension) — fehlt sie, antwortet die Middleware mit `409 consent_required`.
+
+Details zu Tool, Endpunkten und Scope stehen in [tableau-server.md](tableau-server.md), zur
+Site-Einrichtung in [tableau-server-setup.md](tableau-server-setup.md). Gespeichert wird dabei
+**nichts** von den gelesenen Daten — nur ein Audit-Eintrag je Abfrage (Zeitpunkt, ein nicht
+umkehrbares Pseudonym, Site, View, Zeilenzahl, Dauer, Status), 90 Tage lang, einsehbar im Admin
+unter „Tableau Server“. Widerruf: Freigabe „Serverdaten“ abschalten löscht zusätzlich die
+gespeicherte Einwilligung — die Person muss danach erneut zustimmen.
+
+Die **umgebungsweite Untersuchung** (Untersuchen-Modus, Umfang „Gesamte Tableau-Umgebung“, W7)
+nutzt denselben Pfad und dieselben drei Hürden: das Modell darf dabei höchstens 5 Views pro Turn
+lesen, und die Route begrenzt zusätzlich auf höchstens 8 `tableau_view_data`-Aufrufe je Person und
+Dashboard innerhalb von 2 Minuten (`429 budget_exhausted`) — ein reiner Schutz vor Endlosschleifen
+des Modells, keine weitere Freigabe nötig. Ohne die Freigabe oder die Lizenz wird der Umfang
+serverseitig auf „Nur dieses Dashboard“ zurückgestuft; die Extension zeigt dazu einen Hinweis in der
+Antwort statt eines eigenen Fehlerdialogs.
+
+## Watch (Dashboards beobachten und melden)
+
+> **Enterprise:** Lizenz-Feature `watch`, zusätzlich zu `serverData`, `tableauServer` und `sso`
+> (siehe [docs/enterprise.md](enterprise.md)). Details zu Regeln, Zeitplänen, Kanälen und
+> Sicherheit stehen in [docs/watch.md](watch.md).
+
+Watch wertet Regeln nach Zeitplan im Namen des jeweiligen Nutzers aus (derselbe Pfad wie oben:
+alle Hürden bei jedem Lauf) und stellt bei einem Übergang in den Alarmzustand eine kurze Meldung
+per Webhook, Microsoft Teams oder E-Mail zu. Der globale Schalter ist per Default an
+(`OVP_WATCH_ENABLED`, zusätzlich zur Admin-Einstellung „Watch“ → „global an/aus“) und läuft nur
+mit Datenbank. Für den E-Mail-Kanal zusätzlich `OVP_SMTP_URL` (z. B.
+`smtps://user:pass@mail.example.com:465`) und `OVP_SMTP_FROM` setzen — im Helm-Chart über
+`smtp.urlSecret.{existingSecret,key}` und `smtp.from` (siehe Vault-Tabelle im README). Ohne SMTP
+bleiben Webhook und Microsoft Teams unverändert nutzbar.
+
 ## Schritt 2: Manifest erzeugen und verteilen
 
 **Empfohlener Weg — Download aus der Admin-UI** (kein Checkout nötig; setzt voraus, dass die Middleware die Extension-Statik ausliefert — im Container/Helm-Deployment immer der Fall, lokal nur mit `OVP_SERVE_STATIC_DIR` + gebauter Extension; die Admin-UI warnt sonst): Auf `https://<host>/admin` anmelden (Admin-Passwort bzw. `OVP_ADMIN_TOKEN` — siehe Abschnitt „Admin-UI“), im Abschnitt **„Extension für Tableau“** die öffentliche Extension-URL prüfen (vorbelegt mit dem aktuellen Host) und **„Manifest (.trex) herunterladen“** klicken. Die Middleware validiert die URL (HTTPS-Pflicht; Query/Fragment verboten) und liefert das fertige `openvizpilot.trex`. Da die Extension bei leerer Backend-URL automatisch mit **demselben Origin** spricht, aus dem sie geladen wurde, ist damit auch die Verbindung zur Middleware korrekt konfiguriert — nichts weiter einzutragen.

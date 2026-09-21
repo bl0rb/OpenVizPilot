@@ -14,7 +14,7 @@ import { createLogger } from '../src/logger';
 // Diese Legacy-Downstream-Tests nehmen einen bereits genehmigten AI-Zugriff an.
 vi.mock('../src/user-access', () => ({
   requireUserAccess: () => async (c: any, next: () => Promise<void>) => {
-    c.set('userAccess', { ai: true, tableauApi: false });
+    c.set('userAccess', { ai: true, tableauApi: false, serverData: false });
     await next();
   },
 }));
@@ -148,6 +148,9 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'test',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }
@@ -482,6 +485,8 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
         mcp: false,
         actions: false,
         tableauServer: false,
+        serverData: false,
+        watch: false,
       });
 
       // Lizenz ohne Aktivierung (noch nie eine Lease): nur Core.
@@ -496,6 +501,8 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
         mcp: false,
         actions: false,
         tableauServer: false,
+        serverData: false,
+        watch: false,
       });
 
       // Ohne "features"-Liste gilt der volle Umfang des Tiers.
@@ -507,6 +514,8 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
         mcp: true,
         actions: true,
         tableauServer: false, // The AI-only fixture has no separate Tableau API grant.
+        serverData: false, // Same fixture has no separate Serverdaten grant.
+        watch: false, // Needs serverData too, which this fixture also lacks.
       });
     });
 

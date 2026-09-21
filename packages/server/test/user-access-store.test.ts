@@ -61,6 +61,20 @@ describe('user access persistence', () => {
     expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false, admin: false })).toBe(true);
     expect((await store.getUserAccess(pending.id))?.admin).toBe(false);
 
+    // Serverdaten (W5): weglassen lässt unverändert, explizites false löscht die Einwilligung.
+    expect(await store.getServerDataConsent(pending.id)).toBeNull();
+    expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false, serverData: true })).toBe(true);
+    expect((await store.getUserAccess(pending.id))?.serverData).toBe(true);
+    const consentAt = new Date('2026-01-01T00:00:00.000Z');
+    await store.setServerDataConsent(pending.id, consentAt);
+    expect(await store.getServerDataConsent(pending.id)).toEqual(consentAt);
+    expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false })).toBe(true);
+    expect((await store.getUserAccess(pending.id))?.serverData).toBe(true); // weggelassen = unverändert
+    expect(await store.getServerDataConsent(pending.id)).toEqual(consentAt);
+    expect(await store.setUserAccess(pending.id, { ai: false, tableauApi: false, serverData: false })).toBe(true);
+    expect((await store.getUserAccess(pending.id))?.serverData).toBe(false);
+    expect(await store.getServerDataConsent(pending.id)).toBeNull(); // Widerruf löscht die Einwilligung
+
     expect((await store.ensureUserAccess(oidc)).id).not.toBe(pending.id);
     expect((await store.ensureUserAccess(otherIssuer)).id).not.toBe((await store.ensureUserAccess(oidc)).id);
     expect((await store.listUserAccess()).length).toBe(4);
@@ -97,13 +111,17 @@ describe('user access persistence', () => {
     const id = userAccessId({ provider: 'oidc', issuer: 'https://idp.example', subject: 'old' });
     db.prepare('INSERT INTO user_access (id, provider, issuer, subject, ai) VALUES (?, ?, ?, ?, 1)').run(id, 'oidc', 'https://idp.example', 'old');
     const store = createSqliteMemoryStore(db, logger);
-    expect(await store.getUserAccess(id)).toMatchObject({ ai: true, admin: false });
-    expect(await store.setUserAccess(id, { ai: true, tableauApi: false, admin: true })).toBe(true);
+    // Auch `server_data`/`server_data_consent_at` (W5) fehlten in dieser älteren Tabelle.
+    expect(await store.getUserAccess(id)).toMatchObject({ ai: true, admin: false, serverData: false });
+    expect(await store.getServerDataConsent(id)).toBeNull();
+    expect(await store.setUserAccess(id, { ai: true, tableauApi: false, admin: true, serverData: true })).toBe(true);
     expect((await store.getUserAccess(id))?.admin).toBe(true);
+    expect((await store.getUserAccess(id))?.serverData).toBe(true);
     await store.close();
     // Zweiter Start auf derselben Datei: die Nachziehung ist idempotent.
     const reopened = createSqliteMemoryStore(openSqliteDatabase(dbPath), logger);
     expect((await reopened.getUserAccess(id))?.admin).toBe(true);
+    expect((await reopened.getUserAccess(id))?.serverData).toBe(true);
     await reopened.close();
   });
 });

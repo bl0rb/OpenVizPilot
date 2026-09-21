@@ -14,7 +14,7 @@ import { createLogger } from '../src/logger';
 // Diese Legacy-Downstream-Tests nehmen einen bereits genehmigten AI-Zugriff an.
 vi.mock('../src/user-access', () => ({
   requireUserAccess: () => async (c: any, next: () => Promise<void>) => {
-    c.set('userAccess', { ai: true, tableauApi: false });
+    c.set('userAccess', { ai: true, tableauApi: false, serverData: false });
     await next();
   },
 }));
@@ -99,6 +99,9 @@ function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     appVersion: 'test',
     environment: 'test',
     licenseEnv: {},
+    smtpUrl: null,
+    smtpFrom: null,
+    watchEnabled: true,
     ...overrides,
   };
 }

@@ -106,6 +106,12 @@ const envSchema = z.object({
   OVP_ENVIRONMENT: emptyAsUnset(z.enum(OVP_ENVIRONMENTS).default('production')),
   /** Schlüssel für im Web gespeicherte Secrets (aktuell: Tableau Connected-App-Secrets), siehe ee/server/src/secrets.ts. Optional — ohne ihn bleiben nur Env-Secret-Referenzen nutzbar. */
   OVP_SECRET_KEY: emptyAsUnset(z.string().min(32, 'OVP_SECRET_KEY muss mindestens 32 Zeichen lang sein').optional()),
+  /** SMTP-URL für Watch-E-Mail-Alerts (z. B. smtps://user:pass@host:465), siehe ee/server/src/watch/delivery.ts. */
+  OVP_SMTP_URL: z.string().url().optional().or(z.literal('')),
+  /** Absenderadresse für Watch-E-Mail-Alerts. */
+  OVP_SMTP_FROM: z.string().optional(),
+  /** Globaler Schalter für die Watch-Engine (Default an) — zusätzlich zur Lizenz und zur Admin-Einstellung „global an/aus". */
+  OVP_WATCH_ENABLED: emptyAsUnset(z.enum(['true', 'false']).default('true')),
 });
 
 export interface AppConfig {
@@ -180,6 +186,12 @@ export interface AppConfig {
   licenseTrustedKeys?: Record<string, string>;
   /** Wie licenseTrustedKeys, für Leases (TRUSTED_LEASE_KEYS) — ausschließlich für Tests. */
   leaseTrustedKeys?: Record<string, string>;
+  /** SMTP-URL für Watch-E-Mail-Alerts (OVP_SMTP_URL); null = E-Mail-Kanal nicht konfiguriert. */
+  smtpUrl: string | null;
+  /** Absenderadresse für Watch-E-Mail-Alerts (OVP_SMTP_FROM). */
+  smtpFrom: string | null;
+  /** Globaler Schalter für die Watch-Engine (OVP_WATCH_ENABLED, Default an). */
+  watchEnabled: boolean;
 }
 
 function splitCsv(value: string | undefined): string[] {
@@ -270,5 +282,8 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
       OVP_LICENSE: e.OVP_LICENSE,
       OVP_LICENSE_PATH: e.OVP_LICENSE_PATH,
     },
+    smtpUrl: e.OVP_SMTP_URL?.trim() ? e.OVP_SMTP_URL.trim() : null,
+    smtpFrom: e.OVP_SMTP_FROM?.trim() ? e.OVP_SMTP_FROM.trim() : null,
+    watchEnabled: e.OVP_WATCH_ENABLED === 'true',
   };
 }

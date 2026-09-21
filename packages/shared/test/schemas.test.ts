@@ -88,9 +88,10 @@ describe('chatRequestSchema', () => {
     if (result.success) expect(result.data.mode).toBeUndefined();
   });
 
-  it('accepts mode "ask" and "investigate"', () => {
+  it('accepts mode "ask", "investigate" and "investigate-estate"', () => {
     expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'ask' }).success).toBe(true);
     expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'investigate' }).success).toBe(true);
+    expect(chatRequestSchema.safeParse({ ...validRequest, mode: 'investigate-estate' }).success).toBe(true);
   });
 
   it('rejects an unknown mode', () => {

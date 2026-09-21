@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@openvizpilot/shared": "0.1.0",
-    "hono": "^4.13.7"
+    "hono": "^4.13.8"
   },
   "devDependencies": {
     "preact": "^10.24.0"

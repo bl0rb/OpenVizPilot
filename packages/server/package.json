@@ -15,7 +15,7 @@
     "@hono/zod-validator": "^0.9.1",
     "@openvizpilot/ee": "0.1.0",
     "@openvizpilot/shared": "*",
-    "hono": "^4.13.7",
+    "hono": "^4.13.8",
     "lucide": "^1.46.0",
     "openai": "^7.15.0",
     "pg": "^8.13.0",

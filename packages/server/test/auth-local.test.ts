@@ -346,4 +346,33 @@ describe.skipIf(EE_STUB)('runtime auth settings (admin UI)', () => {
     expect((await app.request('/api/admin/auth-settings', { method: 'DELETE', headers: admin })).status).toBe(200);
     expect((await app.request('/api/models')).status).not.toBe(401);
   });
+
+  it('keeps a stored client secret only for the same issuer and client, and rejects plain-http issuers', async () => {
+    const instance = createApp(localConfig({ authMode: 'none', licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: publicKeyB64url } }));
+    await activated(instance, { licenseId: 'admin-test' });
+    const put = (oidc: Record<string, unknown>) => instance.app.request('/api/admin/auth-settings', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ mode: 'oidc', license: licenseToken, publicUrl: 'http://localhost/', oidc: { provider: 'keycloak', scopes: 'openid', ...oidc } }),
+    });
+    const hasSecret = async (res: Response) => ((await res.json()) as { stored: { hasClientSecret: boolean } }).stored.hasClientSecret;
+    expect(await hasSecret(await put({ issuer: idp.issuer, clientId: 'ovp-admin-test', clientSecret: 'shh' }))).toBe(true);
+    expect(await hasSecret(await put({ issuer: idp.issuer, clientId: 'ovp-admin-test' }))).toBe(true);
+    expect(await hasSecret(await put({ issuer: idp.issuer, clientId: 'other-client' }))).toBe(false);
+    const insecure = await put({ issuer: 'http://idp.example/realms/x', clientId: 'ovp-admin-test' });
+    expect(insecure.status).toBe(400);
+  });
+
+  it('refuses to switch to SSO while the stored license is not activated', async () => {
+    const { app } = createApp(localConfig({ authMode: 'none', licenseTrustedKeys: { [DEFAULT_LICENSE_KID]: publicKeyB64url } }));
+    expect((await app.request('/api/admin/auth-settings', { method: 'PUT', headers: admin, body: JSON.stringify({ mode: 'none', license: licenseToken }) })).status).toBe(200);
+    const sso = await app.request('/api/admin/auth-settings', {
+      method: 'PUT',
+      headers: admin,
+      body: JSON.stringify({ mode: 'oidc', publicUrl: 'http://localhost/', oidc: { provider: 'keycloak', issuer: idp.issuer, clientId: 'ovp-admin-test', scopes: 'openid' } }),
+    });
+    expect(sso.status).toBe(400);
+    expect(((await sso.json()) as { error: string }).error).toMatch(/nicht aktiviert/);
+    expect((await app.request('/api/models')).status).not.toBe(503);
+  });
 });

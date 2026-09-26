@@ -20,7 +20,7 @@ OpenVizPilot is a Tableau dashboard extension with a chat UI that answers questi
 
 For dashboard users
 
-- Ask in plain language: the LLM reads worksheet data, filters, parameters and selections through 8 read-only tools (up to 5 tool rounds per question), including aggregation drilldowns (`aggregate_summary_data`: group by/sum/avg/min/max/count over summary data — no full-data permission required).
+- Ask in plain language: the LLM reads worksheet data, filters, parameters and selections through 10 read-only tools (5 tool rounds per question in Ask mode, 12 when investigating, 16 across the estate), including aggregation drilldowns (`aggregate_summary_data`: group by/sum/avg/min/max/count over summary data — no full-data permission required).
 - Action chips (Enterprise, `actions`): the LLM proposes follow-up questions and dashboard actions — apply or clear filters, change parameters, highlight marks (for example “show me the top 3 regions”) and show or hide a dashboard zone. Actions run only on click, with the technical detail always shown in plain text — human-in-the-loop by design, which also reduces prompt injection risk. Without a license the model is not told the action syntax and never proposes one.
 - It knows what you are looking at: the context lists which views are currently hidden behind a show/hide zone, so the assistant can say “that view is closed — shall I open it?” instead of describing something you cannot see. It also names the real controls of the dashboard when you ask where to change something. Mark highlights are counted too, not just what you click. The chat panel inherits the workbook font and text color so it does not stick out on a dashboard with a corporate theme.
 - Transparency: analysis trace (every tool call is visible and expandable), source references in answers, transcript export as Markdown.
@@ -44,7 +44,7 @@ Built-in guardrails
 
 ## How it works
 
-![Architecture: extension inside the Tableau dashboard ↔ stateless middleware on EKS ↔ OpenAI-compatible LLM endpoint/models, with the tool-calling loop in the user session and CloudNativePG user memory](docs/diagrams/architecture.png)
+![Architecture: the chat extension runs inside the Tableau dashboard and executes tool calls in the viewer session, the stateless middleware injects system prompt and tool definitions and streams over SSE to an OpenAI-compatible LLM endpoint, an operational database holds settings, grants and user memory, and a separate Enterprise zone adds Tableau Server APIs, server-side view data, the Watch scheduler and the daily license heartbeat](docs/diagrams/architecture.png)
 
 The extension executes the LLM's tool calls in the user's browser (Extensions API, viewer session); the middleware stays stateless, injects the system prompt and tool definitions, and streams via SSE.
 
@@ -114,7 +114,7 @@ Saved queries are the second half: the answer focus a user picks for a dashboard
 
 ## Data isolation
 
-Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application. Planned Watch/Cross-Dashboard functionality needs its own explicit opt-in (site switch, per-person grant, user consent — see [docs/admin-deployment.md](docs/admin-deployment.md#serverseitiger-datenzugriff-tableau-views-außerhalb-des-dashboards)) for a bounded serverside read of another view's summary data; without it, everything stays in the browser as described above.
+Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application. Watch and cross-dashboard investigation need their own explicit opt-in (site switch, per-person grant, user consent — see [docs/admin-deployment.md](docs/admin-deployment.md#serverseitiger-datenzugriff-tableau-views-außerhalb-des-dashboards)) for a bounded serverside read of another view's summary data; without it, everything stays in the browser as described above.
 
 ## Packages
 
@@ -156,7 +156,7 @@ helm install openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot -f my-values.y
 Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). Release images are signed keyless with Sigstore cosign (GitHub OIDC) and carry an SPDX SBOM attestation (signature and attestation are stored as Sigstore bundles next to the image, so use cosign 3.x), so you can check that an image was built by this repository's release workflow before deploying it:
 
 ```bash
-cosign verify ghcr.io/bl0rb/openvizpilot:1.4.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/bl0rb/OpenVizPilot/'
+cosign verify ghcr.io/bl0rb/openvizpilot:1.6.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com --certificate-identity-regexp '^https://github.com/bl0rb/OpenVizPilot/'
 ```
 
 The production manifest for Tableau comes straight from the admin UI (`/admin` → “Extension for Tableau”); alternatively, generate it from a checkout:
@@ -196,7 +196,7 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_PUBLIC_URL` | `app.publicUrl` | HTTPS origin of the middleware (SSO redirect URI, OAuth 2.0 Trust issuer) |
 | `OVP_ENVIRONMENT` | `app.environment` | `production` (default) \| `development` \| `test` \| `staging` — counted during licence activation |
 | `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
-| `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise) |
+| `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise); the issuer must be `https://` (plain `http://` only for localhost) |
 | `OVP_SMTP_FROM` | `smtp.from` | Sender address for Watch alert emails (Enterprise) |
 | `OVP_WATCH_ENABLED` | `app.watchEnabled` | Global switch for the Watch engine (default on; Enterprise) |
 | `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
@@ -258,6 +258,6 @@ See [docs/testing.md](docs/testing.md).
 
 Core (everything outside `ee/`): [PolyForm Noncommercial 1.0.0](LICENSE) — the full source is public and free for any **noncommercial** purpose. Any commercial use, including internal use in a company and any form of resale or hosting for others, requires an agreement with WerkWorks (info@werkworks.de).
 
-Enterprise Edition (`ee/`): proprietary, see [ee/LICENSE](ee/LICENSE) — usable in production only with a valid license key.
+Enterprise Edition: proprietary — `ee/` in this repository is a stub; the full source and its license live in the private repository, available for review under contract/NDA, see [docs/enterprise.md](docs/enterprise.md#bezug-des-enterprise-images). Usable in production only with a valid license key.
 
 This is deliberately **source-available**, not open source: the code is there to be read, audited and evaluated, not to be taken commercially without a contract.

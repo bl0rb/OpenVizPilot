@@ -40,17 +40,21 @@ Alle vier Tools verwenden feste, variablengebundene Abfragen; beliebiges GraphQL
 
 `tableau_view_data` ist der einzige Weg, Daten aus einer View zu lesen, die nicht im aktuell
 geöffneten Dashboard liegt — dafür läuft die Abfrage serverseitig statt über die Extensions API im
-Browser. Drei Hürden, alle bei jedem Aufruf serverseitig geprüft:
+Browser. Vier Hürden, alle bei jedem Aufruf serverseitig geprüft:
 
-1. Site-Schalter „Serverseitige Daten erlauben“ (`TableauSite.serverData`, Admin → Tableau Server → Site).
+1. Lizenz-Merkmale `serverData`, `tableauServer` und `sso` (geprüft in `TableauService.viewData`, vor jedem Tableau-Kontakt).
 2. Freigabe „Serverdaten“ je Person unter „Benutzerzugriff“ (`UserAccess.serverData`).
-3. Einwilligung der Person (`GET`/`POST /api/tableau-server/consent`) — die Extension zeigt den Einwilligungstext, sobald ein Aufruf `409 consent_required` liefert.
+3. Site-Schalter „Serverseitige Daten erlauben“ (`TableauSite.serverData`, Admin → Tableau Server → Site).
+4. Einwilligung der Person (`GET`/`POST /api/tableau-server/consent`) — die Extension zeigt den Einwilligungstext, sobald ein Aufruf `409 consent_required` liefert.
+
+![Vier Hürden vor serverseitigen Daten: Lizenz-Merkmale, Freigabe je Person, Site-Schalter, Einwilligung — danach der Abruf mit Zeit-, Größen- und Budgetgrenzen und ein Audit-Eintrag](diagrams/datenzugriff.png)
 
 Fehlercodes: `server_data_disabled` (Site-Schalter aus), `server_data_not_granted` (Freigabe fehlt,
 403), `consent_required` (409, Body enthält `{ error, message }` mit dem Einwilligungstext),
 `budget_exhausted` (429, Body enthält `{ error, code, message }`, siehe „Limits und Budgets“),
-`site_unresolved` (Dashboard keiner Site zugeordnet). Jede Abfrage — auch ein Fehlversuch — erzeugt
-einen Audit-Eintrag (`ee_server_data_audit`, 90 Tage Aufbewahrung): Zeitpunkt, ein aus
+`site_unresolved` (Dashboard keiner Site zugeordnet). Jeder Abruf, der `TableauService.viewData`
+erreicht — auch ein fehlgeschlagener — erzeugt einen Audit-Eintrag (Ablehnungen davor, also fehlende
+Freigabe, fehlende Einwilligung und erschöpftes Budget, beantwortet die Route ohne Audit-Zeile) (`ee_server_data_audit`, 90 Tage Aufbewahrung): Zeitpunkt, ein aus
 Installations-ID und `UserAccess.id` gebildetes, nicht umkehrbares Pseudonym, Site, View, Zeilenzahl,
 Dauer, Status, Zweck. Nie Klartext-Nutzer, nie die gelesenen Daten selbst. Einsehbar im Admin unter
 „Tableau Server“ (`GET /api/admin/tableau-server/audit?limit=200`).

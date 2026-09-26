@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import {
   authSettingsSchema,
+  isSecureIssuerUrl,
   buildTrexManifest,
   createUserSchema,
   DEFAULT_SLASH_COMMANDS,
@@ -631,10 +632,17 @@ export function createAdminRoute(
     return result;
   };
 
-  /** Ausdrückliche Aktivierung (neuer Schlüssel, „Jetzt aktualisieren“) — darf eine stillgelegte Installation reaktivieren. */
-  const activateNow = async (): Promise<void> => {
-    await runHeartbeat({ reactivate: true });
+  /**
+   * Ausdrückliche Aktivierung (neuer Schlüssel, „Jetzt aktualisieren“). Eine stillgelegte
+   * Installation reaktiviert nur der initiale Admin — Stilllegen ist ihm ebenfalls vorbehalten.
+   */
+  const activateNow = async (principal: AdminPrincipal): Promise<void> => {
+    await runHeartbeat({ reactivate: principal.role === 'initial' });
   };
+
+  /** Delegierte Admins dürfen eine vom initialen Admin stillgelegte Installation nicht wieder aktivieren. */
+  const reactivationDenied = async (principal: AdminPrincipal): Promise<boolean> =>
+    principal.role !== 'initial' && (await authState.get()).lease.serverState === 'deactivated';
 
   /** Lizenz- und Anmeldestatus (nur Metadaten, nie Token/Secrets). */
   app.get('/auth-settings', async (c) => {
@@ -647,7 +655,10 @@ export function createAdminRoute(
   });
 
   const authSettingsInput = authSettingsSchema.extend({
-    oidc: authSettingsSchema.shape.oidc.unwrap().extend({ clientSecret: z.string().max(500).optional() }).optional(),
+    oidc: authSettingsSchema.shape.oidc.unwrap().extend({
+      issuer: z.string().url().max(500).refine(isSecureIssuerUrl, 'Issuer muss https:// verwenden (http nur für localhost).'),
+      clientSecret: z.string().max(500).optional(),
+    }).optional(),
     /** '' = Lizenz entfernen, undefined = unverändert lassen. */
     license: z.string().max(8000).optional(),
     /** '' = auf OVP_PUBLIC_URL (Env) zurückfallen. */
@@ -658,7 +669,8 @@ export function createAdminRoute(
    * Speichert Modus/OIDC/Lizenz. Prüft VOR dem Speichern, dass der gewünschte
    * Modus betriebsbereit ist (sonst würde die API fail-closed dichtmachen):
    * 'oidc' braucht eine gültige SSO-Lizenz und Issuer/Client-ID. Ein leeres
-   * Client-Secret behält das gespeicherte, eine leere Lizenz entfernt sie.
+   * Client-Secret behält das gespeicherte (nur bei gleichem Issuer und gleicher
+   * Client-ID), eine leere Lizenz entfernt sie.
    */
   app.put('/auth-settings', zValidator('json', authSettingsInput, (result, c) => {
       if (!result.success) return c.json({ error: 'Ungültige Anmelde-Einstellungen', details: result.error.issues }, 400);
@@ -675,15 +687,26 @@ export function createAdminRoute(
       } else {
         license = { status: 'none' };
       }
+      // Ein leeres Feld behält das gespeicherte Secret nur für denselben Client beim selben Issuer —
+      // sonst ginge das Secret des alten Identity-Providers an den Token-Endpunkt des neuen.
+      const sameClient = stored?.oidc?.issuer === input.oidc?.issuer && stored?.oidc?.clientId === input.oidc?.clientId;
       const oidc = input.oidc
-        ? { ...input.oidc, clientSecret: input.oidc.clientSecret?.trim() || stored?.oidc?.clientSecret || undefined }
+        ? { ...input.oidc, clientSecret: input.oidc.clientSecret?.trim() || (sameClient ? stored?.oidc?.clientSecret : undefined) || undefined }
         : stored?.oidc;
       const publicUrl = input.publicUrl === undefined ? stored?.publicUrl : input.publicUrl.trim().replace(/\/$/, '') || undefined;
       if (input.mode === 'oidc') {
         // Ohne DB-Lizenz zählt die Env-Lizenz (Helm-Secret) — der effektive
-        // Zustand entscheidet, nicht nur das Formular.
-        const effectiveLicense = licenseToken ? license : loadLicenseFromEnv(config.licenseEnv, { trustedKeys: config.licenseTrustedKeys });
+        // Zustand entscheidet, nicht nur das Formular. Bleibt der Schlüssel gleich, zählt
+        // auch die Aktivierung (Lease): sonst wäre SSO gespeichert und die API danach zu.
+        const current = await authState.get();
+        const unchanged = licenseToken ? licenseToken === current.licenseToken : !stored?.license;
+        const effectiveLicense = unchanged
+          ? current.license
+          : licenseToken ? license : loadLicenseFromEnv(config.licenseEnv, { trustedKeys: config.licenseTrustedKeys });
         if (!hasFeature(effectiveLicense, 'sso')) {
+          if (effectiveLicense.status === 'inactive') {
+            return c.json({ error: `${effectiveLicense.reason} Single Sign-On erst nach der Aktivierung einschalten.` }, 400);
+          }
           return c.json({ error: 'Single Sign-On braucht eine gültige Enterprise-Lizenz mit Feature „sso“ — bitte zuerst den Lizenzschlüssel eintragen.' }, 400);
         }
         if (!oidc && !config.oidc) return c.json({ error: 'Single Sign-On braucht Issuer und Client-ID.' }, 400);
@@ -708,7 +731,7 @@ export function createAdminRoute(
       authState.invalidate();
       logger.info('auth settings updated', { mode: next.mode, provider: next.oidc?.provider ?? null, license: license.status });
       // Neuer Lizenzschlüssel: sofort aktivieren statt auf den nächsten Tages-Heartbeat zu warten.
-      if (input.license?.trim() && input.license.trim() !== stored?.license) await activateNow();
+      if (input.license?.trim() && input.license.trim() !== stored?.license) await activateNow(c.get('adminPrincipal'));
       return c.json(await describeAuth());
     } catch (err) {
       logger.error('auth settings write failed', { name: err instanceof Error ? err.name : 'unknown' });
@@ -729,8 +752,11 @@ export function createAdminRoute(
   /** „Jetzt aktualisieren“: Heartbeat sofort, Antwort = neuer Stand. */
   app.post('/license/refresh', async (c) => {
     if (!refreshLease) return c.json({ error: 'Aktivierung benötigt eine Datenbank' }, 503);
+    if (await reactivationDenied(c.get('adminPrincipal'))) {
+      return c.json({ error: 'Die Installation ist stillgelegt — reaktivieren kann nur der initiale Admin (Token bzw. Admin-Konto)', code: 'initial_admin_required' }, 403);
+    }
     try {
-      await activateNow();
+      await activateNow(c.get('adminPrincipal'));
       return c.json(await describeAuth());
     } catch (err) {
       logger.error('license refresh failed', { name: err instanceof Error ? err.name : 'unknown' });
@@ -767,6 +793,9 @@ export function createAdminRoute(
     if (!telemetryStore) return c.json({ error: 'Aktivierung benötigt eine Datenbank' }, 503);
     const state = await authState.get();
     if (state.verifiedLicense.status !== 'valid') return c.json({ error: 'Offline-Aktivierung braucht eine gültige Lizenz.' }, 400);
+    if (await reactivationDenied(c.get('adminPrincipal'))) {
+      return c.json({ error: 'Die Installation ist stillgelegt — reaktivieren kann nur der initiale Admin (Token bzw. Admin-Konto)', code: 'initial_admin_required' }, 403);
+    }
     try {
       const token = c.req.valid('json').lease.trim();
       const check = verifyLease(token, {

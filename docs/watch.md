@@ -19,7 +19,7 @@ Mensch bestätigt** — das Chat-Tool legt nie selbst eine Regel an.
 Jeder einzelne Lauf prüft erneut:
 
 1. Lizenz-Feature `watch` (setzt `serverData`, `tableauServer` und `sso` voraus).
-2. Freigabe „Serverdaten“ der Regel-Eigentümerin/des Regel-Eigentümers unter „Benutzerzugriff“.
+2. Freigaben „Tableau API“ und „Serverdaten“ der Regel-Eigentümerin/des Regel-Eigentümers unter „Benutzerzugriff“.
 3. Deren Einwilligung zum serverseitigen Datenzugriff.
 4. Site-Schalter „Serverseitige Daten erlauben“.
 
@@ -40,7 +40,9 @@ Zustellung, bis jemand die Regel manuell wieder aktiviert (und die Hürde behobe
 Jede Regel bezieht sich auf **eine** View (per LUID), eine Kennzahl (Spalte + Aggregat:
 Summe/Durchschnitt/Min/Max/Anzahl/letzter Wert), optional einen Zeilenfilter (`Spalte = Wert`,
 angewendet nach dem Lesen — kein Tableau-`vf_`-Parameter) und eine Bedingung (`unter`/`über` einem
-Schwellwert oder `Änderung in %` gegenüber dem vorherigen Lauf).
+Schwellwert oder `Änderung in %` gegenüber dem vorherigen Lauf). Gelesen werden höchstens 1000
+Zeilen; hat die View mehr, bricht der Lauf mit `too_many_rows` ab, statt über einen Ausschnitt zu
+rechnen. Wer View, Kennzahl, Filter oder Bedingung ändert, startet ohne Vorwert und Alarmzustand.
 
 ## Zeitpläne
 

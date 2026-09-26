@@ -19,3 +19,6 @@ keys/
 
 # Interne Vorbereitung der Tableau-Exchange-Einreichung — nicht veröffentlichen.
 docs/exchange-submission/
+
+# Artefakte lokaler Browser-Werkzeuge
+.playwright-mcp/

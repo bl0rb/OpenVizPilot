@@ -153,9 +153,12 @@ Schlüsselpaar, `… -- sign ./keys/private.pem "Firma GmbH" 2027-12-31` einen T
 
 ## Aktivierung, Lease und Karenz
 
+![Lizenz-Zustände: pending (nur Core) → active mit täglich erneuerter 7-Tage-Lease → grace bis 30 Tage → expired; dazu blocked bei erreichtem Aktivierungslimit, deactivated nach Stilllegen oder Übertragen sowie die 7-tägige Abo-Karenz nach validUntil](diagrams/lizenz-zustaende.png)
+
 Eine lizenzierte Installation meldet sich einmal täglich bei WerkWorks — Umfang,
-Verhalten und der Text für Vertrag und Lizenzdokument stehen in
-[ee/telemetry/README.md](../ee/telemetry/README.md). Seit L1 ist dieser Heartbeat
+Verhalten und der Text für Vertrag und Lizenzdokument stehen in `ee/telemetry/README.md`
+im privaten Enterprise-Repository (siehe [Source-Review](#bezug-des-enterprise-images)).
+Seit L1 ist dieser Heartbeat
 zugleich die **Aktivierung**: Die Installation (dauerhafte Installation-ID aus der
 Datenbank) erhält eine signierte **Lease** über 7 Tage, die der Heartbeat alle
 24 Stunden erneuert. Enterprise-Funktionen sind aktiv, wenn die Lizenz gültig ist
@@ -204,7 +207,8 @@ nötig. Die stillgelegte Seite sieht das beim nächsten eigenen Heartbeat
 („blockiert“, wer sie ersetzt hat) und kann sich, wenn wieder Platz ist, mit
 einem normalen Heartbeat neu aktivieren. Eine selbst stillgelegte Installation
 sendet dagegen keine automatischen Heartbeats mehr — sie bleibt stillgelegt, bis
-ein Admin „Jetzt aktualisieren“ auslöst. Beide Aktionen sind **nur dem
+der initiale Admin „Jetzt aktualisieren“ auslöst oder eine Offline-Lease einspielt
+(delegierte Admins erhalten dafür ebenfalls `403 initial_admin_required`). Beide Aktionen sind **nur dem
 initialen Admin** vorbehalten (Admin-Token bzw. Admin-Konto; delegierte Admins
 erhalten `403 initial_admin_required`) — Routen `POST
 /api/admin/license/{deactivate,transfer}`, Body `{ confirm: true }` bzw.

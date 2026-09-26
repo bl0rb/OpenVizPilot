@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 960 920" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif" role="img" aria-labelledby="openvizpilot-lizenz-title openvizpilot-lizenz-desc">
+    <title id="openvizpilot-lizenz-title">OpenVizPilot — Lizenz-Lebenszyklus</title>
+    <desc id="openvizpilot-lizenz-desc">Eine Installation beginnt im Zustand pending, nur mit Core-Funktionen, bis der erste Heartbeat oder eine Offline-Lease sie aktiviert. Im Zustand active hat sie eine gültige 7-Tage-Lease, die der tägliche Heartbeat erneuert. Schlägt der Heartbeat fehl, wechselt sie in grace, wo Enterprise-Funktionen bis zu 30 Tage nach Lease-Ablauf aktiv bleiben; gelingt in dieser Zeit ein Heartbeat, kehrt sie nach active zurück, sonst nach 30 Tagen in expired, wo nur noch Core läuft, bis der nächste Heartbeat oder eine Offline-Lease sie reaktiviert. Meldet WerkWorks ein Aktivierungslimit und es gibt keine gültige Lease, wechselt die Installation nach blocked; sie kehrt zurück, sobald eine andere Installation derselben Lizenz stillgelegt oder übertragen wird oder die Lizenz erweitert wird, gefolgt von einem Heartbeat. Aus jedem Zustand kann ein Admin die Installation manuell stilllegen (deactivated); sie sendet dann keine automatischen Heartbeats mehr und reaktiviert sich erst, wenn ein Admin „Jetzt aktualisieren“ auslöst. Unabhängig von diesem Lease-Zustand bleibt eine abgelaufene Lizenz selbst noch 7 Tage über ihr validUntil hinaus aktiv (Abo-Karenz mit Warnbanner in der Admin-UI) und schaltet erst danach ab.</desc>
+    <defs>
+      <marker id="arrow-ent2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#b45309"/>
+      </marker>
+      <marker id="arrow-core2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#4f46e5"/>
+      </marker>
+    </defs>
+
+    <rect width="100%" height="100%" fill="#f8fafc"/>
+
+    <!-- pending -->
+    <rect x="120" y="56" width="340" height="100" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="128" y="62" width="18" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="137" y="71" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">P</text>
+    <text x="290" y="90" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">pending</text>
+    <text x="290" y="106" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Ausstehend</text>
+    <text x="290" y="119" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">noch nie eine Lease erhalten</text>
+    <text x="290" y="132" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">nur Core-Funktionen</text>
+
+    <line x1="290" y1="156" x2="290" y2="212" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="238" y="177" width="104" height="12" rx="2" fill="#f8fafc"/>
+    <text x="290" y="186" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">AKTIVIERUNG</text>
+
+    <!-- active -->
+    <rect x="120" y="212" width="340" height="100" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4f46e5" stroke-width="1"/>
+    <rect x="128" y="218" width="18" height="12" rx="2" fill="transparent" stroke="rgba(79,70,229,0.40)" stroke-width="0.8"/>
+    <text x="137" y="227" fill="rgba(79,70,229,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">A</text>
+    <text x="290" y="246" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">active</text>
+    <text x="290" y="262" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Aktiv bis … (7-Tage-Lease)</text>
+    <text x="290" y="275" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">oder Offline-Lease bis …</text>
+    <text x="290" y="288" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">täglicher Heartbeat erneuert sie</text>
+
+    <!-- active: Selbstschleife (täglicher Heartbeat) -->
+    <path d="M 340 212 C 340 186, 420 186, 420 212" fill="none" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="330" y="172" width="100" height="12" rx="2" fill="#f8fafc"/>
+    <text x="380" y="181" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">TÄGLICH +24H</text>
+
+    <line x1="290" y1="312" x2="290" y2="368" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="222" y="333" width="136" height="12" rx="2" fill="#f8fafc"/>
+    <text x="290" y="342" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">HEARTBEAT SCHLÄGT FEHL</text>
+
+    <!-- grace -->
+    <rect x="120" y="368" width="340" height="100" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4f46e5" stroke-width="1"/>
+    <rect x="128" y="374" width="18" height="12" rx="2" fill="transparent" stroke="rgba(79,70,229,0.40)" stroke-width="0.8"/>
+    <text x="137" y="383" fill="rgba(79,70,229,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">G</text>
+    <text x="290" y="402" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">grace</text>
+    <text x="290" y="418" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Grace bis … ( &lt; 30 Tage )</text>
+    <text x="290" y="431" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Lease abgelaufen, nicht erneuert</text>
+    <text x="290" y="444" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Enterprise-Funktionen bleiben an</text>
+
+    <line x1="290" y1="468" x2="290" y2="524" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="256" y="489" width="68" height="12" rx="2" fill="#f8fafc"/>
+    <text x="290" y="498" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">30 TAGE</text>
+
+    <!-- expired -->
+    <rect x="120" y="524" width="340" height="100" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="128" y="530" width="18" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="137" y="539" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">E</text>
+    <text x="290" y="558" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">expired</text>
+    <text x="290" y="574" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Abgelaufen</text>
+    <text x="290" y="587" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Karenz vorbei ( &gt; 30 Tage )</text>
+    <text x="290" y="600" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">nur Core, bis nächster Heartbeat</text>
+
+    <!-- deactivated (Seitenzweig zu active) -->
+    <rect x="620" y="212" width="280" height="100" rx="6" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+    <rect x="628" y="218" width="18" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
+    <text x="637" y="227" fill="rgba(71,85,105,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">D</text>
+    <text x="760" y="246" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">deactivated</text>
+    <text x="760" y="262" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Stillgelegt oder übertragen</text>
+    <text x="760" y="275" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">keine automat. Heartbeats mehr</text>
+    <text x="760" y="288" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">von jedem Zustand auslösbar</text>
+
+    <line x1="460" y1="246" x2="620" y2="246" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="490" y="228" width="100" height="12" rx="2" fill="#f8fafc"/>
+    <text x="540" y="237" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">STILLLEGEN</text>
+
+    <line x1="620" y1="278" x2="460" y2="278" stroke="#4f46e5" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-core2)"/>
+    <rect x="474" y="284" width="132" height="12" rx="2" fill="#f8fafc"/>
+    <text x="540" y="293" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">③ REAKTIVIERUNG</text>
+
+    <!-- blocked (Seitenzweig zu expired) -->
+    <rect x="620" y="524" width="280" height="100" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="530" width="18" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="637" y="539" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">B</text>
+    <text x="760" y="558" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">blocked</text>
+    <text x="760" y="574" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Blockiert</text>
+    <text x="760" y="587" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Aktivierungslimit gemeldet</text>
+    <text x="760" y="600" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">keine gültige Lease</text>
+
+    <line x1="460" y1="558" x2="620" y2="558" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+    <rect x="470" y="540" width="140" height="12" rx="2" fill="#f8fafc"/>
+    <text x="540" y="549" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.04em">LIMIT ERREICHT</text>
+
+    <!-- Reaktivierungs-Pfade (gestrichelt, außen entlang) -->
+    <!-- grace -> active, linke Spur -->
+    <path d="M 120 418 L 95 418 L 95 250 L 120 250" fill="none" stroke="#4f46e5" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-core2)"/>
+    <rect x="86" y="326" width="18" height="14" rx="2" fill="#f8fafc"/>
+    <text x="95" y="337" fill="#4f46e5" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">①</text>
+
+    <!-- expired -> active, äußere linke Spur -->
+    <path d="M 120 574 L 60 574 L 60 274 L 120 274" fill="none" stroke="#4f46e5" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-core2)"/>
+    <rect x="51" y="417" width="18" height="14" rx="2" fill="#f8fafc"/>
+    <text x="60" y="428" fill="#4f46e5" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">①</text>
+
+    <!-- blocked -> active, rechte Spur (unterhalb von deactivated vorbei, in den unteren Rand von active) -->
+    <path d="M 900 574 L 920 574 L 920 350 L 400 350 L 400 312" fill="none" stroke="#4f46e5" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-core2)"/>
+    <rect x="911" y="455" width="18" height="14" rx="2" fill="#f8fafc"/>
+    <text x="920" y="466" fill="#4f46e5" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600">②</text>
+
+    <!-- Fußnoten -->
+    <text x="120" y="662" fill="#475569" font-size="10" font-family="'Geist Mono', monospace">① Heartbeat wieder erfolgreich (oder neue Offline-Lease) — zurück zu active.</text>
+    <text x="120" y="678" fill="#475569" font-size="10" font-family="'Geist Mono', monospace">② Installation stillgelegt/übertragen oder Lizenz erweitert, dann Heartbeat.</text>
+    <text x="120" y="694" fill="#475569" font-size="10" font-family="'Geist Mono', monospace">③ Admin klickt „Jetzt aktualisieren“ — löst sofort einen Heartbeat aus.</text>
+
+    <!-- Abo-Karenz-Zone -->
+    <rect x="24" y="722" width="912" height="128" rx="8" fill="rgba(180,83,9,0.03)" stroke="rgba(180,83,9,0.35)" stroke-width="0.8" stroke-dasharray="5,3"/>
+    <rect x="345" y="726" width="270" height="12" rx="2" fill="#f8fafc"/>
+    <text x="480" y="735" fill="#b45309" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ABO-KARENZ — UNABHÄNGIG VON DER LEASE</text>
+
+    <rect x="54" y="762" width="260" height="68" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="184" y="788" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Lizenz gültig</text>
+    <text x="184" y="804" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">bis validUntil im Token</text>
+
+    <line x1="314" y1="796" x2="350" y2="796" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+
+    <rect x="350" y="762" width="260" height="68" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="480" y="788" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Karenz — 7 Tage</text>
+    <text x="480" y="804" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Warnbanner in der Admin-UI</text>
+
+    <line x1="610" y1="796" x2="646" y2="796" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent2)"/>
+
+    <rect x="646" y="762" width="260" height="68" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="776" y="788" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Enterprise aus</text>
+    <text x="776" y="804" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">unabhängig vom Lease-Zustand</text>
+
+    <!-- Legende -->
+    <line x1="24" y1="868" x2="936" y2="868" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+    <text x="24" y="888" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGENDE</text>
+
+    <rect x="112" y="876" width="12" height="12" rx="2" fill="rgba(79,70,229,0.08)" stroke="#4f46e5" stroke-width="1"/>
+    <text x="132" y="886" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ENTERPRISE AKTIV</text>
+
+    <rect x="258" y="876" width="12" height="12" rx="2" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <text x="278" y="886" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">NUR CORE</text>
+
+    <rect x="368" y="876" width="12" height="12" rx="2" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+    <text x="388" y="886" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">MANUELL GESTOPPT</text>
+
+    <line x1="530" y1="882" x2="558" y2="882" stroke="#b45309" stroke-width="1.2"/>
+    <text x="566" y="886" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ZUSTANDSÜBERGANG</text>
+
+    <line x1="716" y1="882" x2="744" y2="882" stroke="#4f46e5" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="752" y="886" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">REAKTIVIERUNG</text>
+  </svg>

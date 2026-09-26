@@ -170,10 +170,9 @@ function verifiedMetricsSince(items: ChatItem[]): string[] {
  * OpenViz Watch (W6): der zuletzt vorgeschlagene Vorschlag aus einem
  * abgeschlossenen `propose_watch_rule`-Aufruf seit der letzten User-Frage —
  * dieselbe deterministische Ableitung aus dem Tool-Ergebnis wie bei den
- * verifizierten Kennzahlen oben. `parseWatchProposal` liefert `null` bei
- * einem unerwarteten/verstümmelten Ergebnis (z. B. wegen der
- * Vorschau-Kappung auf 1500 Zeichen im Agenten-Loop) — dann bleibt die Karte
- * einfach aus, statt mit falschen Werten zu erscheinen.
+ * verifizierten Kennzahlen oben (der Agenten-Loop kürzt diese Vorschau
+ * nicht). `parseWatchProposal` liefert `null` bei einem unerwarteten
+ * Ergebnis — dann bleibt die Karte aus, statt mit falschen Werten zu erscheinen.
  */
 function watchProposalSince(items: ChatItem[]) {
   let start = 0;

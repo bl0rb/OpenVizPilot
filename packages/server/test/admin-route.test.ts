@@ -395,6 +395,22 @@ describe('stilllegen / übertragen (L3)', () => {
     return { authorization: `Bearer ${token}` };
   }
 
+  // Reaktivierung braucht eine echte Lizenz — im Core-Export (EE_STUB) ist jede Lizenz 'none'.
+  it.skipIf(EE_STUB)('lets only the initial admin reactivate a deactivated installation', async () => {
+    const instance = createApp(testConfig({ adminToken: 'geheim', authMode: 'local', memoryDbPath: tmpDbPath(), ...testLicenseEnv(['sso']) }));
+    const delegated = { ...(await delegatedAdmin(instance.app)), 'content-type': 'application/json' };
+    await instance.telemetryStore!.recordDeactivation();
+    instance.authState.invalidate();
+
+    const refresh = await instance.app.request('/api/admin/license/refresh', { method: 'POST', headers: delegated });
+    expect(refresh.status).toBe(403);
+    expect(((await refresh.json()) as { code: string }).code).toBe('initial_admin_required');
+    const lease = await instance.app.request('/api/admin/license/lease', { method: 'PUT', headers: delegated, body: JSON.stringify({ lease: 'x.y' }) });
+    expect(lease.status).toBe(403);
+
+    expect((await instance.app.request('/api/admin/license/refresh', { method: 'POST', headers: json })).status).toBe(200);
+  });
+
   it('rejects deactivate/transfer from a delegated admin but lets any admin read the installation list', async () => {
     const { app } = createApp(testConfig({ adminToken: 'geheim', authMode: 'local', memoryDbPath: tmpDbPath() }));
     const delegated = { ...(await delegatedAdmin(app)), 'content-type': 'application/json' };

@@ -9,7 +9,7 @@ import {
   type LicenseStatus,
   type TelemetryStore,
 } from '@openvizpilot/ee/server';
-import type { AuthMode, AuthSettings, OidcSettings } from '@openvizpilot/shared';
+import { isSecureIssuerUrl, type AuthMode, type AuthSettings, type OidcSettings } from '@openvizpilot/shared';
 import type { AppConfig } from './env';
 import type { Logger } from './logger';
 import type { MemoryStore } from './memory/store';
@@ -257,6 +257,9 @@ export function createAuthStateProvider(
               : 'Keine gültige Enterprise-Lizenz mit Feature „sso“ — Single Sign-On ist deaktiviert.';
       } else if (!oidcSettings) {
         blockedReason = 'Single Sign-On ist nicht konfiguriert (Issuer und Client-ID fehlen).';
+      } else if (!isSecureIssuerUrl(oidcSettings.issuer)) {
+        // Discovery, JWKS und Token-Aufruf (Client-Secret) nie über Klartext-HTTP.
+        blockedReason = 'Der OIDC-Issuer muss https:// verwenden (http nur für localhost) — Single Sign-On ist deaktiviert.';
       } else if (!publicUrl) {
         // Die Redirect-URI darf nie aus dem Host-Header des Requests entstehen.
         blockedReason = 'Single Sign-On braucht die öffentliche URL der Middleware (Admin-UI oder OVP_PUBLIC_URL).';

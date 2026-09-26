@@ -17,6 +17,19 @@ export const OIDC_PROVIDERS = ['entra', 'keycloak', 'generic'] as const;
 export const oidcProviderSchema = z.enum(OIDC_PROVIDERS);
 export type OidcProvider = z.infer<typeof oidcProviderSchema>;
 
+/**
+ * Issuer nur über HTTPS — Discovery, JWKS und der Token-Aufruf (mit Client-Secret) laufen
+ * darüber. `http://` nur für Loopback (lokaler Mock-IdP in der Entwicklung).
+ */
+export function isSecureIssuerUrl(value: string): boolean {
+  // Ohne `URL` (shared läuft auch ohne DOM-/Node-Typen): Schema und Host (inkl. Userinfo, damit
+  // `http://localhost@evil.example` nicht als Loopback durchgeht).
+  const match = /^(https?):\/\/(\[[^\]]*\]|[^/:?#]*)/i.exec(value);
+  if (!match) return false;
+  if (match[1]!.toLowerCase() === 'https') return true;
+  return ['localhost', '127.0.0.1', '[::1]'].includes(match[2]!.toLowerCase());
+}
+
 export const oidcSettingsSchema = z.object({
   provider: oidcProviderSchema,
   issuer: z.string().url().max(500),

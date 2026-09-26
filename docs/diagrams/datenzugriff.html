@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>OpenVizPilot — Serverseitiger Datenzugriff</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #f8fafc; color: #0f172a; font-family: 'Inter', sans-serif; padding: 2rem 1.5rem; }
+  main { max-width: 960px; margin: 0 auto; }
+  .eyebrow { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.18em;
+             text-transform: uppercase; color: #64748b; margin-bottom: 0.5rem; }
+  h1 { font-family: 'Instrument Serif', serif; font-size: 1.75rem; font-weight: 400; margin-bottom: 0.25rem; }
+  .subtitle { color: #475569; font-size: 0.875rem; margin-bottom: 1.5rem; }
+  svg { width: 100%; height: auto; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">OpenVizPilot · Enterprise</p>
+  <h1>Vier Hürden vor serverseitigen Daten</h1>
+  <p class="subtitle">Jede Hürde wird bei jedem Aufruf von <code>tableau_view_data</code> erneut serverseitig geprüft — fehlt eine, folgt eine sichtbare Ablehnung.</p>
+
+  <svg viewBox="0 0 960 930" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="openvizpilot-datenzugriff-title openvizpilot-datenzugriff-desc">
+    <title id="openvizpilot-datenzugriff-title">OpenVizPilot — Vier Hürden vor serverseitigen Daten</title>
+    <desc id="openvizpilot-datenzugriff-desc">Fragt das Modell über das Tool tableau_view_data Daten aus einer Tableau-View außerhalb des Dashboards ab, prüft die Middleware nacheinander vier Hürden: erstens die Lizenz-Merkmale serverData, tableauServer und sso, zweitens die von einem Admin je Person erteilte Freigabe „Serverdaten“, drittens den Site-Schalter „Serverseitige Daten erlauben“ mit dem Scope tableau:views:download, viertens die einmalige Einwilligung der Person im Dialog. Erst wenn alle vier bestehen, folgt der Abruf der View-Summary-Daten über einen engen Transportpfad mit festen Variablen, Zeit- und Größengrenzen und einem Budget von acht Abfragen je zwei Minuten. Fehlt eine Hürde, wird der Aufruf sichtbar mit einem eigenen Fehlercode abgelehnt. Jeder Abruf, der die Hürden passiert hat, erzeugt einen pseudonymisierten Audit-Eintrag mit Ergebnis oder Fehlerstatus, neunzig Tage aufbewahrt; Ablehnungen durch Freigabe, Einwilligung oder Budget greifen davor und werden nicht protokolliert.</desc>
+    <defs>
+      <marker id="arrow-slate" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+      </marker>
+      <marker id="arrow-ent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#b45309"/>
+      </marker>
+      <marker id="arrow-core" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#4f46e5"/>
+      </marker>
+      <marker id="arrow-deny" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#b91c1c"/>
+      </marker>
+    </defs>
+
+    <rect width="100%" height="100%" fill="#f8fafc"/>
+
+    <!-- Spine: Start -->
+    <rect x="120" y="56" width="340" height="56" rx="6" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+    <rect x="128" y="62" width="34" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
+    <text x="145" y="71" fill="rgba(71,85,105,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LLM</text>
+    <text x="290" y="86" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Anfrage des Modells</text>
+    <text x="290" y="100" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Tool-Call · tableau_view_data</text>
+
+    <line x1="290" y1="112" x2="290" y2="148" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow-slate)"/>
+
+    <!-- Hürde 1 -->
+    <rect x="120" y="148" width="340" height="76" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <rect x="128" y="154" width="70" height="12" rx="2" fill="transparent" stroke="rgba(180,83,9,0.45)" stroke-width="0.8"/>
+    <text x="163" y="163" fill="rgba(180,83,9,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HÜRDE 1</text>
+    <text x="290" y="184" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Lizenz-Merkmale</text>
+    <text x="290" y="200" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">serverData + tableauServer + sso</text>
+    <text x="290" y="213" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Enterprise-Lizenz, Feature-Gate</text>
+
+    <line x1="460" y1="186" x2="620" y2="186" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-deny)"/>
+    <rect x="620" y="148" width="280" height="76" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="154" width="66" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="661" y="163" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABLEHNUNG</text>
+    <text x="760" y="184" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tool nicht registriert</text>
+    <text x="760" y="200" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Lizenzfreigabe fehlt</text>
+    <text x="760" y="213" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Modell sieht das Tool nie</text>
+
+    <line x1="290" y1="224" x2="290" y2="268" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent)"/>
+
+    <!-- Hürde 2 -->
+    <rect x="120" y="268" width="340" height="76" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <rect x="128" y="274" width="70" height="12" rx="2" fill="transparent" stroke="rgba(180,83,9,0.45)" stroke-width="0.8"/>
+    <text x="163" y="283" fill="rgba(180,83,9,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HÜRDE 2</text>
+    <text x="290" y="304" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Freigabe „Serverdaten“</text>
+    <text x="290" y="320" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">UserAccess.serverData</text>
+    <text x="290" y="333" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">vom Admin, je Person erteilt</text>
+
+    <line x1="460" y1="306" x2="620" y2="306" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-deny)"/>
+    <rect x="620" y="268" width="280" height="76" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="274" width="88" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="672" y="283" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABLEHNUNG · 403</text>
+    <text x="760" y="304" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">server_data_not_granted</text>
+    <text x="760" y="320" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Freigabe fehlt</text>
+
+    <line x1="290" y1="344" x2="290" y2="388" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent)"/>
+
+    <!-- Hürde 3 -->
+    <rect x="120" y="388" width="340" height="76" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <rect x="128" y="394" width="70" height="12" rx="2" fill="transparent" stroke="rgba(180,83,9,0.45)" stroke-width="0.8"/>
+    <text x="163" y="403" fill="rgba(180,83,9,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HÜRDE 3</text>
+    <text x="290" y="424" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Tableau-Site-Schalter</text>
+    <text x="290" y="440" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">TableauSite.serverData</text>
+    <text x="290" y="453" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Scope tableau:views:download</text>
+
+    <line x1="460" y1="426" x2="620" y2="426" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-deny)"/>
+    <rect x="620" y="388" width="280" height="76" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="394" width="66" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="661" y="403" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABLEHNUNG</text>
+    <text x="760" y="424" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">server_data_disabled</text>
+    <text x="760" y="440" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Site-Schalter aus</text>
+
+    <line x1="290" y1="464" x2="290" y2="508" stroke="#b45309" stroke-width="1.2" marker-end="url(#arrow-ent)"/>
+
+    <!-- Hürde 4 -->
+    <rect x="120" y="508" width="340" height="76" rx="6" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="4,3"/>
+    <rect x="128" y="514" width="70" height="12" rx="2" fill="transparent" stroke="rgba(180,83,9,0.45)" stroke-width="0.8"/>
+    <text x="163" y="523" fill="rgba(180,83,9,0.85)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HÜRDE 4</text>
+    <text x="290" y="544" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Einwilligung</text>
+    <text x="290" y="560" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Dialog in der Extension</text>
+    <text x="290" y="573" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">einmalig · GET/POST /consent</text>
+
+    <line x1="460" y1="546" x2="620" y2="546" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-deny)"/>
+    <rect x="620" y="508" width="280" height="76" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="514" width="88" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="672" y="523" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABLEHNUNG · 409</text>
+    <text x="760" y="544" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">consent_required</text>
+    <text x="760" y="560" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Einwilligungstext wird</text>
+    <text x="760" y="573" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">in der Extension gezeigt</text>
+
+    <line x1="290" y1="584" x2="290" y2="628" stroke="#4f46e5" stroke-width="1.2" marker-end="url(#arrow-core)"/>
+    <rect x="298" y="598" width="150" height="12" rx="2" fill="#f8fafc"/>
+    <text x="298" y="607" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.04em">4/4 HÜRDEN BESTANDEN</text>
+
+    <!-- Abruf -->
+    <rect x="120" y="628" width="340" height="92" rx="6" fill="rgba(79,70,229,0.08)" stroke="#4f46e5" stroke-width="1"/>
+    <rect x="128" y="634" width="42" height="12" rx="2" fill="transparent" stroke="rgba(79,70,229,0.40)" stroke-width="0.8"/>
+    <text x="149" y="643" fill="rgba(79,70,229,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABRUF</text>
+    <text x="290" y="664" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">View-Summary-Daten</text>
+    <text x="290" y="680" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Feste Variablen, kein freies REST/GraphQL</text>
+    <text x="290" y="692" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Timeout 30 s · max. 1 MiB · maxRows ≤ 1000</text>
+    <text x="290" y="704" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Budget: 8 Abfragen / 2 Min. je Person+Dashboard</text>
+
+    <line x1="460" y1="674" x2="620" y2="674" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow-deny)"/>
+    <rect x="620" y="628" width="280" height="92" rx="6" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <rect x="628" y="634" width="88" height="12" rx="2" fill="transparent" stroke="rgba(185,28,28,0.40)" stroke-width="0.8"/>
+    <text x="672" y="643" fill="rgba(185,28,28,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ABLEHNUNG · 429</text>
+    <text x="760" y="664" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">budget_exhausted</text>
+    <text x="760" y="680" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">&gt; 8 Abfragen / 2 Minuten</text>
+    <text x="760" y="692" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">je Person + Dashboard</text>
+
+    <!-- Kollektor: nur Ablehnungen, die den Abruf erreichen (Site-Schalter, Transport) -> Audit -->
+    <line x1="900" y1="426" x2="920" y2="426" stroke="#b91c1c" stroke-width="1" stroke-dasharray="3,3"/>
+    <circle cx="920" cy="426" r="2" fill="#b91c1c"/>
+    <line x1="920" y1="426" x2="920" y2="780" stroke="#b91c1c" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow-deny)"/>
+    <text x="620" y="742" fill="#b91c1c" font-size="9" font-family="'Geist Mono', monospace">Hürde 1, 2, 4 und Budget greifen vor dem Abruf — kein Audit-Eintrag</text>
+
+    <line x1="290" y1="720" x2="290" y2="780" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow-slate)"/>
+
+    <!-- Audit -->
+    <rect x="120" y="780" width="800" height="64" rx="6" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+    <rect x="128" y="786" width="30" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
+    <text x="143" y="795" fill="rgba(71,85,105,0.80)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+    <text x="520" y="806" fill="#0f172a" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Audit-Eintrag — jeder Abruf, erfolgreich oder fehlgeschlagen</text>
+    <text x="520" y="822" fill="#475569" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">90 Tage · Pseudonym aus Installation + Person · nie Klartext-Nutzer, nie Daten</text>
+
+    <!-- Legende -->
+    <line x1="120" y1="864" x2="920" y2="864" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+    <text x="120" y="884" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGENDE</text>
+
+    <rect x="210" y="872" width="12" height="12" rx="2" fill="rgba(180,83,9,0.06)" stroke="#b45309" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="230" y="882" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">HÜRDE (GATE)</text>
+
+    <rect x="330" y="872" width="12" height="12" rx="2" fill="rgba(79,70,229,0.08)" stroke="#4f46e5" stroke-width="1"/>
+    <text x="350" y="882" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">AUSFÜHRUNG</text>
+
+    <rect x="450" y="872" width="12" height="12" rx="2" fill="rgba(185,28,28,0.05)" stroke="#b91c1c" stroke-width="1"/>
+    <text x="470" y="882" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ABLEHNUNG</text>
+
+    <rect x="570" y="872" width="12" height="12" rx="2" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+    <text x="590" y="882" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">DATEN</text>
+
+    <line x1="670" y1="878" x2="698" y2="878" stroke="#b91c1c" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="706" y="882" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">PFAD ABGELEHNT</text>
+  </svg>
+</main>
+</body>
+</html>

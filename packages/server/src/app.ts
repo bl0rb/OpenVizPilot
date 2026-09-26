@@ -106,18 +106,15 @@ export function createApp(config: AppConfig): {
   /**
    * Watch (W6, ee/): wertet Beobachtungsregeln nach Zeitplan im Namen der jeweiligen
    * Person aus (derselbe Lesepfad wie `tableau.viewData`) und stellt Alerts zu. Läuft
-   * nur mit Datenbank UND Tableau-Integration; `start()` nur mit Lizenz `watch` und
-   * `OVP_WATCH_ENABLED` (Default an) — die Engine selbst prüft Lizenz/Freigabe/
-   * Einwilligung erneut bei jedem Lauf.
+   * nur mit Datenbank UND Tableau-Integration; `start()` mit `OVP_WATCH_ENABLED`
+   * (Default an) — unabhängig von der Lizenz beim Start, damit eine später in der
+   * Admin-UI aktivierte Lizenz ohne Neustart greift. Die Engine selbst prüft Lizenz/
+   * Freigabe/Einwilligung bei jedem Lauf.
    */
   const watchEngine = backend && tableau
     ? new WatchEngine({ store: backend.watch, tableau, users: memoryStore!, hasFeature: licensedFeature, logger })
     : null;
-  if (watchEngine) {
-    void authState.get().then((state) => {
-      if (config.watchEnabled && hasFeature(state.license, 'watch')) watchEngine.start();
-    });
-  }
+  if (watchEngine && config.watchEnabled) watchEngine.start();
 
   /**
    * Lizenz-Heartbeat (ee/): meldet einmal täglich, dass diese Lizenz läuft, und

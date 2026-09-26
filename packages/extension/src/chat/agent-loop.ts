@@ -199,7 +199,8 @@ export class ChatSession {
                 name: call.function.name,
                 argsJson: call.function.arguments,
                 status: 'done',
-                resultPreview: content.slice(0, 1500),
+                // Watch-Vorschläge ungekürzt: die Bestätigungskarte parst sie (Umfang durch das Regel-Schema begrenzt).
+                resultPreview: call.function.name === 'propose_watch_rule' ? content : content.slice(0, 1500),
               });
             }
             this.messages.push({ role: 'tool', tool_call_id: call.id, content });

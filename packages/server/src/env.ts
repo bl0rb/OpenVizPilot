@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { HEARTBEAT_ENDPOINT, OVP_ENVIRONMENTS, type OvpEnvironment } from '@openvizpilot/ee/server';
+import { isSecureIssuerUrl } from '@openvizpilot/shared';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -94,7 +95,7 @@ const envSchema = z.object({
   OVP_AUTH_MODE: emptyAsUnset(z.enum(['none', 'token', 'local', 'oidc']).optional()),
   OVP_PUBLIC_URL: z.string().url().optional().or(z.literal('')),
   OVP_OIDC_PROVIDER: emptyAsUnset(z.enum(['entra', 'keycloak', 'generic']).default('generic')),
-  OVP_OIDC_ISSUER: z.string().url().optional().or(z.literal('')),
+  OVP_OIDC_ISSUER: z.string().url().refine(isSecureIssuerUrl, 'OVP_OIDC_ISSUER muss https:// verwenden (http nur für localhost)').optional().or(z.literal('')),
   OVP_OIDC_CLIENT_ID: z.string().optional(),
   OVP_OIDC_CLIENT_SECRET: z.string().optional(),
   OVP_OIDC_SCOPES: z.string().default('openid profile email'),

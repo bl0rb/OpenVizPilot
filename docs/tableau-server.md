@@ -43,7 +43,7 @@ geöffneten Dashboard liegt — dafür läuft die Abfrage serverseitig statt üb
 Browser. Vier Hürden, alle bei jedem Aufruf serverseitig geprüft:
 
 1. Lizenz-Merkmale `serverData`, `tableauServer` und `sso` (geprüft in `TableauService.viewData`, vor jedem Tableau-Kontakt).
-2. Freigabe „Serverdaten“ je Person unter „Benutzerzugriff“ (`UserAccess.serverData`).
+2. Freigabe „Serverdaten“ je Person unter „Benutzer & Zugriff“ (`UserAccess.serverData`).
 3. Site-Schalter „Serverseitige Daten erlauben“ (`TableauSite.serverData`, Admin → Tableau Server → Site).
 4. Einwilligung der Person (`GET`/`POST /api/tableau-server/consent`) — die Extension zeigt den Einwilligungstext, sobald ein Aufruf `409 consent_required` liefert.
 

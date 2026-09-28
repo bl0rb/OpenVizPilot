@@ -91,6 +91,15 @@ export interface UserAccess extends UserAccessIdentity {
 /** `admin`/`serverData` weglassen = unverändert lassen (die Admin-Route sendet `serverData` trotzdem immer). */
 export type UserAccessGrants = { ai: boolean; tableauApi: boolean; serverData?: boolean; admin?: boolean };
 
+/**
+ * Zuwachs eines Nutzungszählers: Default 1 (ein Ereignis), sonst eine nicht negative ganze Zahl
+ * (Tokens, Millisekunden) — serverseitig gezählt, nie aus dem Browser (dort entfernt die
+ * Metrik-Whitelist in @openvizpilot/shared das Feld).
+ */
+export function usageIncrement(count: number | undefined): number {
+  return count === undefined ? 1 : Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+}
+
 export function userAccessId(identity: Pick<UserAccessIdentity, 'provider' | 'issuer' | 'subject'>): string {
   return createHash('sha256').update(JSON.stringify([identity.provider, identity.issuer, identity.subject])).digest('hex');
 }
@@ -141,7 +150,7 @@ export interface MemoryStore {
    * — das erzwingt bereits die Metrik-Whitelist in @openvizpilot/shared
    * (usage.ts) am öffentlichen /api/stats-Endpunkt.
    */
-  recordUsage(events: Array<{ metric: string; key: string }>): Promise<void>;
+  recordUsage(events: Array<{ metric: string; key: string; count?: number }>): Promise<void>;
   /** Aggregierte Zähler der letzten `days` Tage (inklusive heute), neueste zuerst. */
   getUsageStats(days: number): Promise<Array<{ day: string; metric: string; key: string; count: number }>>;
   /**

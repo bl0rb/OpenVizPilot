@@ -365,14 +365,26 @@ export function createChatRoute(
               return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls, ...(Object.keys(external).length > 0 ? { external } : {}) }) });
             },
             onDone: async (data) => {
+              const durationMs = Date.now() - started;
               logger.info('chat done', {
                 model,
-                durationMs: Date.now() - started,
+                durationMs,
                 finishReason: data.finishReason,
                 promptTokens: data.usage?.promptTokens,
                 completionTokens: data.usage?.completionTokens,
                 messages: req.messages.length,
               });
+              // Betriebszahlen je Modell für die Admin-Übersicht (Aufrufe, Tokens, Antwortzeit) —
+              // wie chat_turn nur aggregierte Tageszähler, nie Inhalte oder Personen. Jede Runde
+              // (auch Tool-Runden) ist ein eigener Modellaufruf.
+              if (memoryStore) {
+                memoryStore.recordUsage([
+                  { metric: 'llm_call', key: model },
+                  { metric: 'llm_ms', key: model, count: durationMs },
+                  { metric: 'llm_tokens_in', key: model, count: data.usage?.promptTokens ?? 0 },
+                  { metric: 'llm_tokens_out', key: model, count: data.usage?.completionTokens ?? 0 },
+                ]).catch(() => undefined);
+              }
               // Fakten-Extraktion nur am Turn-ENDE (nicht nach Tool-Runden),
               // fire-and-forget mit günstigem Modell.
               if (personalizationStore && req.userId && memoryLicensed && data.finishReason !== 'tool_calls') {

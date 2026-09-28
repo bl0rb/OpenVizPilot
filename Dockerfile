@@ -12,6 +12,9 @@ COPY . .
 RUN npm run build
 
 FROM node:24-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+# Release-Version aus dem Publish-Workflow (Git-Tag); Helm und Compose setzen sie zusätzlich per Env.
+ARG OVP_APP_VERSION=unbekannt
+ENV OVP_APP_VERSION=$OVP_APP_VERSION
 ENV NODE_ENV=production
 WORKDIR /app
 # Server ist per tsup vollständig gebündelt (inkl. Dependencies) — keine node_modules nötig.

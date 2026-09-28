@@ -10,7 +10,7 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `sso` | Single Sign-On per OIDC (Microsoft Entra ID, Keycloak) |
 | `memory` | User-Memory: persönliche Fakten personalisieren die Antworten (`GET`/`DELETE /api/memory`) |
 | `savedQueries` | Eigene Abfragen speichern: Antwortfokus und Standardfragen je Dashboard (`/api/memory/prefs`) |
-| `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Site-Freigaben |
+| `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Bereichs-Freigaben |
 | `actions` | Dashboard-Aktionen aus dem Chat: Filter setzen/zurücksetzen, Parameter ändern, Marks markieren, Bereiche ein-/ausblenden |
 | `tableauServer` | Tableau-Server-Konfiguration, persönlicher Connected-App-Sign-in, Workbook-/View-Suche und Metadata-API (Feldsuche/-detail); benötigt OIDC und `sso`. |
 | `serverData` | Serverseitiger Datenzugriff (Watch/Cross-Dashboard): liest Summary-Daten einer Tableau-View außerhalb des aktuellen Dashboards im Namen des Nutzers; benötigt zusätzlich `tableauServer`/`sso`, den Site-Schalter „Serverseitige Daten erlauben“, die Freigabe „Serverdaten“ je Person und deren Einwilligung. |
@@ -40,8 +40,8 @@ keine Zuordnung nötig. `/api/features` zeigt die Lizenzfreigabe; die Integratio
 Admin-Aktivierung aus. Details: [Einrichtung](tableau-server-setup.md) und
 [Referenz](tableau-server.md) (Sicherheitsmodell, Connected-App-Modi, Chat-Tools).
 
-MCP wird unter **MCP & Sites (Enterprise)** in der Admin-UI eingerichtet. Es benötigt
-persönliche Anmeldung, explizite Site-Mitgliedschaften und eine eigene `mcp`-Freigabe.
+MCP wird unter **MCP-Quellen (Enterprise)** in der Admin-UI eingerichtet. Es benötigt
+persönliche Anmeldung, explizite Bereichs-Mitgliedschaften und eine eigene `mcp`-Freigabe.
 Einrichtung, Secret-Referenzen und Grenzen der Site-Zuordnung: [MCP-Dokumentation](mcp.md).
 
 Ohne Anmeldung kann jeder, der die Middleware im Netz erreicht, `/api/chat` aufrufen — mit
@@ -63,16 +63,16 @@ Nutzer-ID für Memory, Präferenzen und Statistik (statt der client-asserted Tab
 
 ## Einrichtung über die Admin-UI (empfohlen)
 
-Alles Folgende lässt sich ohne Redeploy in der Admin-UI (`/admin`) im Abschnitt
-**„Anmeldung, Single Sign-On & Lizenz“** pflegen: Anmeldemodus, Identity-Provider (Entra ID /
-Keycloak / generisch) mit Issuer, Client-ID, optionalem Client-Secret und Scopes sowie der
-Lizenzschlüssel. „Prüfen & speichern“ verifiziert die Lizenzsignatur und lehnt Single Sign-On ohne
-gültige SSO-Lizenz ab; gespeicherte Werte gelten sofort für alle Replicas und überschreiben die
+Alles Folgende lässt sich ohne Redeploy in der Admin-UI (`/admin`) pflegen: unter **„Anmeldung“**
+Anmeldemodus, öffentliche URL und Identity-Provider (Entra ID / Keycloak / generisch) mit Issuer,
+Client-ID, optionalem Client-Secret und Scopes — in drei nummerierten Schritten —, unter
+**„Lizenz & Aktivierung“** den Lizenzschlüssel. Beide Bereiche speichern getrennt; „Lizenz prüfen &
+speichern“ verifiziert die Lizenzsignatur, und „Anmeldung“ lehnt Single Sign-On ohne gültige SSO-Lizenz ab; gespeicherte Werte gelten sofort für alle Replicas und überschreiben die
 Env-Defaults (`OVP_AUTH_MODE`, `OVP_OIDC_*`, `OVP_LICENSE`). Secrets und Token werden nie zurückgegeben,
 nur als „vorhanden“ angezeigt.
 
-Für die Core-Edition gibt es daneben den Modus **„Benutzerkonten“**: Der Admin legt im Abschnitt
-**„Benutzerkonten (Core-Edition)“** Konten mit Passwort an, die Anwender melden sich damit in der
+Für die Core-Edition gibt es daneben den Modus **„Benutzerkonten“**: Der Admin legt unter
+**„Benutzer & Zugriff“ → „Lokale Benutzerkonten“** Konten mit Passwort an, die Anwender melden sich damit in der
 Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der Weg ohne Lizenz.
 
 ## Voraussetzungen
@@ -87,20 +87,27 @@ Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der W
 ## Microsoft Entra ID
 
 1. **App-Registrierung** anlegen (Entra Admin Center → App registrations → New registration).
-2. Plattform **Single-page application** (public client, PKCE) mit Redirect-URI
-   `https://<middleware>/auth/callback`. Alternativ **Web** + Client-Secret (confidential client) —
-   dann `OVP_OIDC_CLIENT_SECRET` setzen.
-3. Unter *Token configuration* optional die Claims `email` und `name` ergänzen (für die Anzeige).
-4. Werte:
+2. Plattform **Web** mit Redirect-URI `https://<middleware>/auth/callback`.
+3. Unter *Certificates & secrets* einen **Client-Secret** anlegen und als `OVP_OIDC_CLIENT_SECRET` oder im
+   Admin (Feld „Client-Secret“) hinterlegen — Ablaufdatum notieren. Entra verlangt ihn, weil die Middleware den
+   Anmeldecode serverseitig einlöst (Backend-for-Frontend): Ohne Secret scheitert der Tausch mit AADSTS7000218,
+   mit der Plattform **Single-page application** mit AADSTS9002327. Die Extension meldet dann „Anmeldung
+   abgelehnt“, das Server-Log `oidc exchange failed` mit dem AADSTS-Code.
+4. Unter *Token configuration* optional die Claims `email` und `name` ergänzen (für die Anzeige).
+5. Werte:
 
 ```env
 OVP_AUTH_MODE=oidc
 OVP_OIDC_PROVIDER=entra
 OVP_OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0
 OVP_OIDC_CLIENT_ID=<application-(client)-id>
+OVP_OIDC_CLIENT_SECRET=<client-secret-wert>
 OVP_OIDC_SCOPES=openid profile email
 OVP_PUBLIC_URL=https://<middleware>
 ```
+
+`OVP_OIDC_CLIENT_SECRET` gilt auch, wenn Issuer und Client-ID in der Admin-UI eingetragen sind, solange dort
+kein eigenes Secret gespeichert ist und die Env nicht auf einen anderen Issuer oder Client zeigt.
 
 Der Issuer muss exakt dem `iss` der v2.0-Tokens entsprechen (Tenant-ID, Suffix `/v2.0`).
 
@@ -146,7 +153,7 @@ Ohne gültige Lizenz mit Feature `sso` startet die Middleware im OIDC-Modus **ni
 abgelaufene Lizenzen deaktivieren die Enterprise-Funktionen. Nach `validUntil` bleiben die
 Enterprise-Funktionen noch **7 Tage** aktiv (Subscription-Karenz, Warnbanner in der Admin-UI) und
 schalten erst danach ab — unabhängig von der separaten 30-Tage-Lease-Karenz unten. Der Status ist in
-der Admin-UI unter „Anmeldung, Single Sign-On & Lizenz“ sichtbar.
+der Admin-UI unter „Lizenz & Aktivierung“ sichtbar; die Startseite „Übersicht“ zeigt ihn ebenfalls.
 
 Für Entwicklung und Tests: `npm run sign-license -w @openvizpilot/ee -- keygen ./keys` erzeugt ein
 Schlüsselpaar, `… -- sign ./keys/private.pem "Firma GmbH" 2027-12-31` einen Token.
@@ -249,7 +256,7 @@ oidc:
   provider: entra                # oder keycloak
   issuer: https://login.microsoftonline.com/<tenant-id>/v2.0
   clientId: <client-id>
-  clientSecretSecret:            # nur confidential clients
+  clientSecretSecret:            # Entra ID: Pflicht · Keycloak: nur confidential clients
     existingSecret: openvizpilot-oidc
     key: OVP_OIDC_CLIENT_SECRET
 license:
@@ -262,17 +269,19 @@ app:
 ## Bezug des Enterprise-Images
 
 Das Enterprise-Image (`ghcr.io/bl0rb/openvizpilot-enterprise`, cosign-signiert und mit SBOM wie das
-Core-Image) ist ein **privates** GHCR-Paket, gebaut aus dem privaten Repository. WerkWorks vergibt dafür
-ein Kunden-Lese-Token — GHCR-Paketzugriff wird **je Paket** vergeben, das Token ist also auf
-`openvizpilot-enterprise` beschränkt (Fine-grained PAT mit `read:packages`). Zum Erhalt: info@werkworks.de.
+Core-Image) ist ein **privates** GHCR-Paket, gebaut aus dem privaten Repository. WerkWorks gibt dafür
+ein GitHub-Konto frei — Ihres oder ein eigens angelegtes — mit Lesezugriff nur auf
+`openvizpilot-enterprise`. Die Anmeldung an ghcr.io braucht ein **klassisches** Personal Access Token dieses
+Kontos mit ausschließlich `read:packages` (Fine-grained-Tokens unterstützt ghcr.io nicht). Das Helm-Chart
+selbst ist öffentlich und braucht keine Anmeldung. Zum Erhalt: info@werkworks.de.
 
 Mit dem Token im Cluster ein Image-Pull-Secret anlegen:
 
 ```bash
 kubectl create secret docker-registry openvizpilot-enterprise-pull \
   --docker-server=ghcr.io \
-  --docker-username=<beliebig, z. B. der Firmenname> \
-  --docker-password=<Kunden-Lese-Token> \
+  --docker-username=<GitHub-Benutzername des Token-Kontos> \
+  --docker-password=<klassisches PAT mit read:packages> \
   --namespace openvizpilot
 ```
 

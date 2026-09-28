@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/teaser.jpeg" width="620" alt="Two colleagues in front of a dashboard: one asks “Nice bars. And what does that mean?”, the other answers “Just ask them.”" />
+  <img src="docs/images/investigate-teaser-transparent.png" width="620" alt="OpenVizPilot poster “Less guessing. More evidence.”: a manager points at a falling revenue chart and asks “Any idea why it dropped?”, an analyst answers “Let’s follow the data.” Below: plan the analysis, compare and explore, show the evidence." />
 </p>
 
 OpenVizPilot is a Tableau dashboard extension with a chat UI that answers questions about the currently open dashboard. A lightweight Node.js middleware connects the extension to any existing OpenAI-compatible LLM endpoint (for example a LiteLLM proxy). The LLM queries dashboard data selectively via tool calling, and every data access happens in the viewer's own Tableau session, so nobody can ask for data they are not allowed to see.
@@ -152,6 +152,8 @@ The middleware runs stateless on EKS and scales horizontally (HPA) and verticall
 ```bash
 helm install openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot -f my-values.yaml
 ```
+
+Without Kubernetes, [deploy/compose](deploy/compose/compose.yaml) runs the same image on a single Linux VM with Docker Compose (Postgres included, optional Caddy for HTTPS) — see [docs/admin-deployment.md](docs/admin-deployment.md#alternative-docker-compose-auf-einer-linux-vm-ohne-kubernetes).
 
 Image (`ghcr.io/bl0rb/openvizpilot`) and the chart are published by the GitHub workflows on `v*` tags (`.github/workflows/`: PR CI as the release gate, GHCR/OCI). Release images are signed keyless with Sigstore cosign (GitHub OIDC) and carry an SPDX SBOM attestation (signature and attestation are stored as Sigstore bundles next to the image, so use cosign 3.x), so you can check that an image was built by this repository's release workflow before deploying it:
 

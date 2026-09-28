@@ -732,7 +732,7 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
     expect(chatBody.messages[0]?.content).not.toContain('<author_notes>');
   });
 
-  it('records an anonymous chat_turn counter in the store after a turn (no content, no user id)', async () => {
+  it('records anonymous chat_turn and per-call LLM counters in the store after a turn (no content, no user id)', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openvizpilot-route-stats-'));
     const dbPath = path.join(tmpDir, 'memory.db');
     try {
@@ -750,7 +750,11 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
         if (!check) throw new Error('node:sqlite nicht verfügbar');
         const rows = await check.getUsageStats(1);
         await check.close();
-        expect(rows).toEqual([expect.objectContaining({ metric: 'chat_turn', key: 'test-model', count: 1 })]);
+        expect(rows).toContainEqual(expect.objectContaining({ metric: 'chat_turn', key: 'test-model', count: 1 }));
+        // Betriebszahlen je Modellaufruf (Aufrufe, Antwortzeit, Tokens) — Schlüssel ist nur das Modell.
+        expect(rows).toContainEqual(expect.objectContaining({ metric: 'llm_call', key: 'test-model', count: 1 }));
+        expect(new Set(rows.map((row) => row.metric))).toEqual(new Set(['chat_turn', 'llm_call', 'llm_ms', 'llm_tokens_in', 'llm_tokens_out']));
+        expect(new Set(rows.map((row) => row.key))).toEqual(new Set(['test-model']));
       });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });

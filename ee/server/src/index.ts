@@ -830,7 +830,7 @@ export const mcpAdminStyles = '';
 export const mcpAdminScript = '';
 export const mcpAdminSection = `
     <section id="mcp-admin" aria-labelledby="mcp-heading" hidden>
-      <h2 id="mcp-heading">MCP &amp; Sites <small>Enterprise</small></h2>
+      <h2 id="mcp-heading" class="visually-hidden">MCP-Quellen</h2>
       <p>${EE_NOTICE}</p>
     </section>`;
 
@@ -838,7 +838,13 @@ export const tableauAdminStyles = '';
 export const tableauAdminScript = '';
 export const tableauAdminSection = `
     <section id="tableau-server-admin" aria-labelledby="tableau-server-heading" hidden>
-      <h2 id="tableau-server-heading">Tableau Server <small>Enterprise</small></h2>
+      <h2 id="tableau-server-heading" class="visually-hidden">Tableau Server</h2>
+      <p>${EE_NOTICE}</p>
+    </section>`;
+
+export const tableauAuditSection = `
+    <section id="tableau-audit-admin" aria-labelledby="tableau-audit-heading" hidden>
+      <h2 id="tableau-audit-heading" class="visually-hidden">Serverzugriffe</h2>
       <p>${EE_NOTICE}</p>
     </section>`;
 
@@ -962,6 +968,6 @@ export const watchAdminStyles = '';
 export const watchAdminScript = '';
 export const watchAdminSection = `
     <section id="watch-admin" aria-labelledby="watch-heading" hidden>
-      <h2 id="watch-heading">Watch <small>Enterprise</small></h2>
+      <h2 id="watch-heading" class="visually-hidden">Watch</h2>
       <p>${EE_NOTICE}</p>
     </section>`;

@@ -20,14 +20,14 @@ voreingestellt, und OpenVizPilot startet keine beliebigen MCP-Prozesse.
 - Netzwerkerreichbarkeit vom Middleware-Host zum freigegebenen MCP-Endpunkt.
 
 Offener Modus und Shared-Token-Modus stellen keine MCP-Tools bereit, weil sie
-keine überprüfbare individuelle Site-Mitgliedschaft liefern.
+keine überprüfbare individuelle Bereichs-Mitgliedschaft liefern.
 
 ## Einrichtung in der Admin-UI
 
-1. Unter **Anmeldung, Single Sign-On & Lizenz** die passende Lizenz aktivieren.
-2. Unter **MCP & Sites (Enterprise)** auf **Aktualisieren** klicken.
-3. Eine **Site hinzufügen**, benennen und ihre bereits registrierten Dashboards
-   auswählen. Jedes Dashboard darf genau einer Site zugeordnet sein.
+1. Unter **Lizenz & Aktivierung** die passende Lizenz aktivieren.
+2. Unter **MCP-Quellen (Enterprise)** auf **Aktualisieren** klicken.
+3. Einen **Bereich hinzufügen**, benennen und seine bereits registrierten Dashboards
+   auswählen. Jedes Dashboard darf genau einem Bereich zugeordnet sein.
 4. Die erlaubten lokalen Benutzer auswählen. Für OIDC im Feld **Weitere
    Identitäten** pro Zeile `oidc:<sub>` eintragen, mit dem tatsächlichen `sub`
    des aktuell konfigurierten Identity-Providers. Nicht die Tableau-User-ID und
@@ -36,11 +36,11 @@ keine überprüfbare individuelle Site-Mitgliedschaft liefern.
    eintragen. Optional die Secret-Referenz setzen, beispielsweise
    `OVP_MCP_KNOWLEDGE_TOKEN`.
 6. **Verbindung prüfen & Tools laden**, die benötigten lesenden Tools auswählen
-   und die Sites markieren, denen dieser Server zur Verfügung stehen soll.
-7. **Aktiviert** setzen und **Freigaben speichern**. Ohne Site-Zuordnung oder
+   und die Bereiche markieren, denen dieser Server zur Verfügung stehen soll.
+7. **Aktiviert** setzen und **Freigaben speichern**. Ohne Bereichs-Zuordnung oder
    passende Nutzerfreigabe bleibt der Server für den Chat unsichtbar.
 
-Server können deaktiviert oder entfernt, Sites und Mitglieder geändert werden.
+Server können deaktiviert oder entfernt, Bereiche und Mitglieder geändert werden.
 Änderungen greifen beim nächsten Tool-Aufruf, auch über mehrere Middleware-Replicas.
 Offene Chat-Freigaben werden durch Konfigurationsänderungen ungültig. Bei gleichzeitig
 bearbeiteten Admin-Seiten verhindert eine Versionsprüfung versehentliches Überschreiben.
@@ -49,22 +49,22 @@ Die Verbindung wird nur getestet; kein Tool wird dabei ausgeführt. Nicht unters
 oder nicht als lesend deklarierte Tools werden nicht angeboten. Nach einer Änderung
 des Endpunkts oder der Secret-Referenz muss die Tool-Auswahl erneuert werden.
 
-## Site- und Berechtigungsmodell
+## Bereichs- und Berechtigungsmodell
 
-Die Sites sind **administrativ gepflegte Zuordnungen in OpenVizPilot**. Es gibt
+Die Bereiche (bis Version 1.6 „Sites“) sind **administrativ gepflegte Zuordnungen in OpenVizPilot**. Es gibt
 noch keinen automatischen Abgleich mit Tableau Server/Cloud, keine Ermittlung der
 Tableau-Site aus dem Browser und keine Synchronisation von Tableau-Gruppen.
 
 Ein vom Browser gelieferter Dashboard-Schlüssel ist nur die Konfigurationsauswahl,
 kein Berechtigungsnachweis. Die Middleware prüft zusätzlich die verifizierte
-Anmeldung und die explizite Site-Mitgliedschaft. Ein berechtigter Site-Nutzer
+Anmeldung und die explizite Bereichs-Mitgliedschaft. Ein berechtigter Bereichs-Nutzer
 kann diese Quellen auch mit einem direkten API-Client verwenden; die Zuordnung
 beweist nicht, dass gerade ein bestimmtes Workbook im Browser geöffnet ist.
 
 Tableau-Abfragen bleiben in der Tableau-Sitzung des Viewers. Externe Quellen
 verwenden dagegen die **gemeinsame Berechtigung des konfigurierten MCP-Servers**.
 Es gibt noch keine nutzerbezogene OAuth-Delegation zu MCP-Servern. Deshalb dürfen
-einer Site nur Quellen zugewiesen werden, deren freigegebene Inhalte alle dort
+einem Bereich nur Quellen zugewiesen werden, deren freigegebene Inhalte alle dort
 eingetragenen Nutzer sehen dürfen. Bei unterschiedlichen Zugriffsrechten sind
 separate, entsprechend eingeschränkte Server-/Credential-Konfigurationen nötig.
 Bei einem Wechsel des OIDC-Issuers müssen die Mitgliedschaften überprüft werden.
@@ -90,7 +90,7 @@ mcp:
 
 Das Secret muss separat bereitgestellt werden. Nach Token-Rotation müssen die
 Pods neu gestartet werden, weil Kubernetes-Secret-Umgebungswerte nicht live wechseln.
-Endpunkt, Tool-Auswahl und Site-Freigaben werden dagegen ohne Redeploy in der
+Endpunkt, Tool-Auswahl und Bereichs-Freigaben werden dagegen ohne Redeploy in der
 Admin-UI gepflegt. Ohne Authentifizierung am MCP-Server bleibt die Secret-Referenz leer.
 
 Es gibt keine Stdio-Ausführung, keine OAuth-Anmeldung am MCP-Server und keine
@@ -102,7 +102,7 @@ JSON-Inhalte verarbeitet, nicht als Bilder, eingebettete Ressourcen oder aktive 
 ## Verhalten im Chat
 
 Die Middleware ergänzt den LLM-Tool-Katalog nur um lizenzierte und für den
-angemeldeten Nutzer freigegebene Site-Tools. Die Extension führt Tableau-Tools
+angemeldeten Nutzer freigegebene Bereichs-Tools. Die Extension führt Tableau-Tools
 weiterhin lokal aus; MCP-Aufrufe laufen über `POST /api/mcp` in der Middleware.
 
 Vor jedem externen Aufruf bestätigt der Nutzer einen Dialog mit Ziel, Tool und
@@ -142,7 +142,7 @@ Veröffentlichungszeit.
   zusätzlich auf genehmigte Ziele beschränken, insbesondere bei internem DNS.
 - Die Read-only-Deklaration ist eine Behauptung des MCP-Betreibers. Sie ersetzt
   keine Prüfung des Servers und keine eingeschränkten Quellsystem-Zugangsdaten.
-- Maximal 5 Server, 10 Tools je Server, 50 Sites; alle Argumente werden gegen das
+- Maximal 5 Server, 10 Tools je Server, 50 Bereiche; alle Argumente werden gegen das
   aktuelle JSON-Schema validiert. Keine ungeprüfte Übernahme des gesamten Tool-Katalogs.
 - Pro MCP-Verbindung gilt ein Gesamt-Timeout von 15 Sekunden, pro HTTP-Antwort
   ein Limit von 256 KiB, für den zurückgegebenen Text 16.000 Zeichen.
@@ -155,7 +155,7 @@ Veröffentlichungszeit.
 - Remote-Fehlertexte und Credentials werden nicht an den Chat durchgereicht.
   Tool-Argumente und Resultate werden nicht im Server-Log gespeichert; im Browser
   erscheinen sie wie bestehende Tableau-Aufrufe im Analyseverlauf.
-- Chat-Historie bleibt im Browser. Die EE-Datenbank speichert Site-Mitglieder,
+- Chat-Historie bleibt im Browser. Die EE-Datenbank speichert Bereichs-Mitglieder,
   Dashboard-Zuordnungen, Server-Endpunkte, Secret-Namen und Freigaben, keine MCP-Ergebnisse.
 
 ## Prüfung
@@ -168,5 +168,5 @@ npm run build
 
 Die Tests nutzen isolierte Testlizenzen und Fixtures, einschließlich des echten
 MCP-SDKs gegen simulierte Protokollantworten. Vor Produktivfreigabe zusätzlich den
-konkreten MCP-Anbieter in einer Test-Site prüfen: Quellenrechte, Datenweitergabe,
+konkreten MCP-Anbieter in einem Test-Bereich prüfen: Quellenrechte, Datenweitergabe,
 Suchqualität, Timeout/Abbruch, Lizenzentzug und Quellenangaben.

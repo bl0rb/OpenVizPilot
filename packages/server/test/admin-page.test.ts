@@ -23,7 +23,7 @@ describe('admin presentation', () => {
     for (const id of ['new-username', 'new-display-name', 'new-password', 'trex-url']) {
       expect(adminPageHtml).toContain(`for="${id}"`);
     }
-    expect(adminPageHtml).toContain('<fieldset class="form-section"><legend>Enterprise-Lizenz</legend>');
+    expect(adminPageHtml).toContain('<fieldset class="form-section"><legend>Lizenzschlüssel eintragen oder ersetzen</legend>');
     expect(adminPageHtml).toContain('class="form-grid"');
     expect(adminPageHtml).toContain('type="url" id="trex-url"');
   });
@@ -76,6 +76,103 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain('href="https://werkworks.de/ovp-lizenz/offline.php"');
   });
 
+  it('groups the navigation by setup order and lands on the overview', () => {
+    const nav = adminPageHtml.match(/<nav aria-label="Administration">[\s\S]*?<\/nav>/)?.[0] ?? '';
+    const groups = [...nav.matchAll(/<p class="nav-group">([^<]+)<\/p>/g)].map(match => match[1]);
+    expect(groups).toEqual(['Einrichtung', 'Zugriff', 'Inhalte', 'Betrieb']);
+    const targets = [...nav.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
+    expect(targets.slice(0, 5)).toEqual(['overview-admin', 'license-admin', 'auth-admin', 'tableau-server-admin', 'models-admin']);
+    // Erste Option = Standardansicht nach dem Login.
+    expect(adminPageHtml).toMatch(/<select id="admin-navigation"[^>]*>\s*<optgroup label="Einrichtung"><option value="overview-admin">/);
+    // Tableau-Sites und MCP-Bereiche heißen verschieden — kein zweites „Sites“ mehr in der Navigation.
+    expect(nav).toContain('MCP-Quellen');
+    expect(nav).not.toContain('MCP &amp; Sites');
+    expect(nav).toContain('Benutzer &amp; Zugriff');
+  });
+
+  it('shows the Enterprise badge on the page title instead of a second heading in EE sections', () => {
+    for (const target of ['tableau-server-admin', 'mcp-admin', 'watch-admin', 'tableau-audit-admin']) {
+      expect(adminPageHtml).toContain(`<option value="${target}" data-ee="true">`);
+    }
+    expect(adminPageHtml).toContain('<span id="view-badge" class="view-badge" hidden>Enterprise</span>');
+    expect(adminPageHtml).toContain("document.getElementById('view-badge').hidden = option.dataset.ee !== 'true';");
+    // Kein Abschnitt wiederholt den Seitentitel sichtbar: die erste h2 je Abschnitt ist nur für Screenreader.
+    for (const id of ['overview', 'license', 'auth', 'users', 'commands', 'playbooks', 'metrics', 'models', 'extension', 'usage']) {
+      expect(adminPageHtml, id).toContain(`<h2 id="${id}-heading" class="visually-hidden">`);
+    }
+  });
+
+  it('summarises the setup state on the overview with worded status chips and links', () => {
+    for (const [key, href] of [['license', 'license-admin'], ['publicUrl', 'auth-admin'], ['auth', 'auth-admin'], ['access', 'users-admin'], ['tableau', 'tableau-server-admin'], ['models', 'models-admin'], ['llm', 'models-admin']]) {
+      expect(adminPageHtml).toMatch(new RegExp(`<li class="status-row" data-key="${key}">[^]*?<a class="status-link" href="#${href}">`));
+    }
+    expect(adminPageHtml).toContain("var overviewLabels = { ok: 'Bereit', warn: 'Unvollständig', error: 'Fehler', off: 'Nicht aktiv' };");
+    expect(adminPageHtml).toContain('function overviewSet(key, level, text)');
+    // Zustand nie nur über Farbe: jede Stufe hat ein Symbol und ein Wort.
+    expect(adminPageHtml).toContain('.status-chip[data-level="error"]::before { content: \'✕\'; }');
+    expect(adminPageHtml).toContain("pending + ' Personen warten auf Freigabe.'");
+  });
+
+  it('shows LLM figures, endpoint reachability, version and a click-only update check on the overview', () => {
+    for (const id of ['kpi-questions', 'kpi-calls', 'kpi-tokens-in', 'kpi-tokens-out', 'kpi-latency', 'kpi-errors', 'sys-version', 'sys-edition', 'update-check', 'update-result', 'update-howto']) {
+      expect(adminPageHtml, id).toContain(`id="${id}"`);
+    }
+    expect(adminPageHtml).toContain('<li class="status-row" data-key="llm">');
+    expect(adminPageHtml).toContain("adminFetch('/stats?days=7')");
+    expect(adminPageHtml).toContain("adminFetch('/upstream-models')");
+    expect(adminPageHtml).toContain("adminFetch('/system')");
+    // Die Update-Prüfung läuft nur auf Klick — beim Laden der Seite nie.
+    const loadAll = adminPageHtml.match(/function loadAll\(\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(loadAll).not.toContain('update-check');
+    expect(adminPageHtml).toMatch(/getElementById\('update-check'\)\.addEventListener\('click'[\s\S]*?adminFetch\('\/update-check'\)/);
+    expect(adminPageHtml).toContain('helm upgrade openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot --version <span class="update-target">');
+    // Nutzung zeigt sprechende Namen statt Metrik-IDs.
+    expect(adminPageHtml).toContain("h3.textContent = metricLabels[metric] || metric;");
+  });
+
+  it('saves the licence separately from the sign-in settings', () => {
+    expect(adminPageHtml).toContain('<button class="primary" id="save-license">Lizenz prüfen &amp; speichern</button>');
+    expect(adminPageHtml).toContain('<button class="primary" id="save-auth">Speichern</button>');
+    const saveAuth = adminPageHtml.match(/function saveAuth\(\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(saveAuth).not.toContain('license');
+    // Die Lizenz-Karte speichert mit dem bereits gültigen Modus, nie mit dem Formularstand unter „Anmeldung“.
+    expect(adminPageHtml).toContain('return putAuthSettings({ mode: mode, license: license }, licenseBanner, okText, loadInstallations);');
+    expect(adminPageHtml).toContain('if (lastAuthData.stored && lastAuthData.stored.mode) return lastAuthData.stored.mode;');
+    expect(adminPageHtml).toContain('bitte auch die Lizenz per Env setzen (OVP_LICENSE)');
+    // Zurücksetzen löscht auch den gespeicherten Lizenzschlüssel — das steht im Dialog und daneben.
+    expect(adminPageHtml).toMatch(/window\.confirm\('Alle Anmelde- und Lizenzeinstellungen der Admin-UI verwerfen \(auch den hier gespeicherten Lizenzschlüssel\)/);
+    expect(adminPageHtml).toMatch(/<div class="danger-zone">[\s\S]*?id="reset-auth"/);
+  });
+
+  it('walks through single sign-on in numbered steps with visible prerequisites', () => {
+    expect(adminPageHtml).toMatch(/<ol class="setup-flow">[\s\S]*?Redirect-URI beim Identity-Provider registrieren[\s\S]*?Werte vom Identity-Provider eintragen[\s\S]*?Speichern und Personen freischalten/);
+    expect(adminPageHtml).toContain('<p id="oidc-license-hint" class="banner error" role="status" hidden>Single Sign-On braucht eine gültige Enterprise-Lizenz mit „sso“. <a href="#license-admin">Zur Lizenz</a></p>');
+    expect(adminPageHtml).toContain("document.getElementById('oidc-license-hint').hidden = authMode.value !== 'oidc' || hasSso;");
+    // „Offen“ erklärt sich sichtbar, nicht nur im Tooltip.
+    expect(adminPageHtml).toContain('<p id="auth-mode-none-hint" class="hint error" hidden>Ohne Anmeldung gibt es keine Anwenderidentität');
+    expect(adminPageHtml).toContain("document.getElementById('oidc-setup').open = !oidc;");
+  });
+
+  it('tells Entra admins to use the Web platform with a client secret, because the middleware redeems the code', () => {
+    const entra = adminPageHtml.match(/<ol id="oidc-setup-entra">[\s\S]*?<\/ol>/)?.[0] ?? '';
+    expect(entra).toContain('<strong>Web</strong>');
+    expect(entra).toContain('AADSTS9002327');
+    expect(entra).toContain('„Neuer geheimer Clientschlüssel“');
+    expect(entra).not.toContain('Kein Client-Secret anlegen');
+    expect(adminPageHtml).toContain('<p id="oidc-entra-secret-hint" class="hint error" style="grid-column: 1 / -1; margin: 0;" hidden>Entra ID braucht ein Client-Secret');
+    expect(adminPageHtml).toContain("document.getElementById('oidc-entra-secret-hint').hidden = !entra || stored || fromEnv || Boolean(oidcClientSecret.value);");
+    expect(adminPageHtml).toContain("fromEnv ? 'aus OVP_OIDC_CLIENT_SECRET (Env)'");
+  });
+
+  it('opens the admin SSO popup synchronously on the click and navigates it after the PKCE hash', () => {
+    const handler = adminPageHtml.match(/getElementById\('sso-submit'\)\.addEventListener\('click'[\s\S]*?\n  \}\);/)?.[0] ?? '';
+    const openAt = handler.indexOf("window.open('about:blank', 'openvizpilot-admin-login'");
+    expect(openAt).toBeGreaterThan(-1);
+    expect(openAt).toBeLessThan(handler.indexOf("crypto.subtle.digest('SHA-256'"));
+    expect(handler).toContain('popup.location.href = url.toString();');
+    expect(handler).toContain('if (!popup.closed) popup.close();');
+  });
+
   it('offers labeled first-run and login forms with matching password limits', () => {
     expect(adminPageHtml).toContain('<form id="gate-setup" hidden>');
     expect(adminPageHtml).toContain('<form id="gate-login" hidden>');
@@ -116,8 +213,8 @@ describe('admin presentation', () => {
     // Abschnitte verweisen (z. B. „SSO im Abschnitt Anmeldung einrichten“).
     const nav = adminPageHtml.match(/<nav aria-label="Administration">[\s\S]*?<\/nav>/)?.[0] ?? '';
     const targets = [...nav.matchAll(/href="#([a-z-]+)"/g)].map(match => match[1]);
-    expect(targets).toHaveLength(11);
-    expect(new Set(targets).size).toBe(11);
+    expect(targets).toHaveLength(14);
+    expect(new Set(targets).size).toBe(14);
     for (const target of targets) {
       expect(adminPageHtml.split(`id="${target}"`)).toHaveLength(2);
       expect(adminPageHtml).toContain(`value="${target}"`);

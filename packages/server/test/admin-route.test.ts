@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EE_STUB } from '@openvizpilot/ee/server';
 import { createApp } from '../src/app';
+import { isNewerVersion, RELEASES_API, RELEASES_PAGE } from '../src/routes/admin';
 import type { AppConfig } from '../src/env';
 import { activated, signTestLease, testLicenseEnv } from './license-helper';
 import { userAccessId } from '../src/memory/store';
@@ -476,5 +477,48 @@ describe('PUT /api/admin/user-access/:id — Serverdaten (W5)', () => {
     expect((await app.request(`/api/admin/user-access/${id}`, { method: 'PUT', headers: json, body: JSON.stringify({ ai: false, tableauApi: false, serverData: false }) })).status).toBe(200);
     expect((await memoryStore!.getUserAccess(id))?.serverData).toBe(false);
     expect(await memoryStore!.getServerDataConsent(id)).toBeNull();
+  });
+});
+
+describe('Version und Update-Prüfung (Übersicht)', () => {
+  const auth = { headers: { authorization: 'Bearer geheim' } };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('compares release versions, treating pre-releases as older and unknown versions as unknown', () => {
+    expect(isNewerVersion('1.7.0', '1.6.1')).toBe(true);
+    expect(isNewerVersion('1.6.1', '1.6.1')).toBe(false);
+    expect(isNewerVersion('1.6.0', '1.10.0')).toBe(false);
+    expect(isNewerVersion('1.7.0', '1.7.0-rc.1')).toBe(true);
+    expect(isNewerVersion('1.7.0-rc.1', '1.7.0')).toBe(false);
+    expect(isNewerVersion('1.7.0', 'unbekannt')).toBeNull();
+  });
+
+  it('describes the installation without contacting anything outside', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { app } = createApp(testConfig({ adminToken: 'geheim', appVersion: '1.7.0', memoryDbPath: tmpDbPath() }));
+    const res = await app.request('/api/admin/system', auth);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ version: '1.7.0', edition: EE_STUB ? 'core' : 'enterprise', environment: 'test', database: 'sqlite', releasesUrl: RELEASES_PAGE });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('checks the public releases only on request and never passes on a foreign link', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ tag_name: 'v1.8.0', html_url: 'https://evil.example/release', published_at: '2026-10-01T00:00:00Z' }), { status: 200 }));
+    const { app } = createApp(testConfig({ adminToken: 'geheim', appVersion: '1.7.0' }));
+    const res = await app.request('/api/admin/update-check', auth);
+    expect(await res.json()).toEqual({ current: '1.7.0', latest: '1.8.0', newer: true, url: RELEASES_PAGE, publishedAt: '2026-10-01T00:00:00Z' });
+    expect(fetchSpy).toHaveBeenCalledWith(RELEASES_API, expect.anything());
+    // Zweiter Aufruf innerhalb einer Stunde: aus dem Cache, keine zweite Anfrage.
+    await app.request('/api/admin/update-check', auth);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an unreachable GitHub with a link to the release page instead of failing silently', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
+    const { app } = createApp(testConfig({ adminToken: 'geheim' }));
+    const res = await app.request('/api/admin/update-check', auth);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ url: RELEASES_PAGE });
+    expect((await app.request('/api/admin/update-check')).status).toBe(401);
   });
 });

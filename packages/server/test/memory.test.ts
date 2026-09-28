@@ -59,6 +59,18 @@ describe('sqlite memory store', () => {
     await store.close();
   });
 
+  it('adds server-side increments (tokens, milliseconds) and ignores negative or broken values', async () => {
+    const store = makeStore();
+    await store.recordUsage([{ metric: 'llm_tokens_in', key: 'gpt', count: 1200 }, { metric: 'llm_call', key: 'gpt' }]);
+    await store.recordUsage([{ metric: 'llm_tokens_in', key: 'gpt', count: 300.4 }, { metric: 'llm_tokens_in', key: 'gpt', count: -5 }, { metric: 'llm_tokens_in', key: 'gpt', count: Number.NaN }]);
+
+    const rows = await store.getUsageStats(30);
+    const byMetric = Object.fromEntries(rows.map((r) => [r.metric, r.count]));
+    expect(byMetric.llm_tokens_in).toBe(1500);
+    expect(byMetric.llm_call).toBe(1);
+    await store.close();
+  });
+
   it('keeps different keys of one recordUsage batch as separate counters', async () => {
     const store = makeStore();
     await store.recordUsage([

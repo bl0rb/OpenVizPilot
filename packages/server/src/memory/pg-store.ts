@@ -13,7 +13,7 @@ import {
 import { Pool } from 'pg';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
+import { usageIncrement, userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
 
 /**
  * Postgres-Backend der Middleware-Datenbank — Produktionspfad auf EKS:
@@ -340,18 +340,18 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
       });
     },
 
-    async recordUsage(events: Array<{ metric: string; key: string }>): Promise<void> {
+    async recordUsage(events: Array<{ metric: string; key: string; count?: number }>): Promise<void> {
       if (events.length === 0) return;
       await ensureSchema();
       // EIN Tag für den ganzen Batch — die Events eines Requests treffen
       // praktisch gleichzeitig ein.
       const day = new Date().toISOString().slice(0, 10);
-      for (const { metric, key } of events) {
+      for (const { metric, key, count } of events) {
         await pool.query(
           `INSERT INTO usage_stats (day, metric, key, count)
-           VALUES ($1, $2, $3, 1)
+           VALUES ($1, $2, $3, $4)
            ON CONFLICT (day, metric, key) DO UPDATE SET count = usage_stats.count + EXCLUDED.count`,
-          [day, metric, key],
+          [day, metric, key, usageIncrement(count)],
         );
       }
     },

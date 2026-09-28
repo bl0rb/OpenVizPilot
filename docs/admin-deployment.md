@@ -16,7 +16,7 @@
 
 ## Zugriffsschutz der Middleware (wichtig)
 
-> **Anmeldung in der Extension:** Damit nicht jeder, der die Middleware erreicht, den Chat nutzen kann, gibt es in der Admin-UI (Abschnitt „Anmeldung, Single Sign-On & Lizenz“) den Modus **Benutzerkonten** (Open Core: Konten mit Passwort, vom Admin angelegt) und — mit Enterprise-Lizenz — **Single Sign-On** per OIDC (Microsoft Entra ID, Keycloak); die Middleware verifiziert dann jeden Request gegen den Identity-Provider. Details: [docs/enterprise.md](enterprise.md). Die folgenden Optionen sind die Env-Defaults, die die Admin-UI überschreiben kann.
+> **Anmeldung in der Extension:** Damit nicht jeder, der die Middleware erreicht, den Chat nutzen kann, gibt es in der Admin-UI (Bereich „Anmeldung“) den Modus **Benutzerkonten** (Open Core: Konten mit Passwort, vom Admin angelegt) und — mit Enterprise-Lizenz — **Single Sign-On** per OIDC (Microsoft Entra ID, Keycloak); die Middleware verifiziert dann jeden Request gegen den Identity-Provider. Details: [docs/enterprise.md](enterprise.md). Die folgenden Optionen sind die Env-Defaults, die die Admin-UI überschreiben kann.
 
 Die Middleware selbst hat keine Tableau-Anmeldung — jeder, der sie im Netz erreicht, kann über sie kostenpflichtige LLM-Aufrufe auslösen (nicht: fremde Daten lesen — Daten holt nur der Browser des jeweiligen Users). Deshalb **mindestens eine** dieser Maßnahmen:
 
@@ -54,8 +54,27 @@ Image und Chart werden von den GitHub-Workflows (`.github/workflows/publish-ghcr
 
 Test: `https://chat.example.com/healthz` → `{"ok":true}`; `https://chat.example.com/` → Chat-UI lädt.
 
+## Alternative: Docker Compose auf einer Linux-VM (ohne Kubernetes)
+
+Für Umgebungen ohne Cluster liegt unter [`deploy/compose/`](../deploy/compose/compose.yaml) ein fertiges Setup: Middleware (dasselbe Image wie im Helm-Chart), Postgres 17 als Datenbank und optional Caddy als HTTPS-Proxy. Voraussetzung: eine Linux-VM mit Docker Engine und Compose-Plugin (2 vCPU, 4 GB RAM genügen), von den Browsern der Tableau-Nutzer erreichbar.
+
+```bash
+cd deploy/compose
+cp .env.example .env       # ausfüllen: DEPLOY_VERSION, POSTGRES_PASSWORD, OVP_LLM_*, OVP_DEFAULT_MODEL, OVP_SECRET_KEY …
+docker compose --profile caddy up -d
+```
+
+- **Image:** `DEPLOY_VERSION` auf eine Release-Version pinnen (nicht `latest`). Enterprise: `DEPLOY_IMAGE=ghcr.io/bl0rb/openvizpilot-enterprise` und vorher `docker login ghcr.io` mit dem Kunden-Lese-Token ([docs/enterprise.md](enterprise.md#bezug-des-enterprise-images)).
+- **Konfiguration:** `.env` wird komplett an die Middleware durchgereicht — alle `OVP_*`-Variablen aus der [`.env.example`](../.env.example) im Repo-Root gelten auch hier. `DEPLOY_*` und `POSTGRES_PASSWORD` sind nur für Compose; `OVP_DATABASE_URL` setzt die `compose.yaml` selbst.
+- **HTTPS mit Caddy** (`--profile caddy`, Ports 80/443): `DEPLOY_HOST` setzen und das Zertifikat samt Zwischenzertifikaten als `certs/fullchain.pem` und `certs/privkey.pem` ablegen — eine interne CA genügt, wenn die Browser ihr vertrauen. Für einen aus dem Internet erreichbaren Host die `tls`-Zeile im [`Caddyfile`](../deploy/compose/Caddyfile) entfernen, dann holt Caddy selbst ein Let's-Encrypt-Zertifikat. SSE ist dort bereits ungepuffert konfiguriert; die Beschränkung von `/admin` auf das Admin-Netz ist als Kommentar vorbereitet.
+- **Eigener Reverse Proxy** (nginx, Load Balancer): ohne `--profile caddy` starten; die Middleware lauscht dann auf `127.0.0.1:3000` (`DEPLOY_BIND`/`DEPLOY_PORT`). SSE beachten: `proxy_buffering off;` für `/api/chat`.
+- **Admin-Ersteinrichtung** unter `https://<host>/admin` direkt nach dem ersten Start durchführen (siehe „Admin-UI“).
+- **Update:** `DEPLOY_VERSION` anheben, dann `docker compose pull && docker compose --profile caddy up -d`. Datenbank und Caddy-Zertifikate liegen in den Volumes `openvizpilot_db-data` und `openvizpilot_caddy-data` und bleiben erhalten — **nie** `docker compose down -v` ausführen, das löscht auch die Installations-ID der Lizenzaktivierung.
+- **Backup:** `docker compose exec -T db pg_dump -U openvizpilot openvizpilot > openvizpilot-$(date +%F).sql` regelmäßig (z. B. per cron) sichern.
+- **Skalierung:** eine Instanz; für mehrere Knoten eine gemeinsame, externe Postgres-Datenbank verwenden (dann den `db`-Dienst samt `depends_on` weglassen und `OVP_DATABASE_URL` in der `compose.yaml` darauf zeigen lassen).
+
 <details>
-<summary>Alternative ohne Kubernetes (Bare-Metal/VM)</summary>
+<summary>Alternative ohne Container (Bare-Metal/VM)</summary>
 
 `npm ci && npm run build`, dann `packages/server/dist/index.js` mit Node ≥ 24 starten (systemd/pm2), Umgebung nach `.env.example`, `OVP_SERVE_STATIC_DIR` auf den Extension-Build zeigen lassen, Reverse Proxy mit HTTPS davor (SSE: `proxy_buffering off;`).
 </details>
@@ -89,7 +108,7 @@ als der übliche clientseitige Zugriff über die Extensions API prüft die Middl
 Abfrage drei Hürden:
 
 1. **Site-Schalter** „Serverseitige Daten erlauben“ (Admin → Tableau Server → Site) — sonst bricht die Abfrage mit `server_data_disabled` ab.
-2. **Freigabe „Serverdaten“** je Person unter „Benutzerzugriff“ — sonst `server_data_not_granted`.
+2. **Freigabe „Serverdaten“** je Person unter „Benutzer & Zugriff“ — sonst `server_data_not_granted`.
 3. **Einwilligung** der Person (einmalig, über die Extension) — fehlt sie, antwortet die Middleware mit `409 consent_required`.
 
 Details zu Tool, Endpunkten und Scope stehen in [tableau-server.md](tableau-server.md), zur
@@ -124,7 +143,7 @@ bleiben Webhook und Microsoft Teams unverändert nutzbar.
 
 ## Schritt 2: Manifest erzeugen und verteilen
 
-**Empfohlener Weg — Download aus der Admin-UI** (kein Checkout nötig; setzt voraus, dass die Middleware die Extension-Statik ausliefert — im Container/Helm-Deployment immer der Fall, lokal nur mit `OVP_SERVE_STATIC_DIR` + gebauter Extension; die Admin-UI warnt sonst): Auf `https://<host>/admin` anmelden (Admin-Passwort bzw. `OVP_ADMIN_TOKEN` — siehe Abschnitt „Admin-UI“), im Abschnitt **„Extension für Tableau“** die öffentliche Extension-URL prüfen (vorbelegt mit dem aktuellen Host) und **„Manifest (.trex) herunterladen“** klicken. Die Middleware validiert die URL (HTTPS-Pflicht; Query/Fragment verboten) und liefert das fertige `openvizpilot.trex`. Da die Extension bei leerer Backend-URL automatisch mit **demselben Origin** spricht, aus dem sie geladen wurde, ist damit auch die Verbindung zur Middleware korrekt konfiguriert — nichts weiter einzutragen.
+**Empfohlener Weg — Download aus der Admin-UI** (kein Checkout nötig; setzt voraus, dass die Middleware die Extension-Statik ausliefert — im Container/Helm-Deployment immer der Fall, lokal nur mit `OVP_SERVE_STATIC_DIR` + gebauter Extension; die Admin-UI warnt sonst): Auf `https://<host>/admin` anmelden (Admin-Passwort bzw. `OVP_ADMIN_TOKEN` — siehe Abschnitt „Admin-UI“), im Bereich **„Tableau-Extension“** die öffentliche Extension-URL prüfen (vorbelegt mit dem aktuellen Host) und **„Manifest (.trex) herunterladen“** klicken. Die Middleware validiert die URL (HTTPS-Pflicht; Query/Fragment verboten) und liefert das fertige `openvizpilot.trex`. Da die Extension bei leerer Backend-URL automatisch mit **demselben Origin** spricht, aus dem sie geladen wurde, ist damit auch die Verbindung zur Middleware korrekt konfiguriert — nichts weiter einzutragen.
 
 Alternativ per Build-Script aus dem Repo:
 
@@ -151,14 +170,15 @@ Unter `https://<host>/admin` liegt die Verwaltungsseite. Zwei Betriebsarten:
 
 Ohne `OVP_ADMIN_TOKEN` **und** ohne User-Memory existiert die Route nicht (404).
 
-**Rollen.** Token bzw. Admin-Konto sind der **initiale Admin**. Zusätzlich kann er unter „Benutzerzugriff“ einzelnen Identitäten (lokale Konten oder SSO-Identitäten) den Schalter **Admin** geben — diese **delegierten Admins** melden sich an `/admin` mit ihrem eigenen Konto an („Mit Benutzerkonto anmelden“: Benutzername/Passwort im Modus `local`, „Mit Single Sign-On anmelden“ im Modus `oidc`; die Anmeldung folgt dem jeweils aktiven Anmeldemodus). Delegierte Admins bedienen die gesamte Administration, dürfen aber die Admin-Rolle **weder vergeben noch entziehen** (API: `403 initial_admin_required`); gesperrte Konten kommen nicht durch, ein Konto ohne Rolle erhält `403 not_admin`. Ein Entzug der Rolle wirkt beim nächsten Request. `GET /api/admin/me` liefert `{ role: 'initial' | 'delegated', name, provider }`.
+**Rollen.** Token bzw. Admin-Konto sind der **initiale Admin**. Zusätzlich kann er unter „Benutzer & Zugriff“ einzelnen Identitäten (lokale Konten oder SSO-Identitäten) den Schalter **Admin** geben — diese **delegierten Admins** melden sich an `/admin` mit ihrem eigenen Konto an („Mit Benutzerkonto anmelden“: Benutzername/Passwort im Modus `local`, „Mit Single Sign-On anmelden“ im Modus `oidc`; die Anmeldung folgt dem jeweils aktiven Anmeldemodus). Delegierte Admins bedienen die gesamte Administration, dürfen aber die Admin-Rolle **weder vergeben noch entziehen** (API: `403 initial_admin_required`); gesperrte Konten kommen nicht durch, ein Konto ohne Rolle erhält `403 not_admin`. Ein Entzug der Rolle wirkt beim nächsten Request. `GET /api/admin/me` liefert `{ role: 'initial' | 'delegated', name, provider }`.
 
+- **Übersicht** (Startseite nach dem Login): Stand der Einrichtung — Lizenz, öffentliche URL, Anmeldemodus, offene Freigaben, Tableau Server, Modelle, Erreichbarkeit des LLM-Endpunkts — je mit Status in Worten und Link in den zuständigen Bereich. Dazu die LLM-Kennzahlen der letzten 7 Tage (Fragen, Modellaufrufe, Tokens ein/aus, Ø Antwortzeit, Fehlerquote, je Modell; anonyme Tageszähler, ab 1.7.0) sowie installierte Version, Edition, Umgebung und Datenbank. **„Auf Updates prüfen“** fragt nur auf Klick die öffentlichen GitHub-Releases ab (ausgehend HTTPS auf `api.github.com`, sonst keine Verbindung) und zeigt bei einer neueren Version die passenden Befehle für Helm und Docker Compose. Die Navigation folgt der Einrichtungsreihenfolge: *Einrichtung* (Übersicht, Lizenz & Aktivierung, Anmeldung, Tableau Server, Modelle), *Zugriff*, *Inhalte*, *Betrieb*.
 - **Slash-Befehle**: Die deutschen Prompt-Playbooks der Extension (`/zusammenfassung` usw.) zentral bearbeiten, ergänzen (max. 20) oder auf die eingebauten Standards zurücksetzen. Die Extension lädt die Befehle beim Start vom Server (Fallback: eingebaute Defaults).
 - **Kennzahlen**: Unternehmensweit verbindlicher Kennzahlenkatalog (bis zu 200 Einträge: Name, Synonyme, Definition, Owner, Datenquelle, Interpretationshinweis, bis zu fünf geprüfte Fragen mit Antwortlogik). Der Katalog wird kompakt in den System-Prompt eingebettet; erkennt der Assistent eine Kennzahl oder ein Synonym, schlägt er die Definition per Tool `lookup_metric` nach und die Antwort zeigt „✓ Verifizierte Definition“ — nur dann, wenn das Tool wirklich lief. Ergänzt das Autoren-Glossar im Workbook, das je Dashboard gilt.
 - **Standardanalysen pro Dashboard**: Eingebundene Dashboards unabhängig von der Nutzungsstatistik auswählen, bis zu fünf Starter-Fragen und eigene Slash-Befehle hinterlegen. [Einrichtung und Zuordnung](#standardanalysen-pro-dashboard).
 - **Modelle**: Welche Modelle die Extension anbietet — per „Vom Endpunkt laden“ die Liste des LLM-Endpunkts abrufen, Einträge übernehmen und mit sprechenden **Anzeigenamen** versehen (z. B. „Standard (empfohlen)“ statt der technischen Modell-ID). Ein gespeicherter Katalog **übersteuert `OVP_MODEL_ALLOWLIST`**: Nur noch seine Modell-IDs sind wählbar — am Chat-Endpunkt erzwungen, auch für Requests ohne `model`-Feld. Enthält der Katalog das konfigurierte `OVP_DEFAULT_MODEL` nicht, gilt sein **erster Eintrag** als Standard-Modell (so kann ein Modell rein über die Admin-UI stillgelegt werden). Ist der Katalog wegen eines DB-Fehlers kurzzeitig nicht lesbar, wird **fail-closed** nur `OVP_MODEL_ALLOWLIST` bzw. das Default-Modell akzeptiert. Ohne Katalog gilt wie bisher die Endpunkt-Liste ∩ `OVP_MODEL_ALLOWLIST`.
-- **Extension für Tableau**: Manifest-Download mit validierter HTTPS-URL (siehe „Schritt 2“).
-- **Nutzung (anonym)**: Aggregierte Tageszähler — Chat-Turns pro Modell, Tool-Aufrufe pro Tool, verwendete Slash-Befehle, ausgeführte Action-Chips, vom Scope-Guard abgelehnte Fragen (`scope_blocked`), Fehler — **ohne Nutzer-IDs und ohne Frage-/Antwort-Inhalte**. Dazu eine **Dashboard-Tabelle**: Fragen je Dashboard, Anzahl Anwender, Ø und Maximum Fragen je Anwender. „Anwender“ sind dabei **nicht umkehrbare Pseudonyme**: HMAC-SHA256 der obfuskierten Tableau-User-ID mit einem geheimen, pro Installation einmalig erzeugten Salt (DB-Singleton, replikaübergreifend) — es werden weder Namen noch Tableau-IDs gespeichert, und die Pseudonyme verlassen den Server nicht (die Admin-UI sieht nur Zähler). Sie sind bewusst nicht mit dem User-Memory verknüpfbar. Kennzahlen **je Anwender** (Anzahl, Ø, Maximum) werden erst ab **3 Anwendern** je Dashboard ausgewiesen — darunter „< 3“, damit sich eine einzelne Person nicht über die Zähler erraten lässt (die Fragen-Summe je Dashboard bleibt sichtbar; bei Dashboards mit nur einem Nutzer ist diese Summe naturgemäß dessen Nutzung). Gezählt werden nur frische, vom Scope-Guard akzeptierte Fragen — keine Tool-Runden, keine Wiederholungen nach Fehlern, keine abgelehnten Off-Topic-Fragen. Datenschutzrechtlich handelt es sich um pseudonymisierte Nutzungsdaten; bei Bedarf über die Retention der Memory-Datenbank (Tabelle `usage_dashboards`) begrenzen.
+- **Tableau-Extension**: Manifest-Download mit validierter HTTPS-URL (siehe „Schritt 2“).
+- **Nutzung**: Anonyme, aggregierte Tageszähler — Chat-Turns pro Modell, Tool-Aufrufe pro Tool, verwendete Slash-Befehle, ausgeführte Action-Chips, vom Scope-Guard abgelehnte Fragen (`scope_blocked`), Fehler — **ohne Nutzer-IDs und ohne Frage-/Antwort-Inhalte**. Dazu eine **Dashboard-Tabelle**: Fragen je Dashboard, Anzahl Anwender, Ø und Maximum Fragen je Anwender. „Anwender“ sind dabei **nicht umkehrbare Pseudonyme**: HMAC-SHA256 der obfuskierten Tableau-User-ID mit einem geheimen, pro Installation einmalig erzeugten Salt (DB-Singleton, replikaübergreifend) — es werden weder Namen noch Tableau-IDs gespeichert, und die Pseudonyme verlassen den Server nicht (die Admin-UI sieht nur Zähler). Sie sind bewusst nicht mit dem User-Memory verknüpfbar. Kennzahlen **je Anwender** (Anzahl, Ø, Maximum) werden erst ab **3 Anwendern** je Dashboard ausgewiesen — darunter „< 3“, damit sich eine einzelne Person nicht über die Zähler erraten lässt (die Fragen-Summe je Dashboard bleibt sichtbar; bei Dashboards mit nur einem Nutzer ist diese Summe naturgemäß dessen Nutzung). Gezählt werden nur frische, vom Scope-Guard akzeptierte Fragen — keine Tool-Runden, keine Wiederholungen nach Fehlern, keine abgelehnten Off-Topic-Fragen. Datenschutzrechtlich handelt es sich um pseudonymisierte Nutzungsdaten; bei Bedarf über die Retention der Memory-Datenbank (Tabelle `usage_dashboards`) begrenzen.
 
 `/admin` gehört nicht in die Tableau-Safelist und sollte idealerweise nur aus dem Admin-Netz erreichbar sein (Ingress-/Proxy-Regel).
 
@@ -222,7 +242,7 @@ wurde zu `llm.*` und schlägt beim Rendern mit einer Fehlermeldung fehl, wenn no
 - [ ] `OVP_MODEL_ALLOWLIST` und `app.defaultModel` gesetzt; `memory.model` und `app.scopeModel` auf ein günstiges Modell.
 - [ ] Admin-Zugang geklärt: entweder `app.adminTokenSecret` gesetzt (Token-Modus) **oder** die Ersteinrichtung im Passwort-Modus **sofort nach dem Deploy** durchgeführt — und `/admin` per Ingress-/Netzwerkregel auf Admins beschränkt.
 - [ ] Ingress mit CA-signiertem TLS-Zertifikat; SSE-Buffering für `/api/chat` deaktiviert (nginx: `proxy-buffering: "off"`).
-- [ ] CloudNativePG: Storage-Größe passend, **Backups/Retention** konfiguriert (CNPG `backup`-Spec).
+- [ ] CloudNativePG: Storage-Größe passend, **Backups/Retention** konfiguriert (CNPG `backup`-Spec). Docker Compose: `pg_dump`-Sicherung eingerichtet.
 - [ ] `https://<host>/healthz` und `/api/models` liefern korrekte Antworten.
 
 **Tableau**

@@ -15,7 +15,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
-import { userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
+import { usageIncrement, userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
 
 /**
  * SQLite-Backend über das Node-Builtin `node:sqlite` — für die lokale
@@ -289,17 +289,17 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       });
     },
 
-    async recordUsage(events: Array<{ metric: string; key: string }>): Promise<void> {
+    async recordUsage(events: Array<{ metric: string; key: string; count?: number }>): Promise<void> {
       if (events.length === 0) return;
       // EIN Tag für den ganzen Batch — die Events eines Requests treffen
       // praktisch gleichzeitig ein.
       const day = new Date().toISOString().slice(0, 10);
-      for (const { metric, key } of events) {
+      for (const { metric, key, count } of events) {
         db.prepare(
           `INSERT INTO usage_stats (day, metric, key, count)
-           VALUES (?, ?, ?, 1)
+           VALUES (?, ?, ?, ?)
            ON CONFLICT(day, metric, key) DO UPDATE SET count = count + excluded.count`,
-        ).run(day, metric, key);
+        ).run(day, metric, key, usageIncrement(count));
       }
     },
 

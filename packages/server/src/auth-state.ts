@@ -174,6 +174,19 @@ export function createAuthStateProvider(
         }
       : null;
 
+  /**
+   * In der Admin-UI gespeichertes OIDC ohne eigenes Secret bekommt OVP_OIDC_CLIENT_SECRET (so
+   * empfiehlt es die Admin-UI für Vault-Deployments). Zeigt die Env dagegen auf einen anderen
+   * Issuer oder Client, bleibt das Secret draußen — sonst ginge es an einen fremden
+   * Token-Endpunkt. Ein im Admin gespeichertes Secret hat immer Vorrang.
+   */
+  const withEnvSecret = (stored: OidcSettings): OidcSettings => {
+    if (stored.clientSecret || !config.oidcClientSecretEnv) return stored;
+    const env = config.oidc;
+    if (env && (env.issuer !== stored.issuer.replace(/\/$/, '') || env.clientId !== stored.clientId)) return stored;
+    return { ...stored, clientSecret: config.oidcClientSecretEnv };
+  };
+
   const compute = async (): Promise<AuthState> => {
     let settings: AuthSettings | null = null;
     if (store) {
@@ -243,7 +256,7 @@ export function createAuthStateProvider(
         : verifiedLicense;
 
     const mode: AuthMode = settings?.mode ?? config.authMode;
-    const oidcSettings = settings?.oidc ?? envOidc();
+    const oidcSettings = settings?.oidc ? withEnvSecret(settings.oidc) : envOidc();
     const publicUrl = settings?.publicUrl?.replace(/\/$/, '') ?? config.publicUrl;
     let blockedReason: string | null = null;
     let oidc: OidcClient | null = null;

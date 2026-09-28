@@ -1,0 +1,25 @@
+# HTTPS-Proxy vor der Middleware (Profil "caddy" in compose.yaml).
+#
+# Zertifikat: Tableau lädt die Extension nur mit einem Zertifikat, dem die
+# Browser der Nutzer vertrauen (öffentliche oder interne CA, nicht self-signed).
+# Default: eigenes Zertifikat samt Zwischenzertifikaten als
+# ./certs/fullchain.pem und ./certs/privkey.pem ablegen.
+# Öffentlich erreichbarer Host mit Let's Encrypt: die tls-Zeile entfernen,
+# Caddy holt das Zertifikat dann selbst (Port 80 und 443 müssen aus dem
+# Internet erreichbar sein).
+
+{$DEPLOY_HOST} {
+	tls /certs/fullchain.pem /certs/privkey.pem
+
+	# Optional: Admin-UI nur aus dem Admin-Netz erreichbar machen.
+	# @admin_extern {
+	# 	path /admin /admin/* /api/admin/*
+	# 	not remote_ip 10.0.0.0/8
+	# }
+	# respond @admin_extern 403
+
+	reverse_proxy app:3000 {
+		# Chat-Antworten kommen per SSE (/api/chat) — sofort durchreichen.
+		flush_interval -1
+	}
+}

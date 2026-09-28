@@ -71,6 +71,27 @@ async function stateAt(telemetry: TelemetryStore | null, nowMs: number, extra: P
 const lease = (leaseUntilMs: number, extra: { offline?: boolean; installationId?: string; licenseId?: string } = {}) =>
   signTestLease({ installationId: extra.installationId ?? 'inst-1', licenseId: extra.licenseId, leaseUntil: new Date(leaseUntilMs).toISOString(), offline: extra.offline });
 
+describe('OIDC client secret from the environment', () => {
+  const stored = { provider: 'entra' as const, issuer: 'https://login.microsoftonline.com/t/v2.0', clientId: 'app-1', scopes: 'openid profile email' };
+  // Nur getAuthSettings wird gelesen — mehr braucht auth-state vom Store hier nicht.
+  const storeWith = (oidc: typeof stored & { clientSecret?: string }) => ({ getAuthSettings: async () => ({ mode: 'oidc' as const, oidc }) }) as unknown as Parameters<typeof createAuthStateProvider>[1];
+  const secretOf = async (oidc: typeof stored & { clientSecret?: string }, extra: Partial<AppConfig>) =>
+    (await createAuthStateProvider(config(extra), storeWith(oidc), createLogger('error')).get()).oidcSettings?.clientSecret;
+
+  it('fills a missing secret of the admin-UI configuration from OVP_OIDC_CLIENT_SECRET (Vault deployments)', async () => {
+    expect(await secretOf(stored, { oidcClientSecretEnv: 'from-vault' })).toBe('from-vault');
+    // Env mit demselben Client (nur mit abschließendem Schrägstrich im gespeicherten Issuer) zählt als derselbe.
+    expect(await secretOf({ ...stored, issuer: stored.issuer + '/' }, { oidcClientSecretEnv: 'from-vault', oidc: { ...stored, clientSecret: 'from-vault' } })).toBe('from-vault');
+  });
+
+  it('keeps a secret saved in the admin UI and never sends the env secret to another client', async () => {
+    expect(await secretOf({ ...stored, clientSecret: 'from-db' }, { oidcClientSecretEnv: 'from-vault' })).toBe('from-db');
+    const otherClient = { ...stored, clientId: 'other-app', clientSecret: 'from-vault' };
+    expect(await secretOf(stored, { oidcClientSecretEnv: 'from-vault', oidc: otherClient })).toBeUndefined();
+    expect(await secretOf(stored, {})).toBeUndefined();
+  });
+});
+
 // Testet die reale Lizenz-/Lease-Verifikation (verifyLicense/verifyLease) —
 // im Core-Export (EE_STUB) ist jede Lizenz 'none'/'invalid', diese Suite
 // läuft nur im vollen Baum.

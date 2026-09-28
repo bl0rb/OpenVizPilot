@@ -8,8 +8,8 @@
  * jedem Request als "Authorization: Bearer <token>" an /api/admin/* gesendet
  * — nie in der URL (siehe Datenschutz-Regel: keine Secrets in URLs/Logs).
  */
-import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles, watchAdminScript, watchAdminSection, watchAdminStyles } from '@openvizpilot/ee/server';
-import { ChartNoAxesCombined, Download, Eye, KeyRound, LayoutDashboard, LockKeyhole, LockKeyholeOpen, LogOut, Network, RefreshCw, Ruler, Save, Settings, ShieldCheck, Terminal, Trash2, Users, type IconNode } from 'lucide';
+import { mcpAdminScript, mcpAdminSection, mcpAdminStyles, tableauAdminScript, tableauAdminSection, tableauAdminStyles, tableauAuditSection, watchAdminScript, watchAdminSection, watchAdminStyles } from '@openvizpilot/ee/server';
+import { ChartNoAxesCombined, Download, Eye, KeyRound, LayoutDashboard, ListChecks, LockKeyhole, LockKeyholeOpen, LogIn, LogOut, Network, RefreshCw, Ruler, Save, ScrollText, Server, Settings, Terminal, Trash2, Users, type IconNode } from 'lucide';
 import { adminFont } from './admin-font';
 
 const adminLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -180,6 +180,48 @@ export const adminPageHtml = `<!doctype html>
   .banner.error { display: block; background: var(--danger-bg); color: var(--danger); }
   .banner.ok { display: block; background: var(--ok-bg); color: #1e5631; }
   .hint.error { color: var(--danger); font-weight: 600; }
+  /* Titel, die der Seitentitel (h1) schon sichtbar trägt — nur für aria-labelledby und Screenreader. */
+  .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* Statuszeilen (Übersicht, Voraussetzungen): Zustand immer als Wort im Chip, die Farbe unterstützt nur. */
+  .status-list { list-style: none; margin: 0.5rem 0 1.25rem; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .status-row { display: grid; grid-template-columns: 9.5rem minmax(9rem, 13rem) minmax(0, 1fr) auto; gap: 0.35rem 1rem; align-items: center; padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-size: 13px; }
+  .status-row:first-child { border-top: 0; }
+  .status-chip { justify-self: start; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 12px; font-weight: 600; background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); white-space: nowrap; }
+  .status-chip::before { content: '–'; font-weight: 700; }
+  .status-chip[data-level="ok"] { background: var(--ok-bg); color: #1e5631; border-color: #cfe5d5; }
+  .status-chip[data-level="ok"]::before { content: '✓'; }
+  .status-chip[data-level="warn"] { background: #fff4e0; color: #8a4b00; border-color: #f3dcb2; }
+  .status-chip[data-level="warn"]::before { content: '!'; }
+  .status-chip[data-level="error"] { background: var(--danger-bg); color: var(--danger); border-color: #f5c9c4; }
+  .status-chip[data-level="error"]::before { content: '✕'; }
+  .status-name { font-weight: 600; }
+  .status-detail { color: var(--text-muted); overflow-wrap: anywhere; }
+  .status-link { color: var(--accent); font-weight: 500; text-decoration: none; white-space: nowrap; }
+  .status-link:hover { text-decoration: underline; }
+  .overview-heading { font-size: 15px; margin: 2rem 0 0.5rem; }
+  .kv-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 0.75rem 1.25rem; margin: 0.5rem 0 1rem; }
+  .kv-list div { min-width: 0; }
+  .kv-list dt { font-size: 12px; color: var(--text-muted); }
+  .kv-list dd { margin: 0.15rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr)); gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
+  .kpi { display: grid; gap: 0.15rem; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .kpi-value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi-label { font-size: 12px; color: var(--text-muted); }
+  #update-howto pre { margin: 0.35rem 0 0.75rem; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #update-howto pre code { font-size: 12px; }
+  #overview-llm-models { max-width: 640px; }
+  .view-badge { display: inline-block; margin-left: 0.6rem; font-size: 11px; font-weight: 600; color: #4a35d6; background: #eeedff; border-radius: 4px; padding: 4px 7px; vertical-align: middle; }
+  /* Nummerierte Einrichtungsschritte (Single Sign-On). */
+  .setup-flow { list-style: none; counter-reset: setup-step; margin: 1rem 0 0; padding: 0; }
+  .setup-flow > li { counter-increment: setup-step; position: relative; padding: 0 0 1.25rem 2.5rem; margin: 0; }
+  .setup-flow > li::before { content: counter(setup-step); position: absolute; left: 0; top: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: #eeedff; color: #4a35d6; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .setup-flow > li + li { border-top: 1px solid var(--border); padding-top: 1rem; }
+  .setup-flow > li + li::before { top: 1rem; }
+  .setup-flow h3 { font-size: 14px; margin: 0.1rem 0 0.75rem; }
+  .setup-flow .form-grid { margin-bottom: 0.75rem; }
+  .danger-zone { margin-top: 2rem; padding: 1rem 1.25rem; border: 1px solid #f5c9c4; border-radius: 8px; }
+  .danger-zone h3 { font-size: 14px; margin: 0 0 0.25rem; }
+  .danger-zone .hint { margin: 0 0 0.75rem; }
   .stats-grid { display: flex; flex-wrap: wrap; gap: 1.25rem; }
   .stats-block { min-width: 220px; flex: 1 1 220px; }
   .stats-block h3 { font-size: 0.85rem; margin: 0 0 0.4rem; color: var(--text-muted); letter-spacing: 0; }
@@ -242,6 +284,13 @@ export const adminPageHtml = `<!doctype html>
   #gate .gate-caption { color: var(--text-muted); font-size: 12px; margin: 0 0 0.5rem; }
   #gate .gate-divider { margin: 1.75rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
   #gate #gate-sso .primary { margin-top: 1rem; }
+  /* Mittlere Breite: Name und Detail der Statuszeilen untereinander statt drei schmaler Spalten. */
+  @media (max-width: 1180px) {
+    .status-row { grid-template-columns: 9.5rem minmax(0, 1fr) auto; }
+    .status-name { grid-column: 2; grid-row: 1; }
+    .status-detail { grid-column: 2; grid-row: 2; }
+    .status-link { grid-column: 3; grid-row: 1 / span 2; }
+  }
   @media (max-width: 900px) {
     .admin-shell { grid-template-columns: 210px minmax(0, 1fr); }
     .workspace { padding: 1.75rem 1.5rem 3rem; }
@@ -264,6 +313,9 @@ export const adminPageHtml = `<!doctype html>
     #mcp-admin .mcp-entry { padding: 1rem; }
     #gate { margin: 2rem 1rem; padding: 1.5rem; }
     #commands-table, #playbook-commands-table { min-width: 680px; }
+    .status-row { grid-template-columns: auto minmax(0, 1fr); }
+    .status-detail, .status-link { grid-column: 1 / -1; grid-row: auto; }
+    .setup-flow > li { padding-left: 2.1rem; }
   }
 </style>
 </head>
@@ -306,7 +358,7 @@ export const adminPageHtml = `<!doctype html>
     <div id="gate-user" hidden>
       <p class="gate-divider">Mit Benutzerkonto anmelden</p>
       <form id="gate-user-login" hidden>
-        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzerzugriff“).</p>
+        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzer &amp; Zugriff“).</p>
         <label for="user-login-name">Benutzername</label>
         <input type="text" id="user-login-name" autocomplete="username" required maxlength="100" />
         <label for="user-login-password">Passwort</label>
@@ -314,7 +366,7 @@ export const adminPageHtml = `<!doctype html>
         <button class="primary" id="user-login-submit" type="submit">Mit Benutzerkonto anmelden</button>
       </form>
       <div id="gate-sso" hidden>
-        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzerzugriff“).</p>
+        <p class="subtitle">Nur für Konten mit Admin-Rolle (siehe „Benutzer &amp; Zugriff“).</p>
         <button class="primary" id="sso-submit" type="button">Mit Single Sign-On anmelden</button>
       </div>
     </div>
@@ -327,37 +379,96 @@ export const adminPageHtml = `<!doctype html>
     <div class="admin-shell">
     <aside class="sidebar">
       <nav aria-label="Administration">
-        <p class="nav-group">Arbeitsbereich</p>
-        <a href="#mcp-admin" aria-current="page">${adminIcon(Network)}MCP &amp; Sites <span class="nav-ee">EE</span></a>
-        <a href="#tableau-server-admin">${adminIcon(Network)}Tableau Server <span class="nav-ee">EE</span></a>
+        <p class="nav-group">Einrichtung</p>
+        <a href="#overview-admin" aria-current="page">${adminIcon(ListChecks)}Übersicht</a>
+        <a href="#license-admin">${adminIcon(KeyRound)}Lizenz &amp; Aktivierung</a>
+        <a href="#auth-admin">${adminIcon(LogIn)}Anmeldung</a>
+        <a href="#tableau-server-admin">${adminIcon(Server)}Tableau Server <span class="nav-ee">EE</span></a>
+        <a href="#models-admin">${adminIcon(Settings)}Modelle</a>
+        <p class="nav-group">Zugriff</p>
+        <a href="#users-admin">${adminIcon(Users)}Benutzer &amp; Zugriff</a>
+        <a href="#mcp-admin">${adminIcon(Network)}MCP-Quellen <span class="nav-ee">EE</span></a>
+        <p class="nav-group">Inhalte</p>
         <a href="#commands-admin">${adminIcon(Terminal)}Slash-Befehle</a>
         <a href="#playbooks-admin">${adminIcon(LayoutDashboard)}Dashboard-Analysen</a>
         <a href="#metrics-admin">${adminIcon(Ruler)}Kennzahlen</a>
-        <a href="#models-admin">${adminIcon(Settings)}Modelle</a>
-        <p class="nav-group">Zugriff</p>
-        <a href="#auth-admin">${adminIcon(ShieldCheck)}Anmeldung &amp; Lizenz</a>
-        <a href="#users-admin">${adminIcon(Users)}Benutzerkonten</a>
         <p class="nav-group">Betrieb</p>
         <a href="#extension-admin">${adminIcon(Download)}Tableau-Extension</a>
         <a href="#usage-admin">${adminIcon(ChartNoAxesCombined)}Nutzung</a>
         <a href="#watch-admin">${adminIcon(Eye)}Watch <span class="nav-ee">EE</span></a>
+        <a href="#tableau-audit-admin">${adminIcon(ScrollText)}Serverzugriffe <span class="nav-ee">EE</span></a>
       </nav>
       <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
-        <optgroup label="Arbeitsbereich"><option value="mcp-admin">MCP &amp; Sites</option><option value="tableau-server-admin">Tableau Server</option><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="metrics-admin">Kennzahlen</option><option value="models-admin">Modelle</option></optgroup>
-        <optgroup label="Zugriff"><option value="auth-admin">Anmeldung &amp; Lizenz</option><option value="users-admin">Benutzerkonten</option></optgroup>
-        <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option><option value="watch-admin">Watch</option></optgroup>
+        <optgroup label="Einrichtung"><option value="overview-admin">Übersicht</option><option value="license-admin">Lizenz &amp; Aktivierung</option><option value="auth-admin">Anmeldung</option><option value="tableau-server-admin" data-ee="true">Tableau Server</option><option value="models-admin">Modelle</option></optgroup>
+        <optgroup label="Zugriff"><option value="users-admin">Benutzer &amp; Zugriff</option><option value="mcp-admin" data-ee="true">MCP-Quellen</option></optgroup>
+        <optgroup label="Inhalte"><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="metrics-admin">Kennzahlen</option></optgroup>
+        <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option><option value="watch-admin" data-ee="true">Watch</option><option value="tableau-audit-admin" data-ee="true">Serverzugriffe</option></optgroup>
       </select>
       <button id="logout" title="Abmelden" aria-label="Abmelden">${adminIcon(LogOut)}<span>Abmelden</span></button>
     </aside>
     <div class="workspace">
-      <header class="workspace-heading"><p id="view-group">Arbeitsbereich</p><h1 id="view-title" tabindex="-1">MCP &amp; Sites</h1></header>
+      <header class="workspace-heading"><p id="view-group">Einrichtung</p><h1 id="view-title" tabindex="-1"><span id="view-title-text">Übersicht</span> <span id="view-badge" class="view-badge" hidden>Enterprise</span></h1></header>
+
+    <section class="card" id="overview-admin" aria-labelledby="overview-heading" hidden>
+      <h2 id="overview-heading" class="visually-hidden">Übersicht</h2>
+      <p class="hint">Stand der Einrichtung — jede Zeile führt zum zuständigen Bereich.</p>
+      <ul class="status-list" id="overview-list" aria-live="polite">
+        <li class="status-row" data-key="license"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Lizenz &amp; Aktivierung</span><span class="status-detail"></span><a class="status-link" href="#license-admin">Öffnen</a></li>
+        <li class="status-row" data-key="publicUrl"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Öffentliche URL</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
+        <li class="status-row" data-key="auth"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Anmeldung</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
+        <li class="status-row" data-key="access"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Freigaben</span><span class="status-detail"></span><a class="status-link" href="#users-admin">Öffnen</a></li>
+        <li class="status-row" data-key="tableau"><span class="status-chip" data-level="off">Nicht aktiv</span><span class="status-name">Tableau Server</span><span class="status-detail">Enterprise-Funktion</span><a class="status-link" href="#tableau-server-admin">Öffnen</a></li>
+        <li class="status-row" data-key="models"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Modelle</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
+        <li class="status-row" data-key="llm"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">LLM-Endpunkt</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
+      </ul>
+
+      <h3 class="overview-heading">LLM-Betrieb (letzte 7 Tage)</h3>
+      <div class="kpi-grid" id="overview-llm" aria-live="polite">
+        <div class="kpi"><span class="kpi-value" id="kpi-questions">–</span><span class="kpi-label">Fragen</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi-calls">–</span><span class="kpi-label">Modellaufrufe</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi-tokens-in">–</span><span class="kpi-label">Tokens ein (Prompt)</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi-tokens-out">–</span><span class="kpi-label">Tokens aus (Antwort)</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi-latency">–</span><span class="kpi-label">Ø Antwortzeit</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi-errors">–</span><span class="kpi-label">Fehlerquote</span></div>
+      </div>
+      <div style="overflow-x: auto;">
+        <table id="overview-llm-models" hidden>
+          <thead><tr><th>Modell</th><th class="num">Aufrufe</th><th class="num">Tokens ein</th><th class="num">Tokens aus</th><th class="num">Ø Antwortzeit</th></tr></thead>
+          <tbody id="overview-llm-models-body"></tbody>
+        </table>
+      </div>
+      <p class="hint">Anonyme Tageszähler ohne Inhalte, Details unter <a href="#usage-admin">Nutzung</a>. Modellaufrufe und Tokens werden ab Version 1.7.0 gezählt.</p>
+
+      <h3 class="overview-heading">Version &amp; Updates</h3>
+      <dl class="kv-list">
+        <div><dt>Installierte Version</dt><dd id="sys-version">–</dd></div>
+        <div><dt>Edition</dt><dd id="sys-edition">–</dd></div>
+        <div><dt>Umgebung</dt><dd id="sys-environment">–</dd></div>
+        <div><dt>Datenbank</dt><dd id="sys-database">–</dd></div>
+        <div><dt>Läuft seit</dt><dd id="sys-started">–</dd></div>
+      </dl>
+      <div class="row">
+        <button type="button" id="update-check">Auf Updates prüfen</button>
+        <span id="update-result" class="status-detail" role="status" aria-live="polite"></span>
+      </div>
+      <p class="hint">Die Prüfung fragt nur auf Klick die öffentlichen Releases ab (ausgehend HTTPS auf api.github.com) und überträgt nichts über diese Installation.</p>
+      <details class="setup-steps" id="update-howto">
+        <summary>So wird aktualisiert</summary>
+        <p>Kubernetes (Helm):</p>
+        <pre><code>helm upgrade openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot --version <span class="update-target">&lt;Version&gt;</span> --reuse-values</code></pre>
+        <p>Docker Compose: in der <code>.env</code> <code>DEPLOY_VERSION=<span class="update-target">&lt;Version&gt;</span></code> setzen, dann im Verzeichnis <code>deploy/compose</code>:</p>
+        <pre><code>docker compose pull &amp;&amp; docker compose --profile caddy up -d</code></pre>
+        <p>Die Datenbank passt die Middleware beim Start selbst an. Vor größeren Sprüngen die <a id="update-notes" href="https://github.com/bl0rb/OpenVizPilot/releases" target="_blank" rel="noopener">Release-Notes</a> lesen und ein Backup ziehen.</p>
+      </details>
+    </section>
 
     ${mcpAdminSection}
     ${tableauAdminSection}
     ${watchAdminSection}
+    ${tableauAuditSection}
 
-    <section class="card" id="commands-admin" hidden>
-      <h2>Slash-Befehle</h2>
+    <section class="card" id="commands-admin" aria-labelledby="commands-heading" hidden>
+      <h2 id="commands-heading" class="visually-hidden">Slash-Befehle</h2>
       <p class="hint">Eigene „/name“-Befehle, die Anwender im Chat eintippen, um ein festes Prompt-Template zu starten (z. B. <code>/vergleich Umsatz DACH</code>).</p>
       <p id="commands-source" class="hint"></p>
       <p id="commands-banner" class="banner"></p>
@@ -382,99 +493,13 @@ export const adminPageHtml = `<!doctype html>
       </div>
     </section>
 
-    <section class="card" id="auth-admin" hidden>
-      <h2>Anmeldung, Single Sign-On &amp; Lizenz</h2>
-      <p class="hint">Wer die Extension nutzen darf — Benutzerkonten (Core) oder Single Sign-On (Enterprise).</p>
-      <p id="auth-source" class="hint"></p>
-      <p id="auth-banner" class="banner"></p>
-      <div class="form-grid">
-        <label class="has-help"><span class="help-term">Anmeldemodus</span><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter Benutzerzugriff. Benutzerkonten: Anmeldung mit Konten aus „Benutzerkonten“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span>
-          <select id="auth-mode" aria-describedby="help-auth-mode">
-            <option value="none">Offen (kein Login — Chat &amp; Tableau API bleiben gesperrt)</option>
-            <option value="local">Benutzerkonten (Core-Edition)</option>
-            <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
-          </select>
-        </label>
-        <label style="flex: 1 1 320px;">Öffentliche URL der Middleware (für die SSO-Redirect-URI)
-          <input type="text" id="auth-public-url" placeholder="https://chat.example.com" autocomplete="off" />
-        </label>
-      </div>
-      <div id="oidc-fields">
-        <p class="hint">Reihenfolge: öffentliche URL eintragen · Redirect-URI beim Provider registrieren · Issuer und Client-ID übernehmen · speichern · nach dem ersten Login unter „Benutzerzugriff" freischalten.</p>
-        <div class="form-grid">
-          <label class="has-help" style="grid-column: 1 / -1;"><span class="help-term">Redirect-URI (Callback-URL)</span><span role="tooltip" id="help-oidc-redirect" class="help-tip">Genau diese Adresse beim Identity-Provider als Redirect-URI eintragen — Entra ID: Plattform „Web"; Keycloak: „Valid redirect URIs". Sie ergibt sich aus der öffentlichen URL oben und muss HTTPS sein.</span>
-            <span class="inline-field">
-              <input type="text" id="oidc-redirect" readonly placeholder="Öffentliche URL oben eintragen" aria-describedby="help-oidc-redirect" />
-              <button type="button" id="oidc-redirect-copy">Kopieren</button>
-            </span>
-          </label>
-        </div>
-        <div class="form-grid">
-          <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Legt Issuer-Format und Claim-Zuordnung fest. „Anderer" funktioniert mit jedem Provider, der ein Discovery-Dokument unter <code>&lt;Issuer&gt;/.well-known/openid-configuration</code> liefert.</span>
-            <select id="oidc-provider" aria-describedby="help-oidc-provider">
-              <option value="entra">Microsoft Entra ID</option>
-              <option value="keycloak">Keycloak</option>
-              <option value="generic">Anderer OIDC-Provider</option>
-            </select>
-          </label>
-          <label style="flex: 1 1 320px;" class="has-help help-left"><span class="help-term">Issuer-URL</span><span role="tooltip" id="help-oidc-issuer" class="help-tip">Entra ID: <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> · Keycloak: <code>https://&lt;host&gt;/realms/&lt;realm&gt;</code> · sonst der „issuer"-Wert aus dem Discovery-Dokument — ohne Pfad-Suffix wie <code>/.well-known/…</code>.</span>
-            <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" aria-describedby="help-oidc-issuer" />
-          </label>
-        </div>
-        <div class="form-grid">
-          <label style="flex: 1 1 240px;" class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-oidc-client-id" class="help-tip">Entra ID: „Anwendungs-ID (Client)" der App-Registrierung · Keycloak: „Client ID" des Clients.</span>
-            <input type="text" id="oidc-client-id" autocomplete="off" aria-describedby="help-oidc-client-id" />
-          </label>
-          <label style="flex: 1 1 240px;" class="has-help"><span class="help-term">Client-Secret (nur confidential clients)</span><span role="tooltip" id="help-oidc-client-secret" class="help-tip">Leer lassen für einen public client mit PKCE (empfohlen — die Extension läuft im Browser). Nur ausfüllen, wenn der Client beim Provider als „confidential" angelegt ist (Keycloak: „Client authentication: On"). Wird in der Datenbank gespeichert; für Vault-Deployments stattdessen <code>OVP_OIDC_CLIENT_SECRET</code> setzen.</span>
-            <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-oidc-client-secret" />
-          </label>
-          <label style="flex: 1 1 200px;" class="has-help help-left"><span class="help-term">Scopes</span><span role="tooltip" id="help-oidc-scopes" class="help-tip"><code>openid profile email</code> reicht: „email" liefert die Adresse für Tableau Cloud bzw. den Username-Claim, „profile" den Anzeigenamen unter „Benutzerzugriff".</span>
-            <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" aria-describedby="help-oidc-scopes" />
-          </label>
-        </div>
-        <details class="setup-steps" id="oidc-setup">
-          <summary>Einrichtung Schritt für Schritt</summary>
-          <ol id="oidc-setup-entra">
-            <li>Entra Admin Center → <em>App-Registrierungen</em> → „Neue Registrierung": Name vergeben, Kontotyp „Nur Konten in diesem Organisationsverzeichnis".</li>
-            <li>Unter <em>Authentifizierung</em> → „Plattform hinzufügen" → <strong>Web</strong> → die Redirect-URI von oben eintragen. Kein Client-Secret anlegen (public client mit PKCE); unter „Erweiterte Einstellungen" „Öffentliche Clientflows zulassen" auf <em>Nein</em> lassen.</li>
-            <li>Auf der Übersichtsseite „Anwendungs-ID (Client)" → hier als <strong>Client-ID</strong>; „Verzeichnis-ID (Mandant)" → in die <strong>Issuer-URL</strong> <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> einsetzen.</li>
-            <li><em>API-Berechtigungen</em>: Microsoft Graph → <code>openid</code>, <code>profile</code>, <code>email</code> (delegiert), Admin-Einwilligung erteilen.</li>
-            <li>Gültigen Lizenzschlüssel unten eintragen, „Prüfen &amp; speichern". Dann in der Extension einmal per SSO anmelden — die Identität erscheint unter „Benutzerzugriff" und wird dort für Chat/Tableau freigeschaltet.</li>
-          </ol>
-          <ol id="oidc-setup-keycloak" hidden>
-            <li>Keycloak Admin Console → Realm wählen → <em>Clients</em> → „Create client": Typ OpenID Connect, Client-ID frei wählen (→ hier als <strong>Client-ID</strong>).</li>
-            <li>„Capability config": <em>Client authentication</em> <strong>Off</strong> (public client mit PKCE), „Standard flow" an. Bei „On" (confidential) das Secret aus dem Tab <em>Credentials</em> unten als Client-Secret eintragen.</li>
-            <li>„Login settings": <em>Valid redirect URIs</em> = Redirect-URI von oben, <em>Web origins</em> = öffentliche URL der Middleware.</li>
-            <li><strong>Issuer-URL</strong>: <code>https://&lt;keycloak-host&gt;/realms/&lt;realm&gt;</code>. Die Nutzer brauchen im Realm eine E-Mail-Adresse (Claim „email").</li>
-            <li>Gültigen Lizenzschlüssel unten eintragen, „Prüfen &amp; speichern". Dann in der Extension einmal per SSO anmelden und die Identität unter „Benutzerzugriff" freischalten.</li>
-          </ol>
-          <ol id="oidc-setup-generic" hidden>
-            <li>Beim Provider einen OIDC-Client mit <em>Authorization Code Flow + PKCE</em> anlegen; Redirect-URI von oben registrieren.</li>
-            <li><strong>Issuer-URL</strong> = „issuer" aus <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>; <strong>Client-ID</strong> aus dem Client. Secret nur bei confidential clients.</li>
-            <li>Das ID-Token muss die Claims <code>sub</code>, <code>email</code> und <code>name</code> enthalten (Scopes <code>openid profile email</code>).</li>
-            <li>Lizenzschlüssel eintragen, „Prüfen &amp; speichern", einmal per SSO anmelden, Identität unter „Benutzerzugriff" freischalten.</li>
-          </ol>
-        </details>
-        <details class="setup-steps">
-          <summary>Env-Variablen oder Admin-UI — wann was?</summary>
-          <p>Alles hier Gespeicherte landet in der Datenbank und hat Vorrang vor den Env-Variablen (oben steht „Quelle: Admin-UI" bzw. „Env-Defaults"). Env eignet sich für Deployments, deren Konfiguration aus Helm/Vault kommt; das Admin-UI für die Einrichtung von Hand. „Auf Env-Defaults zurücksetzen" löscht die Datenbank-Werte.</p>
-          <table>
-            <tr><th>Einstellung</th><th>Env-Variable</th><th>Admin-UI</th></tr>
-            <tr><td>Anmeldemodus</td><td><code>OVP_AUTH_MODE</code></td><td>Feld „Anmeldemodus"</td></tr>
-            <tr><td>Öffentliche URL</td><td><code>OVP_PUBLIC_URL</code></td><td>Feld „Öffentliche URL"</td></tr>
-            <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Felder oben</td></tr>
-            <tr><td>Client-Secret</td><td><code>OVP_OIDC_CLIENT_SECRET</code> (empfohlen bei Vault)</td><td>Feld „Client-Secret" (Datenbank)</td></tr>
-            <tr><td>Lizenz</td><td><code>OVP_LICENSE</code> oder <code>OVP_LICENSE_PATH</code></td><td>Feld „Lizenzschlüssel"</td></tr>
-            <tr><td>Umgebung</td><td><code>OVP_ENVIRONMENT</code> (nur per Env)</td><td>—</td></tr>
-            <tr><td>Shared-Token-Modus</td><td><code>OVP_API_AUTH_TOKEN</code> (nur per Env)</td><td>—</td></tr>
-          </table>
-        </details>
-      </div>
-      <fieldset class="form-section"><legend>Enterprise-Lizenz</legend>
-      <label class="form-field has-help"><span class="help-term">Lizenzschlüssel</span><span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span>
-        <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token (leer lassen = unverändert)" spellcheck="false" aria-describedby="help-license-token"></textarea>
-      </label>
-      <p id="license-summary" class="hint">Lade …</p>
+    <section class="card" id="license-admin" aria-labelledby="license-heading" hidden>
+      <h2 id="license-heading" class="visually-hidden">Lizenz &amp; Aktivierung</h2>
+      <p class="hint">Die Enterprise-Lizenz schaltet Single Sign-On, Tableau Server, MCP-Quellen und Watch frei. Ohne Lizenz laufen alle Core-Funktionen.</p>
+      <p id="license-banner" class="banner" role="status"></p>
+      <ul class="status-list">
+        <li class="status-row"><span class="status-chip" id="license-status-chip" data-level="off">Lade …</span><span class="status-name">Lizenz</span><span id="license-summary" class="status-detail">Lade …</span></li>
+      </ul>
       <div id="license-card" hidden>
         <p id="license-pending" class="banner" role="alert"><strong>Installation noch nicht aktiviert — es laufen nur die Core-Funktionen.</strong> Enterprise-Funktionen schalten sich mit der ersten Aktivierung frei. Online: ausgehend HTTPS auf <code>werkworks.de</code> (Port 443) zulassen und „Jetzt aktualisieren“ klicken — der Heartbeat läuft auch sofort beim Start. Offline: unter „Offline-Aktivierung“ die Anfrage herunterladen, an WerkWorks senden und die Lease einfügen.</p>
         <p id="license-subscription-grace" class="banner error" role="status" hidden></p>
@@ -518,6 +543,15 @@ export const adminPageHtml = `<!doctype html>
           <p>Ohne Internetzugang: Anfrage-Datei direkt unter <a href="https://werkworks.de/ovp-lizenz/offline.php" target="_blank" rel="noopener">werkworks.de/ovp-lizenz/offline.php</a> einreichen (Lizenz-Token bereithalten) — die Lease kommt sofort zurück, ohne WerkWorks-Rückfrage.</p>
         </details>
       </div>
+      <fieldset class="form-section"><legend>Lizenzschlüssel eintragen oder ersetzen</legend>
+      <label class="form-field has-help"><span class="help-term">Lizenzschlüssel</span><span role="tooltip" id="help-license-token" class="help-tip">Vom Lizenz-Aussteller erhaltener Token im Format „<code>&lt;Payload&gt;.&lt;Signatur&gt;</code>“ (zwei durch Punkt getrennte Zeichenblöcke) — vollständig einfügen.</span>
+        <textarea id="license-token" rows="3" placeholder="Signierter Lizenz-Token" spellcheck="false" aria-describedby="help-license-token"></textarea>
+      </label>
+      <div class="form-actions">
+        <button class="primary" id="save-license">Lizenz prüfen &amp; speichern</button>
+        <button id="remove-license">Lizenz entfernen</button>
+      </div>
+      </fieldset>
       <div id="telemetry-box" class="hint" style="border-top: 1px solid var(--border); margin-top: 0.75rem; padding-top: 0.75rem;">
         <strong>Lizenz-Heartbeat</strong>
         <p id="telemetry-status" class="hint"></p>
@@ -529,46 +563,126 @@ export const adminPageHtml = `<!doctype html>
           </div>
         </details>
       </div>
-      </fieldset>
+    </section>
+
+    <section class="card" id="auth-admin" aria-labelledby="auth-heading" hidden>
+      <h2 id="auth-heading" class="visually-hidden">Anmeldung</h2>
+      <p class="hint">Wie sich Anwender in der Extension anmelden — mit Benutzerkonten (Core) oder per Single Sign-On (Enterprise).</p>
+      <ul class="status-list">
+        <li class="status-row"><span class="status-chip" id="auth-status-chip" data-level="off">Lade …</span><span class="status-name">Aktiver Modus</span><span id="auth-source" class="status-detail"></span></li>
+      </ul>
+      <p id="auth-banner" class="banner"></p>
+      <div class="form-grid">
+        <label class="has-help"><span class="help-term">Anmeldemodus</span><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter „Benutzer &amp; Zugriff“. Benutzerkonten: Anmeldung mit den lokalen Konten aus „Benutzer &amp; Zugriff“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span>
+          <select id="auth-mode" aria-describedby="help-auth-mode">
+            <option value="none">Offen (kein Login)</option>
+            <option value="local">Benutzerkonten (Core-Edition)</option>
+            <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
+          </select>
+        </label>
+        <label class="has-help help-left"><span class="help-term">Öffentliche URL dieser Installation</span><span role="tooltip" id="help-auth-public-url" class="help-tip">HTTPS-Adresse, unter der die Browser diese Middleware erreichen, z. B. <code>https://chat.example.com</code>. Daraus entstehen die SSO-Redirect-URI und die Issuer-URL für Tableau OAuth 2.0 Trust.</span>
+          <input type="text" id="auth-public-url" placeholder="https://chat.example.com" autocomplete="off" aria-describedby="help-auth-public-url" />
+        </label>
+      </div>
+      <p id="auth-mode-none-hint" class="hint error" hidden>Ohne Anmeldung gibt es keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt.</p>
+      <div id="oidc-fields">
+        <p id="oidc-license-hint" class="banner error" role="status" hidden>Single Sign-On braucht eine gültige Enterprise-Lizenz mit „sso“. <a href="#license-admin">Zur Lizenz</a></p>
+        <ol class="setup-flow">
+          <li>
+            <h3>Redirect-URI beim Identity-Provider registrieren</h3>
+            <div class="form-grid">
+              <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Legt Issuer-Format und Claim-Zuordnung fest. „Anderer" funktioniert mit jedem Provider, der ein Discovery-Dokument unter <code>&lt;Issuer&gt;/.well-known/openid-configuration</code> liefert.</span>
+                <select id="oidc-provider" aria-describedby="help-oidc-provider">
+                  <option value="entra">Microsoft Entra ID</option>
+                  <option value="keycloak">Keycloak</option>
+                  <option value="generic">Anderer OIDC-Provider</option>
+                </select>
+              </label>
+              <label class="has-help" style="grid-column: 1 / -1;"><span class="help-term">Redirect-URI (Callback-URL)</span><span role="tooltip" id="help-oidc-redirect" class="help-tip">Genau diese Adresse beim Identity-Provider als Redirect-URI eintragen — Entra ID: Plattform „Web"; Keycloak: „Valid redirect URIs". Sie ergibt sich aus der öffentlichen URL oben und muss HTTPS sein.</span>
+                <span class="inline-field">
+                  <input type="text" id="oidc-redirect" readonly placeholder="Öffentliche URL oben eintragen" aria-describedby="help-oidc-redirect" />
+                  <button type="button" id="oidc-redirect-copy">Kopieren</button>
+                </span>
+              </label>
+            </div>
+            <details class="setup-steps" id="oidc-setup">
+              <summary>Anleitung für den gewählten Identity-Provider</summary>
+              <ol id="oidc-setup-entra">
+                <li>Entra Admin Center → <em>App-Registrierungen</em> → „Neue Registrierung": Name vergeben, Kontotyp „Nur Konten in diesem Organisationsverzeichnis".</li>
+                <li>Unter <em>Authentifizierung</em> → „Plattform hinzufügen" → <strong>Web</strong> → die Redirect-URI von oben eintragen. Nicht „Single-Page-Anwendung“: deren Codes löst Entra nur im Browser ein, die Middleware tauscht ihn aber serverseitig (Fehler AADSTS9002327).</li>
+                <li><em>Zertifikate &amp; Geheimnisse</em> → „Neuer geheimer Clientschlüssel“ → den <strong>Wert</strong> unten als <strong>Client-Secret</strong> eintragen oder per <code>OVP_OIDC_CLIENT_SECRET</code> setzen. Ohne Secret lehnt Entra den Code-Tausch ab (AADSTS7000218). Ablaufdatum notieren.</li>
+                <li>Auf der Übersichtsseite „Anwendungs-ID (Client)" → hier als <strong>Client-ID</strong>; „Verzeichnis-ID (Mandant)" → in die <strong>Issuer-URL</strong> <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> einsetzen.</li>
+                <li><em>API-Berechtigungen</em>: Microsoft Graph → <code>openid</code>, <code>profile</code>, <code>email</code> (delegiert), Admin-Einwilligung erteilen.</li>
+                <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden — die Identität erscheint unter „Benutzer &amp; Zugriff" und wird dort für Chat/Tableau freigeschaltet.</li>
+              </ol>
+              <ol id="oidc-setup-keycloak" hidden>
+                <li>Keycloak Admin Console → Realm wählen → <em>Clients</em> → „Create client": Typ OpenID Connect, Client-ID frei wählen (→ hier als <strong>Client-ID</strong>).</li>
+                <li>„Capability config": <em>Client authentication</em> <strong>Off</strong> (public client mit PKCE), „Standard flow" an. Bei „On" (confidential) das Secret aus dem Tab <em>Credentials</em> unten als Client-Secret eintragen.</li>
+                <li>„Login settings": <em>Valid redirect URIs</em> = Redirect-URI von oben, <em>Web origins</em> = öffentliche URL der Middleware.</li>
+                <li><strong>Issuer-URL</strong>: <code>https://&lt;keycloak-host&gt;/realms/&lt;realm&gt;</code>. Die Nutzer brauchen im Realm eine E-Mail-Adresse (Claim „email").</li>
+                <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden und die Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
+              </ol>
+              <ol id="oidc-setup-generic" hidden>
+                <li>Beim Provider einen OIDC-Client mit <em>Authorization Code Flow + PKCE</em> anlegen; Redirect-URI von oben registrieren.</li>
+                <li><strong>Issuer-URL</strong> = „issuer" aus <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>; <strong>Client-ID</strong> aus dem Client. Secret nur bei confidential clients.</li>
+                <li>Das ID-Token muss die Claims <code>sub</code>, <code>email</code> und <code>name</code> enthalten (Scopes <code>openid profile email</code>).</li>
+                <li>Lizenz mit „sso" unter „Lizenz &amp; Aktivierung", speichern, einmal per SSO anmelden, Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
+              </ol>
+            </details>
+          </li>
+          <li>
+            <h3>Werte vom Identity-Provider eintragen</h3>
+            <div class="form-grid">
+              <label class="has-help help-left"><span class="help-term">Issuer-URL</span><span role="tooltip" id="help-oidc-issuer" class="help-tip">Entra ID: <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> · Keycloak: <code>https://&lt;host&gt;/realms/&lt;realm&gt;</code> · sonst der „issuer"-Wert aus dem Discovery-Dokument — ohne Pfad-Suffix wie <code>/.well-known/…</code>.</span>
+                <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" aria-describedby="help-oidc-issuer" />
+              </label>
+              <label class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-oidc-client-id" class="help-tip">Entra ID: „Anwendungs-ID (Client)" der App-Registrierung · Keycloak: „Client ID" des Clients.</span>
+                <input type="text" id="oidc-client-id" autocomplete="off" aria-describedby="help-oidc-client-id" />
+              </label>
+              <label class="has-help"><span class="help-term">Client-Secret</span><span role="tooltip" id="help-oidc-client-secret" class="help-tip">Microsoft Entra ID: Pflicht — die Middleware löst den Anmeldecode serverseitig ein (Plattform „Web“). Keycloak und andere: leer lassen bei einem public client mit PKCE, ausfüllen bei „Client authentication: On“. Wird in der Datenbank gespeichert; alternativ <code>OVP_OIDC_CLIENT_SECRET</code> setzen — gilt, solange hier keins gespeichert ist.</span>
+                <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-oidc-client-secret" />
+              </label>
+              <p id="oidc-entra-secret-hint" class="hint error" style="grid-column: 1 / -1; margin: 0;" hidden>Entra ID braucht ein Client-Secret — ohne lehnt Entra die Anmeldung ab (AADSTS7000218).</p>
+              <label class="has-help help-left"><span class="help-term">Scopes</span><span role="tooltip" id="help-oidc-scopes" class="help-tip"><code>openid profile email</code> reicht: „email" liefert die Adresse für Tableau Cloud bzw. den Username-Claim, „profile" den Anzeigenamen unter „Benutzer &amp; Zugriff".</span>
+                <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" aria-describedby="help-oidc-scopes" />
+              </label>
+            </div>
+          </li>
+          <li>
+            <h3>Speichern und Personen freischalten</h3>
+            <p class="hint">Nach dem Speichern einmal in der Extension per SSO anmelden — die Person erscheint dann unter <a href="#users-admin">Benutzer &amp; Zugriff</a> zur Freigabe.</p>
+          </li>
+        </ol>
+      </div>
       <div class="form-actions">
-        <button class="primary" id="save-auth">Prüfen &amp; speichern</button>
-        <button id="remove-license">Lizenz entfernen</button>
+        <button class="primary" id="save-auth">Speichern</button>
+      </div>
+      <details class="setup-steps" id="auth-env-table" style="margin-top: 1.5rem;">
+        <summary>Env-Variablen oder Admin-UI — wann was?</summary>
+        <p>Alles hier Gespeicherte landet in der Datenbank und hat Vorrang vor den Env-Variablen (oben steht „Quelle: Admin-UI" bzw. „Env-Defaults"). Env eignet sich für Deployments, deren Konfiguration aus Helm/Vault kommt; das Admin-UI für die Einrichtung von Hand. „Auf Env-Defaults zurücksetzen" löscht die Datenbank-Werte.</p>
+        <table>
+          <tr><th>Einstellung</th><th>Env-Variable</th><th>Admin-UI</th></tr>
+          <tr><td>Anmeldemodus</td><td><code>OVP_AUTH_MODE</code></td><td>Feld „Anmeldemodus"</td></tr>
+          <tr><td>Öffentliche URL</td><td><code>OVP_PUBLIC_URL</code></td><td>Feld „Öffentliche URL"</td></tr>
+          <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Felder oben</td></tr>
+          <tr><td>Client-Secret</td><td><code>OVP_OIDC_CLIENT_SECRET</code> (empfohlen bei Vault; gilt, solange im Feld keins gespeichert ist)</td><td>Feld „Client-Secret" (Datenbank)</td></tr>
+          <tr><td>Lizenz</td><td><code>OVP_LICENSE</code> oder <code>OVP_LICENSE_PATH</code></td><td>„Lizenz &amp; Aktivierung“ → Lizenzschlüssel</td></tr>
+          <tr><td>Umgebung</td><td><code>OVP_ENVIRONMENT</code> (nur per Env)</td><td>—</td></tr>
+          <tr><td>Shared-Token-Modus</td><td><code>OVP_API_AUTH_TOKEN</code> (nur per Env)</td><td>—</td></tr>
+        </table>
+      </details>
+      <div class="danger-zone">
+        <h3>Auf Env-Defaults zurücksetzen</h3>
+        <p class="hint">Löscht alle hier gespeicherten Anmelde- und Lizenzeinstellungen, auch den Lizenzschlüssel. Danach gelten nur die Env-Variablen.</p>
         <button class="danger" id="reset-auth">Auf Env-Defaults zurücksetzen</button>
       </div>
     </section>
 
-    <section class="card" id="users-admin" hidden>
-      <h2>Benutzerkonten (Core-Edition)</h2>
-      <p class="hint">Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“.</p>
-      <p id="users-banner" class="banner"></p>
-      <div style="overflow-x: auto;">
-        <table id="users-table">
-          <thead>
-            <tr>
-              <th>Benutzername</th>
-              <th>Anzeigename</th>
-              <th class="has-help" aria-expanded="false"><span class="help-term">Status</span><span role="tooltip" id="help-users-status" class="help-tip">Sperren beendet laufende Sitzungen sofort.</span></th>
-              <th class="col-del"></th>
-            </tr>
-          </thead>
-          <tbody id="users-body"></tbody>
-        </table>
-      </div>
-      <form id="create-user-form">
-      <fieldset class="form-section"><legend class="has-help" aria-expanded="false"><span class="help-term">Benutzer anlegen</span><span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Benutzerzugriff“ Zugriff auf Chat oder Tableau API.</span></legend>
-      <div class="form-grid">
-        <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
-        <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
-        <label for="new-password" class="has-help"><span class="help-term">Passwort (mindestens 10 Zeichen)</span><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required aria-describedby="help-users-password" /></label>
-      </div>
-      <div class="form-actions">
-        <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
-      </div>
-      </fieldset>
-      </form>
-
+    <section class="card" id="users-admin" aria-labelledby="users-heading" hidden>
+      <h2 id="users-heading" class="visually-hidden">Benutzer &amp; Zugriff</h2>
+      <p class="hint">Wer Chat, Tableau API und Administration nutzen darf — für lokale Konten und SSO-Identitäten.</p>
       <fieldset class="form-section" id="user-access-section">
-        <legend class="has-help" aria-expanded="false"><span class="help-term">Benutzerzugriff</span><span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></legend>
+        <legend class="has-help" aria-expanded="false"><span class="help-term">Zugriff je Person</span><span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></legend>
         <p id="user-access-banner" class="banner" role="status"></p>
         <div class="form-actions">
           <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
@@ -580,10 +694,41 @@ export const adminPageHtml = `<!doctype html>
           </table>
         </div>
       </fieldset>
+
+      <fieldset class="form-section" id="local-users-section"><legend>Lokale Benutzerkonten (Core-Edition)</legend>
+        <p class="hint">Konten für die Anmeldung in der Extension im Modus „Benutzerkonten“.</p>
+        <p id="users-banner" class="banner"></p>
+        <div style="overflow-x: auto;">
+          <table id="users-table">
+            <thead>
+              <tr>
+                <th>Benutzername</th>
+                <th>Anzeigename</th>
+                <th class="has-help" aria-expanded="false"><span class="help-term">Status</span><span role="tooltip" id="help-users-status" class="help-tip">Sperren beendet laufende Sitzungen sofort.</span></th>
+                <th class="col-del"></th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+      </fieldset>
+      <form id="create-user-form">
+      <fieldset class="form-section"><legend class="has-help" aria-expanded="false"><span class="help-term">Benutzer anlegen</span><span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Zugriff je Person“ Zugriff auf Chat oder Tableau API.</span></legend>
+      <div class="form-grid">
+        <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
+        <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
+        <label for="new-password" class="has-help"><span class="help-term">Passwort (mindestens 10 Zeichen)</span><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required aria-describedby="help-users-password" /></label>
+      </div>
+      <div class="form-actions">
+        <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
+      </div>
+      </fieldset>
+      </form>
+
     </section>
 
-    <section class="card" id="playbooks-admin" hidden>
-      <h2>Standardanalysen pro Dashboard</h2>
+    <section class="card" id="playbooks-admin" aria-labelledby="playbooks-heading" hidden>
+      <h2 id="playbooks-heading" class="visually-hidden">Dashboard-Analysen</h2>
       <p class="hint">Eigene Starter-Fragen (max. 5) und Slash-Befehle je Dashboard.</p>
       <p id="playbooks-banner" class="banner"></p>
       <div class="row" style="margin-bottom: 0.75rem;">
@@ -618,8 +763,8 @@ export const adminPageHtml = `<!doctype html>
       </fieldset>
     </section>
 
-    <section class="card" id="metrics-admin" hidden>
-      <h2>Kennzahlen</h2>
+    <section class="card" id="metrics-admin" aria-labelledby="metrics-heading" hidden>
+      <h2 id="metrics-heading" class="visually-hidden">Kennzahlen</h2>
       <p class="hint">Unternehmensweit verbindliche Definitionen — der Assistent erkennt Name oder Synonym in der Frage und hält sich an die hinterlegte Definition.</p>
       <p id="metrics-source" class="hint"></p>
       <p id="metrics-banner" class="banner"></p>
@@ -645,8 +790,8 @@ export const adminPageHtml = `<!doctype html>
       </div>
     </section>
 
-    <section class="card" id="models-admin" hidden>
-      <h2>Modelle in der Extension</h2>
+    <section class="card" id="models-admin" aria-labelledby="models-heading" hidden>
+      <h2 id="models-heading" class="visually-hidden">Modelle</h2>
       <p class="hint">Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt der technischen Modell-ID.</p>
       <p id="models-source" class="hint"></p>
       <p id="models-banner" class="banner"></p>
@@ -671,8 +816,8 @@ export const adminPageHtml = `<!doctype html>
       <div id="lookup-results" class="row" style="margin-top: 0.75rem;"></div>
     </section>
 
-    <section class="card" id="extension-admin" hidden>
-      <h2>Extension für Tableau</h2>
+    <section class="card" id="extension-admin" aria-labelledby="extension-heading" hidden>
+      <h2 id="extension-heading" class="visually-hidden">Tableau-Extension</h2>
       <p class="hint">Lädt das Manifest (.trex) mit der eingetragenen Extension-URL herunter.</p>
       <p id="trex-banner" class="banner"></p>
       <label class="form-field has-help" for="trex-url"><span class="help-term">Öffentliche Extension-URL</span><span role="tooltip" id="help-trex-url" class="help-tip">Die Adresse, unter der diese Middleware die Extension ausliefert — HTTPS-Pflicht auf Tableau Server; die Extension verbindet sich dann automatisch mit demselben Host.</span>
@@ -683,9 +828,9 @@ export const adminPageHtml = `<!doctype html>
       </div>
     </section>
 
-    <section class="card" id="usage-admin" hidden>
-      <h2>Nutzung (anonym)</h2>
-      <p class="hint">Aggregierte Zähler ohne Nutzerbezug und ohne Inhalte.</p>
+    <section class="card" id="usage-admin" aria-labelledby="usage-heading" hidden>
+      <h2 id="usage-heading" class="visually-hidden">Nutzung</h2>
+      <p class="hint">Anonym: aggregierte Zähler ohne Nutzerbezug und ohne Inhalte.</p>
       <div class="row" style="margin-bottom: 1rem;">
         <label for="stats-days">Zeitraum:</label>
         <select id="stats-days">
@@ -953,6 +1098,9 @@ export const adminPageHtml = `<!doctype html>
   }
 
   function loadAll() {
+    loadSystem();
+    loadOverviewLlm();
+    loadLlmEndpoint();
     loadMcp();
     loadTableauServer(false);
     loadAuth();
@@ -977,7 +1125,9 @@ export const adminPageHtml = `<!doctype html>
       if (link.hash === '#' + selected) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
-    document.getElementById('view-title').textContent = option.textContent;
+    document.getElementById('view-title-text').textContent = option.textContent;
+    // Enterprise-Bereiche tragen das Badge am Seitentitel statt einer zweiten Überschrift im Inhalt.
+    document.getElementById('view-badge').hidden = option.dataset.ee !== 'true';
     document.getElementById('view-group').textContent = option.parentElement.label;
     if (focus && app.style.display !== 'none') {
       window.scrollTo(0, 0);
@@ -986,6 +1136,144 @@ export const adminPageHtml = `<!doctype html>
   }
   window.addEventListener('hashchange', function () { selectAdminView(true); });
   document.getElementById('admin-navigation').addEventListener('change', function (event) { location.hash = event.target.value; });
+
+  // ---------- Übersicht ----------
+
+  var overviewLabels = { ok: 'Bereit', warn: 'Unvollständig', error: 'Fehler', off: 'Nicht aktiv' };
+
+  /**
+   * Eine Zeile der Übersicht setzen (level: ok | warn | error | off). Die Bereiche melden ihren
+   * Stand nach jedem Laden/Speichern selbst — auch die EE-Skripte (Tableau), deshalb global im
+   * Skript-Scope. Unbekannte Schlüssel werden ignoriert.
+   */
+  function overviewSet(key, level, text) {
+    var row = document.querySelector('#overview-list [data-key="' + key + '"]');
+    if (!row) return;
+    var chip = row.querySelector('.status-chip');
+    chip.dataset.level = level;
+    chip.textContent = overviewLabels[level] || level;
+    row.querySelector('.status-detail').textContent = text || '';
+  }
+
+  var numberFormat = new Intl.NumberFormat('de-DE');
+  var compactFormat = new Intl.NumberFormat('de-DE', { notation: 'compact', maximumFractionDigits: 1 });
+  /** Tokens: bis unter eine Million mit Tausenderpunkt, darüber kompakt („1,2 Mio.“). */
+  function formatTokens(n) { return n >= 1000000 ? compactFormat.format(n) : numberFormat.format(n); }
+
+  /** Version, Edition, Umgebung — ohne Anfrage nach außen. */
+  function loadSystem() {
+    return adminFetch('/system')
+      .then(function (res) { return res.json(); })
+      .then(function (s) {
+        document.getElementById('sys-version').textContent = s.version || 'unbekannt';
+        document.getElementById('sys-edition').textContent = s.edition === 'enterprise' ? 'Enterprise' : 'Core';
+        document.getElementById('sys-environment').textContent = s.environment || '—';
+        document.getElementById('sys-database').textContent = s.database === 'postgres' ? 'PostgreSQL' : s.database === 'sqlite' ? 'SQLite' : 'keine';
+        document.getElementById('sys-started').textContent = s.startedAt ? new Date(s.startedAt).toLocaleString('de-DE') : '—';
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+  }
+
+  /** LLM-Kennzahlen der letzten 7 Tage aus denselben anonymen Tageszählern wie „Nutzung“. */
+  function loadOverviewLlm() {
+    return adminFetch('/stats?days=7')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var total = { chat_turn: 0, llm_call: 0, llm_tokens_in: 0, llm_tokens_out: 0, llm_ms: 0, chat_error: 0 };
+        var byModel = {};
+        (data.rows || []).forEach(function (row) {
+          if (Object.prototype.hasOwnProperty.call(total, row.metric)) total[row.metric] += row.count;
+          if (row.metric.indexOf('llm_') === 0) {
+            var m = byModel[row.key] = byModel[row.key] || { llm_call: 0, llm_tokens_in: 0, llm_tokens_out: 0, llm_ms: 0 };
+            m[row.metric] += row.count;
+          }
+        });
+        document.getElementById('kpi-questions').textContent = numberFormat.format(total.chat_turn);
+        document.getElementById('kpi-calls').textContent = numberFormat.format(total.llm_call);
+        document.getElementById('kpi-tokens-in').textContent = formatTokens(total.llm_tokens_in);
+        document.getElementById('kpi-tokens-out').textContent = formatTokens(total.llm_tokens_out);
+        document.getElementById('kpi-latency').textContent = total.llm_call ? (total.llm_ms / total.llm_call / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' s' : '–';
+        var attempts = total.llm_call + total.chat_error;
+        document.getElementById('kpi-errors').textContent = attempts ? (total.chat_error / attempts * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %' : '–';
+        var models = Object.keys(byModel).sort(function (a, b) { return byModel[b].llm_call - byModel[a].llm_call; }).slice(0, 5);
+        var body = document.getElementById('overview-llm-models-body');
+        body.innerHTML = '';
+        document.getElementById('overview-llm-models').hidden = models.length === 0;
+        models.forEach(function (key) {
+          var m = byModel[key];
+          var tr = document.createElement('tr');
+          [key, numberFormat.format(m.llm_call), formatTokens(m.llm_tokens_in), formatTokens(m.llm_tokens_out),
+            m.llm_call ? (m.llm_ms / m.llm_call / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' s' : '–'].forEach(function (value, i) {
+            var td = document.createElement('td');
+            if (i > 0) td.className = 'num';
+            td.textContent = value;
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+      })
+      .catch(function () { /* ohne Datenbank bleiben die Kennzahlen leer */ });
+  }
+
+  /** Erreichbarkeit des LLM-Endpunkts: dieselbe Abfrage wie „Vom Endpunkt laden“ unter Modelle. */
+  function loadLlmEndpoint() {
+    return adminFetch('/upstream-models')
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { overviewSet('llm', 'error', 'Nicht erreichbar — Adresse und API-Key des LLM-Endpunkts prüfen.'); return; }
+        var count = (result.data.models || []).length;
+        overviewSet('llm', 'ok', 'Erreichbar · ' + (count === 1 ? '1 Modell' : count + ' Modelle') + ' gemeldet');
+      })
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        overviewSet('llm', 'error', 'Nicht erreichbar — Adresse und API-Key des LLM-Endpunkts prüfen.');
+      });
+  }
+
+  document.getElementById('update-check').addEventListener('click', function () {
+    var button = this;
+    var result = document.getElementById('update-result');
+    button.disabled = true;
+    result.textContent = 'Prüfe …';
+    adminFetch('/update-check')
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        var d = r.data;
+        result.textContent = '';
+        var link = document.createElement('a');
+        link.href = d.url || 'https://github.com/bl0rb/OpenVizPilot/releases';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        if (!r.ok) {
+          result.textContent = (d.error || 'Update-Prüfung fehlgeschlagen.') + ' ';
+          link.textContent = 'Zur Release-Seite';
+          result.appendChild(link);
+          return;
+        }
+        document.getElementById('update-notes').href = link.href;
+        if (d.newer) {
+          Array.prototype.forEach.call(document.querySelectorAll('.update-target'), function (el) { el.textContent = d.latest; });
+          document.getElementById('update-howto').open = true;
+          result.textContent = 'Version ' + d.latest + ' verfügbar' + (d.publishedAt ? ' (seit ' + fmtDate(d.publishedAt) + ')' : '') + ' — ';
+          link.textContent = 'Release-Notes';
+          result.appendChild(link);
+        } else if (d.newer === false) {
+          result.textContent = 'Aktuell — neueste Version ist ' + d.latest + '.';
+        } else {
+          result.textContent = 'Neueste Version: ' + d.latest + ' (installierte Version unbekannt) — ';
+          link.textContent = 'Release-Notes';
+          result.appendChild(link);
+        }
+      })
+      .catch(function () { result.textContent = 'Update-Prüfung fehlgeschlagen.'; })
+      .then(function () { button.disabled = false; });
+  });
+
+  /** Statuschip außerhalb der Übersicht (Lizenz, Anmeldung) — gleiche Stufen und Wörter. */
+  function setStatusChip(chip, level, label) {
+    chip.dataset.level = level;
+    chip.textContent = label || overviewLabels[level] || level;
+  }
 
   /** fetch gegen /api/admin/* mit Bearer-Token; wirft bei 401 zurück ins Token-Gate. */
   function adminFetch(path, options) {
@@ -1150,8 +1438,13 @@ export const adminPageHtml = `<!doctype html>
   var oidcRedirect = document.getElementById('oidc-redirect');
   var licenseToken = document.getElementById('license-token');
   var licenseSummary = document.getElementById('license-summary');
+  var licenseBanner = document.getElementById('license-banner');
+  var licenseStatusChip = document.getElementById('license-status-chip');
+  var authStatusChip = document.getElementById('auth-status-chip');
   var authPublicUrl = document.getElementById('auth-public-url');
   var featureLabels = {};
+  /** Letzte Antwort von /auth-settings — die Lizenz-Karte speichert mit dem dort gespeicherten Modus. */
+  var lastAuthData = null;
 
   function updateRedirectPreview() {
     var origin = authPublicUrl.value.trim().replace(/\\/$/, '');
@@ -1170,8 +1463,40 @@ export const adminPageHtml = `<!doctype html>
     ['entra', 'keycloak', 'generic'].forEach(function (key) {
       document.getElementById('oidc-setup-' + key).hidden = oidcProvider.value !== key;
     });
+    updateClientSecretHint();
   }
   oidcProvider.addEventListener('change', updateOidcSetup);
+
+  /**
+   * Entra ID löst den Code nur mit Secret ein (Plattform „Web“, die Middleware tauscht serverseitig).
+   * Hinweis, solange weder im Admin noch per OVP_OIDC_CLIENT_SECRET eins vorliegt.
+   */
+  function updateClientSecretHint() {
+    var stored = Boolean(lastAuthData && lastAuthData.stored && lastAuthData.stored.hasClientSecret);
+    var fromEnv = Boolean(lastAuthData && lastAuthData.envDefaults && lastAuthData.envDefaults.hasClientSecret);
+    var entra = oidcProvider.value === 'entra';
+    oidcClientSecret.placeholder = stored ? 'gespeichert — leer lassen = unverändert'
+      : fromEnv ? 'aus OVP_OIDC_CLIENT_SECRET (Env)'
+      : entra ? 'Pflicht für Entra ID' : 'leer = public client (PKCE)';
+    document.getElementById('oidc-entra-secret-hint').hidden = !entra || stored || fromEnv || Boolean(oidcClientSecret.value);
+  }
+  oidcClientSecret.addEventListener('input', updateClientSecretHint);
+
+  /** Stufe und Kurztext der Lizenz — für den Chip auf „Lizenz & Aktivierung“ und die Übersicht. */
+  function licenseLevel(lic) {
+    if (lic.status === 'none') return { level: 'off', label: 'Core-Edition', text: 'Keine Enterprise-Lizenz — alle Core-Funktionen laufen.' };
+    if (lic.status === 'invalid') return { level: 'error', label: 'Ungültig', text: 'Lizenzschlüssel ungültig.' };
+    if (lic.status === 'expired') return { level: 'error', label: 'Abgelaufen', text: 'Lizenz abgelaufen — nur Core-Funktionen.' };
+    if (lic.subscriptionGraceUntil) return { level: 'warn', label: 'Verlängern', text: 'Lizenz abgelaufen, Enterprise läuft noch bis ' + fmtDate(lic.subscriptionGraceUntil) + '.' };
+    switch (lic.leaseState) {
+      case 'active': return { level: 'ok', label: 'Aktiv', text: (lic.licensee || 'Enterprise') + ' · aktiviert bis ' + fmtDate(lic.leaseUntil) };
+      case 'grace': return { level: 'warn', label: 'Grace', text: 'WerkWorks nicht erreichbar — Enterprise läuft bis ' + fmtDate(lic.graceUntil) + '.' };
+      case 'pending': return { level: 'warn', label: 'Nicht aktiviert', text: 'Installation noch nicht aktiviert — nur Core-Funktionen.' };
+      case 'blocked': return { level: 'error', label: 'Blockiert', text: 'Aktivierungslimit erreicht — Installation übertragen oder stilllegen.' };
+      case 'expired': return { level: 'error', label: 'Abgelaufen', text: 'Aktivierung abgelaufen — nur Core-Funktionen.' };
+      default: return lic.status === 'valid' ? { level: 'ok', label: 'Gültig', text: lic.licensee || 'Enterprise' } : { level: 'warn', label: 'Prüfen', text: lic.reason || '' };
+    }
+  }
 
   function describeLicenseStatus(lic) {
     if (lic.status === 'valid') return 'Enterprise Edition — Lizenz gültig (Schlüssel ' + lic.kid + ').';
@@ -1271,12 +1596,12 @@ export const adminPageHtml = `<!doctype html>
           adminFetch('/license/transfer', jsonRequest('POST', { installationId: full }))
             .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
             .then(function (result) {
-              if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Übertragen fehlgeschlagen'), 'error'); return; }
+              if (!result.ok) { showBanner(licenseBanner, errorText(result.data, 'Übertragen fehlgeschlagen'), 'error'); return; }
               renderAuth(result.data);
-              showBanner(authBanner, 'Installation übernommen.', 'ok');
+              showBanner(licenseBanner, 'Installation übernommen.', 'ok');
               loadInstallations();
             })
-            .catch(function () { showBanner(authBanner, 'Übertragen fehlgeschlagen', 'error'); })
+            .catch(function () { showBanner(licenseBanner, 'Übertragen fehlgeschlagen', 'error'); })
             .then(function () { btn.disabled = !canManageInstallations; });
         });
         actionCell.appendChild(btn);
@@ -1293,22 +1618,35 @@ export const adminPageHtml = `<!doctype html>
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
 
+  /** Schaltet die OIDC-Schritte und die sichtbaren Hinweise passend zum gewählten Modus. */
   function updateOidcVisibility() {
     oidcFields.hidden = authMode.value !== 'oidc';
+    document.getElementById('auth-mode-none-hint').hidden = authMode.value !== 'none';
+    var lic = lastAuthData && lastAuthData.effective.license || { status: 'none' };
+    var hasSso = lic.status === 'valid' && (lic.features || []).indexOf('sso') !== -1;
+    document.getElementById('oidc-license-hint').hidden = authMode.value !== 'oidc' || hasSso;
   }
   authMode.addEventListener('change', updateOidcVisibility);
 
   function renderAuth(data) {
+    lastAuthData = data;
     featureLabels = data.featureLabels || {};
     var eff = data.effective;
-    var modeLabels = { none: 'offen (nur Netzwerkschutz)', token: 'Shared-Token (OVP_API_AUTH_TOKEN, per Env)', local: 'Benutzerkonten', oidc: 'Single Sign-On' };
-    var text = 'Aktiv: ' + (modeLabels[eff.mode] || eff.mode) + ' (Quelle: ' + (eff.source === 'db' ? 'Admin-UI' : 'Env-Defaults') + ')';
-    if (eff.blockedReason) text += ' — BLOCKIERT: ' + eff.blockedReason;
+    var modeLabels = { none: 'Offen — Chat und Tableau API gesperrt', token: 'Shared-Token (OVP_API_AUTH_TOKEN, per Env)', local: 'Benutzerkonten', oidc: 'Single Sign-On' };
+    var modeText = modeLabels[eff.mode] || eff.mode;
+    var text = modeText + ' · Quelle: ' + (eff.source === 'db' ? 'Admin-UI' : 'Env-Defaults');
+    if (eff.blockedReason) text += ' — ' + eff.blockedReason;
     authSource.textContent = text;
-    authSource.classList.toggle('error', Boolean(eff.blockedReason));
+    var authLevel = eff.blockedReason ? 'error' : eff.mode === 'none' ? 'warn' : 'ok';
+    setStatusChip(authStatusChip, authLevel, eff.blockedReason ? 'Blockiert' : eff.mode === 'none' ? 'Offen' : 'Aktiv');
+    overviewSet('auth', authLevel, eff.blockedReason ? 'Blockiert: ' + eff.blockedReason : modeText);
+    if (eff.publicUrl) overviewSet('publicUrl', 'ok', eff.publicUrl);
+    else overviewSet('publicUrl', eff.mode === 'oidc' ? 'error' : 'off', 'Nicht gesetzt — nötig für Single Sign-On und Tableau OAuth 2.0 Trust.');
     var lic = eff.license || { status: 'none' };
+    var licState = licenseLevel(lic);
+    setStatusChip(licenseStatusChip, licState.level, licState.label);
+    overviewSet('license', licState.level, licState.text);
     licenseSummary.textContent = describeLicenseStatus(lic) + (data.stored && data.stored.hasLicense ? ' (aus Admin-UI)' : data.envDefaults && data.envDefaults.hasLicense ? ' (aus Env)' : '');
-    licenseSummary.classList.toggle('error', lic.status === 'inactive' || lic.status === 'expired' || lic.status === 'invalid');
     renderLicenseCard(lic, data);
     if (eff.mode === 'none' || eff.mode === 'local' || eff.mode === 'oidc') authMode.value = eff.mode;
     var oidc = (data.stored && data.stored.oidc) || eff.oidc;
@@ -1318,8 +1656,10 @@ export const adminPageHtml = `<!doctype html>
       oidcClientId.value = oidc.clientId;
       oidcScopes.value = oidc.scopes || 'openid profile email';
     }
+    // Die Anleitung ist aufgeklappt, solange noch kein Identity-Provider eingetragen ist.
+    document.getElementById('oidc-setup').open = !oidc;
     oidcClientSecret.value = '';
-    oidcClientSecret.placeholder = data.stored && data.stored.hasClientSecret ? 'gespeichert — leer lassen = unverändert' : 'leer = public client (PKCE)';
+    updateClientSecretHint();
     licenseToken.value = '';
     renderTelemetry(data.telemetry);
     authPublicUrl.value = eff.publicUrl || (data.envDefaults && data.envDefaults.publicUrl) || window.location.origin;
@@ -1354,7 +1694,11 @@ export const adminPageHtml = `<!doctype html>
     return adminFetch('/auth-settings')
       .then(function (res) { return res.json(); })
       .then(function (data) { renderAuth(data); loadInstallations(); })
-      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        overviewSet('license', 'error', 'Lizenzstatus konnte nicht geladen werden.');
+        overviewSet('auth', 'error', 'Anmelde-Einstellungen konnten nicht geladen werden.');
+      });
   }
 
   function jsonRequest(method, body) {
@@ -1369,7 +1713,24 @@ export const adminPageHtml = `<!doctype html>
     return fallback;
   }
 
-  function saveAuth(extra) {
+  /** PUT /auth-settings; fehlt license, publicUrl oder oidc, bleibt der gespeicherte Wert (routes/admin.ts). */
+  function putAuthSettings(body, banner, okText, onSaved) {
+    return adminFetch('/auth-settings', jsonRequest('PUT', body))
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) {
+          showBanner(banner, errorText(result.data, 'Speichern fehlgeschlagen'), 'error');
+          return;
+        }
+        renderAuth(result.data);
+        if (onSaved) onSaved();
+        showBanner(banner, okText, 'ok');
+      })
+      .catch(function () { showBanner(banner, 'Speichern fehlgeschlagen', 'error'); });
+  }
+
+  /** Anmeldung speichern: Modus, öffentliche URL und OIDC — der Lizenzschlüssel bleibt unberührt. */
+  function saveAuth() {
     var body = { mode: authMode.value };
     if (oidcIssuer.value.trim() || oidcClientId.value.trim()) {
       body.oidc = {
@@ -1380,28 +1741,44 @@ export const adminPageHtml = `<!doctype html>
       };
       if (oidcClientSecret.value) body.oidc.clientSecret = oidcClientSecret.value;
     }
-    if (licenseToken.value.trim()) body.license = licenseToken.value.trim();
     body.publicUrl = authPublicUrl.value.trim();
-    if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
-    return adminFetch('/auth-settings', jsonRequest('PUT', body))
-      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
-      .then(function (result) {
-        if (!result.ok) {
-          showBanner(authBanner, errorText(result.data, 'Speichern fehlgeschlagen'), 'error');
-          return;
-        }
-        renderAuth(result.data);
-        showBanner(authBanner, 'Gespeichert — gilt sofort für alle Anmeldungen.', 'ok');
-      })
-      .catch(function () { showBanner(authBanner, 'Speichern fehlgeschlagen', 'error'); });
+    return putAuthSettings(body, authBanner, 'Gespeichert — gilt sofort für alle Anmeldungen.');
+  }
+
+  /**
+   * Der Server speichert Lizenz und Anmeldung in einem Datensatz und verlangt den Modus. Die
+   * Lizenz-Karte schickt deshalb den bereits gültigen Modus mit, nie den ungespeicherten Stand
+   * des Formulars unter „Anmeldung“. Kommt der Modus aus der Env (Shared-Token), würde jedes
+   * Speichern ihn überschreiben — dann gehört auch die Lizenz in die Env.
+   */
+  function currentAuthMode() {
+    if (!lastAuthData) return null;
+    if (lastAuthData.stored && lastAuthData.stored.mode) return lastAuthData.stored.mode;
+    var mode = lastAuthData.effective.mode;
+    return mode === 'none' || mode === 'local' || mode === 'oidc' ? mode : null;
+  }
+
+  function saveLicense(license, mode, okText) {
+    if (!mode) {
+      showBanner(licenseBanner, 'Die Anmeldung läuft im Shared-Token-Modus aus der Env — bitte auch die Lizenz per Env setzen (OVP_LICENSE).', 'error');
+      return Promise.resolve();
+    }
+    // Neuer Schlüssel = sofortiger Heartbeat auf dem Server; die Installationsliste danach neu holen.
+    return putAuthSettings({ mode: mode, license: license }, licenseBanner, okText, loadInstallations);
   }
 
   document.getElementById('save-auth').addEventListener('click', function () { saveAuth(); });
+  document.getElementById('save-license').addEventListener('click', function () {
+    var token = licenseToken.value.trim();
+    if (!token) { licenseToken.focus(); showBanner(licenseBanner, 'Bitte zuerst den Lizenzschlüssel einfügen.', 'error'); return; }
+    saveLicense(token, currentAuthMode(), 'Lizenz gespeichert — die Aktivierung läuft sofort an.');
+  });
   document.getElementById('remove-license').addEventListener('click', function () {
-    if (!window.confirm('Lizenzschlüssel aus der Admin-UI entfernen? Enterprise-Funktionen werden deaktiviert.')) return;
+    var mode = currentAuthMode();
+    var ssoActive = mode === 'oidc';
+    if (!window.confirm('Lizenzschlüssel aus der Admin-UI entfernen? Enterprise-Funktionen werden deaktiviert.' + (ssoActive ? ' Single Sign-On braucht die Lizenz — die Anmeldung wechselt auf Benutzerkonten.' : ''))) return;
     licenseToken.value = '';
-    if (authMode.value === 'oidc') authMode.value = 'local';
-    saveAuth({ license: '' });
+    saveLicense('', ssoActive ? 'local' : mode, 'Lizenz entfernt.');
   });
   document.getElementById('license-refresh').addEventListener('click', function () {
     var button = this;
@@ -1409,12 +1786,12 @@ export const adminPageHtml = `<!doctype html>
     adminFetch('/license/refresh', { method: 'POST' })
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
-        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Aktualisierung fehlgeschlagen'), 'error'); return; }
+        if (!result.ok) { showBanner(licenseBanner, errorText(result.data, 'Aktualisierung fehlgeschlagen'), 'error'); return; }
         renderAuth(result.data);
         loadInstallations();
-        showBanner(authBanner, 'Aktivierung aktualisiert.', 'ok');
+        showBanner(licenseBanner, 'Aktivierung aktualisiert.', 'ok');
       })
-      .catch(function () { showBanner(authBanner, 'Aktualisierung fehlgeschlagen', 'error'); })
+      .catch(function () { showBanner(licenseBanner, 'Aktualisierung fehlgeschlagen', 'error'); })
       .then(function () { button.disabled = false; });
   });
   document.getElementById('license-deactivate').addEventListener('click', function () {
@@ -1424,17 +1801,17 @@ export const adminPageHtml = `<!doctype html>
     adminFetch('/license/deactivate', jsonRequest('POST', { confirm: true }))
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
-        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Stilllegen fehlgeschlagen'), 'error'); return; }
+        if (!result.ok) { showBanner(licenseBanner, errorText(result.data, 'Stilllegen fehlgeschlagen'), 'error'); return; }
         renderAuth(result.data);
-        showBanner(authBanner, 'Installation stillgelegt.', 'ok');
+        showBanner(licenseBanner, 'Installation stillgelegt.', 'ok');
       })
-      .catch(function () { showBanner(authBanner, 'Stilllegen fehlgeschlagen', 'error'); })
+      .catch(function () { showBanner(licenseBanner, 'Stilllegen fehlgeschlagen', 'error'); })
       .then(function () { button.disabled = false; });
   });
   document.getElementById('activation-request-download').addEventListener('click', function () {
     adminFetch('/license/activation-request')
       .then(function (res) {
-        if (!res.ok) return res.json().then(function (data) { showBanner(authBanner, errorText(data, 'Anfrage fehlgeschlagen'), 'error'); });
+        if (!res.ok) return res.json().then(function (data) { showBanner(licenseBanner, errorText(data, 'Anfrage fehlgeschlagen'), 'error'); });
         return res.blob().then(function (blob) {
           var href = URL.createObjectURL(blob);
           var a = document.createElement('a');
@@ -1454,15 +1831,15 @@ export const adminPageHtml = `<!doctype html>
     adminFetch('/license/lease', jsonRequest('PUT', { lease: lease.value.trim() }))
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
-        if (!result.ok) { showBanner(authBanner, errorText(result.data, 'Lease abgelehnt'), 'error'); return; }
+        if (!result.ok) { showBanner(licenseBanner, errorText(result.data, 'Lease abgelehnt'), 'error'); return; }
         lease.value = '';
         renderAuth(result.data);
-        showBanner(authBanner, 'Lease gespeichert — Installation aktiviert.', 'ok');
+        showBanner(licenseBanner, 'Lease gespeichert — Installation aktiviert.', 'ok');
       })
-      .catch(function () { showBanner(authBanner, 'Lease konnte nicht gespeichert werden', 'error'); });
+      .catch(function () { showBanner(licenseBanner, 'Lease konnte nicht gespeichert werden', 'error'); });
   });
   document.getElementById('reset-auth').addEventListener('click', function () {
-    if (!window.confirm('Alle Anmelde-Einstellungen der Admin-UI verwerfen und die Env-Defaults verwenden?')) return;
+    if (!window.confirm('Alle Anmelde- und Lizenzeinstellungen der Admin-UI verwerfen (auch den hier gespeicherten Lizenzschlüssel) und die Env-Defaults verwenden?')) return;
     adminFetch('/auth-settings', { method: 'DELETE' })
       .then(function (res) { return res.json(); })
       .then(function (data) { renderAuth(data); showBanner(authBanner, 'Zurückgesetzt auf Env-Defaults.', 'ok'); })
@@ -1476,8 +1853,17 @@ export const adminPageHtml = `<!doctype html>
   var userAccessBody = document.getElementById('user-access-body');
   var userAccessBanner = document.getElementById('user-access-banner');
 
+  /** Übersicht: wer wartet noch auf eine Freigabe (weder AI-Chat noch Tableau API)? */
+  function overviewAccess(users) {
+    if (users.length === 0) { overviewSet('access', 'off', 'Noch keine Identitäten — sie erscheinen nach der ersten Anmeldung.'); return; }
+    var pending = users.filter(function (u) { return u.ai !== true && u.tableauApi !== true; }).length;
+    if (pending > 0) overviewSet('access', 'warn', pending === 1 ? '1 Person wartet auf Freigabe.' : pending + ' Personen warten auf Freigabe.');
+    else overviewSet('access', 'ok', users.length === 1 ? '1 Person freigegeben.' : users.length + ' Personen freigegeben.');
+  }
+
   function renderUserAccess(users) {
     userAccessBody.innerHTML = '';
+    overviewAccess(users);
     if (users.length === 0) {
       var empty = document.createElement('tr');
       var emptyCell = document.createElement('td');
@@ -1568,6 +1954,9 @@ export const adminPageHtml = `<!doctype html>
             if (!result.ok) throw new Error(errorText(result.data, 'Zugriff konnte nicht gespeichert werden.'));
             showBanner(userAccessBanner, 'Zugriff gespeichert.', 'ok');
             status.textContent = aiInput.checked || tableauInput.checked ? 'freigegeben' : 'ausstehend';
+            u.ai = aiInput.checked;
+            u.tableauApi = tableauInput.checked;
+            overviewAccess(users);
           })
           .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriff konnte nicht gespeichert werden.', 'error'); })
           .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; serverDataInput.disabled = false; adminInput.disabled = !canGrantAdmin; });
@@ -1591,9 +1980,16 @@ export const adminPageHtml = `<!doctype html>
       .then(function (result) {
         if (!result.ok) throw new Error(errorText(result.data, 'Zugriffe konnten nicht geladen werden.'));
         renderUserAccess(result.data.users || []);
-        if (result.data.storeAvailable === false) showBanner(userAccessBanner, 'Benutzerzugriff benötigt einen Memory-Store.', 'error');
+        if (result.data.storeAvailable === false) {
+          showBanner(userAccessBanner, 'Benutzer & Zugriff benötigt einen Memory-Store.', 'error');
+          overviewSet('access', 'error', 'Freigaben brauchen eine Datenbank.');
+        }
       })
-      .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriffe konnten nicht geladen werden.', 'error'); });
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        showBanner(userAccessBanner, error.message || 'Zugriffe konnten nicht geladen werden.', 'error');
+        overviewSet('access', 'error', 'Freigaben konnten nicht geladen werden.');
+      });
   }
 
   function userAction(path, options, okText) {
@@ -2202,6 +2598,9 @@ export const adminPageHtml = `<!doctype html>
       source === 'custom'
         ? 'Aktuell: eigener Katalog — die Extension zeigt genau diese Modelle.'
         : 'Aktuell: keine eigene Liste — die Extension zeigt die Endpunkt-Liste.';
+    overviewSet('models', 'ok', source === 'custom'
+      ? (models.length === 1 ? '1 Modell im eigenen Katalog.' : models.length + ' Modelle im eigenen Katalog.')
+      : 'Alle Modelle des LLM-Endpunkts (kein eigener Katalog).');
   }
 
   function readModelsFromTable() {
@@ -2218,7 +2617,10 @@ export const adminPageHtml = `<!doctype html>
     return adminFetch('/models')
       .then(function (res) { return res.json(); })
       .then(function (data) { renderModels(data.models || [], data.source); })
-      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        overviewSet('models', 'error', 'Modelle konnten nicht geladen werden.');
+      });
   }
 
   document.getElementById('add-model').addEventListener('click', function () {
@@ -2406,6 +2808,12 @@ export const adminPageHtml = `<!doctype html>
     });
   }
 
+  var metricLabels = {
+    chat_turn: 'Fragen je Modell', llm_call: 'Modellaufrufe je Modell', llm_tokens_in: 'Tokens ein je Modell',
+    llm_tokens_out: 'Tokens aus je Modell', llm_ms: 'Antwortzeit gesamt (ms) je Modell', tool_call: 'Tool-Aufrufe',
+    chat_error: 'Fehler', scope_blocked: 'Vom Themenfilter abgelehnt'
+  };
+
   function renderStats(rows) {
     var byMetric = {};
     var chatTurns = 0;
@@ -2425,7 +2833,7 @@ export const adminPageHtml = `<!doctype html>
       var block = document.createElement('div');
       block.className = 'stats-block';
       var h3 = document.createElement('h3');
-      h3.textContent = metric;
+      h3.textContent = metricLabels[metric] || metric;
       block.appendChild(h3);
 
       var table = document.createElement('table');
@@ -2589,6 +2997,13 @@ export const adminPageHtml = `<!doctype html>
     var verifier = randomString(48);
     var state = randomString(24);
     var expectedOrigin = new URL(ssoConfig.redirectUri).origin;
+    // Popup sofort und synchron im Klick öffnen, erst danach den PKCE-Hash rechnen — nach einem
+    // await blockieren manche Browser window.open als „nicht vom Nutzer ausgelöst“.
+    var popup = window.open('about:blank', 'openvizpilot-admin-login', 'popup,width=520,height=680');
+    if (!popup) {
+      showBanner(gateError, 'Das Anmeldefenster wurde blockiert — bitte Popups für diese Seite erlauben.', 'error');
+      return;
+    }
     button.disabled = true;
     showBanner(gateError, '', 'error');
     crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (digest) {
@@ -2601,8 +3016,7 @@ export const adminPageHtml = `<!doctype html>
       url.searchParams.set('code_challenge', base64url(new Uint8Array(digest)));
       url.searchParams.set('code_challenge_method', 'S256');
       if (ssoConfig.provider === 'entra') url.searchParams.set('prompt', 'select_account');
-      var popup = window.open(url.toString(), 'openvizpilot-admin-login', 'popup,width=520,height=680');
-      if (!popup) throw new Error('Das Anmeldefenster wurde blockiert — bitte Popups für diese Seite erlauben.');
+      popup.location.href = url.toString();
       return new Promise(function (resolve, reject) {
         var closedPoll = null;
         var timeout = null;
@@ -2628,8 +3042,11 @@ export const adminPageHtml = `<!doctype html>
     }).then(function (result) {
       if (!result.res.ok) throw new Error(result.data.error || 'Anmeldung fehlgeschlagen.');
       return enterAsUser(result.data.token, 'oidc');
-    }).catch(function (error) { showBanner(gateError, error.message || 'Anmeldung fehlgeschlagen.', 'error'); })
-      .finally(function () { button.disabled = false; });
+    }).catch(function (error) {
+      // Ein noch offenes (z. B. leeres) Anmeldefenster nicht stehen lassen.
+      try { if (!popup.closed) popup.close(); } catch (e) { /* ignorieren */ }
+      showBanner(gateError, error.message || 'Anmeldung fehlgeschlagen.', 'error');
+    }).finally(function () { button.disabled = false; });
   });
 
   document.getElementById('logout').addEventListener('click', function () {

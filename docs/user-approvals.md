@@ -5,7 +5,7 @@ Die Extension verwendet den konfigurierten Anmeldemodus: lokale Benutzerkonten o
 ## Ablauf
 
 1. Ein Administrator legt ein lokales Konto an, oder ein Benutzer meldet sich erstmals erfolgreich per SSO an.
-2. Die Identität erscheint im Admin-Bereich unter Benutzerzugriff. Beide Freigaben sind zunächst deaktiviert.
+2. Die Identität erscheint im Admin-Bereich unter „Benutzer & Zugriff“ → „Zugriff je Person“. Beide Freigaben sind zunächst deaktiviert.
 3. Der Administrator vergibt **KI-Chat** und **Tableau-API** unabhängig voneinander und speichert die Zeile. Der Schalter **Admin** (nur für den initialen Admin — Token bzw. Admin-Konto — bedienbar, für delegierte Admins nur lesbar) macht die Identität zum delegierten Admin: Sie darf sich mit ihrem eigenen Konto an `/admin` anmelden und die Administration bedienen, die Admin-Rolle selbst aber nicht vergeben oder entziehen (siehe [Admin-UI: Rollen](admin-deployment.md#admin-ui-slash-befehle-manifest-download--anonyme-nutzung)).
 4. Die Extension zeigt den Freigabestatus an. Er wird alle 30 Sekunden sowie über „Status aktualisieren“ neu geladen.
 

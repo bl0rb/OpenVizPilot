@@ -91,6 +91,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Versionsanzeige im Admin (Übersicht) auch bei `docker run` ohne Helm/Compose.
+          build-args: |
+            OVP_APP_VERSION=${{ steps.tag.outputs.value }}
 
       # Nur echte Tag-Builds signieren, nicht workflow_dispatch-Reruns
       # (die z. B. für den permission_denied-Retry ohne "v"-Tag laufen).

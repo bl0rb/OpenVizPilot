@@ -37,39 +37,39 @@ Auth-Modus, eigener Connected App und eigenem Secret.
 2. In Tableau: Settings → Connected Apps → New Connected App → Direct Trust. Name, Access level und Domain
    allowlist (Public URL der Middleware) setzen, Enable connected app aktivieren.
 3. Client-ID und Secret-ID in die Site-Karte eintragen.
-4. Secret Value entweder direkt in der Site-Karte über **Ersetzen** speichern (verschlüsselt im Web, braucht
+4. Unter **Secret-Ablage** wählen: Secret Value entweder in der Datenbank über **Ersetzen** speichern (verschlüsselt im Web, braucht
    `OVP_SECRET_KEY`) oder als Deployment-Umgebungsvariable mit `OVP_TABLEAU_`-Präfix bereitstellen, zum Beispiel
    `OVP_TABLEAU_CONNECTED_APP_SECRET` (Env-Referenz-Feld in der Site-Karte eintragen; in Kubernetes kann die
    Variable aus einem vorhandenen Secret kommen; nach einer Änderung alle Replicas neu starten). Der Secret-Wert
    wird nie über die Admin-API gelesen oder zurückgegeben — nur `secretConfigured: 'db' | 'env' | false`.
 5. Server-URL (einmal, gilt für alle Sites) und Username-Claim (global) oben eintragen, Integration aktivieren,
    speichern.
-6. **Konfiguration prüfen** validiert je Site die gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und
+6. **Eingaben prüfen** validiert je Site die gespeicherte Konfiguration, Lizenz, OIDC-Bereitschaft und
    Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
-7. Nach dem Speichern den Button **Verbindung als Nutzer prüfen** der jeweiligen Site-Karte verwenden. Der Button
+7. Nach dem Speichern den Button **Verbindung testen** der jeweiligen Site-Karte verwenden. Der Button
    ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und
-   OIDC-Bereitschaft aktiv.
+   OIDC-Bereitschaft aktiv; ist er gesperrt, steht der Grund daneben. Das Ergebnis erscheint in der Site-Karte.
 
 ### OAuth 2.0 Trust (je Site, ein gemeinsamer Schlüssel)
 
 OpenVizPilot tritt dabei selbst als External Authorization Server (EAS) auf: Es besitzt ein eigenes RSA-2048-
 Schlüsselpaar, veröffentlicht OIDC-Discovery und JWKS unter einer Issuer-URL und stellt für jeden verifizierten
 OIDC-Nutzer ein kurzlebiges RS256-JWT aus. Dieses Schlüsselpaar ist **ein gemeinsames** für alle Sites im
-OAuth-2.0-Trust-Modus (Abschnitt „OAuth 2.0 Trust“, einmal, oberhalb der Sites-Liste) — es gibt kein aus Tableau
+OAuth-2.0-Trust-Modus (jede OAuth-Site-Karte zeigt dieselbe Issuer-URL) — es gibt kein aus Tableau
 stammendes Shared Secret; der Schlüssel bleibt unter eigener Kontrolle. Der private Schlüssel verlässt Datenbank
 und Prozess nie — weder über die Admin-API noch in Logs.
 
 1. Für mindestens eine Site-Karte Authentifizierung auf **Connected App – OAuth 2.0 Trust** stellen und ohne
    weitere Angaben speichern — auch im deaktivierten Entwurf. Dabei erzeugt die Middleware einmalig den
-   EAS-Schlüssel; der Abschnitt darüber zeigt danach die schreibgeschützte **Issuer URL**, **JWKS-URL** und
-   **Key-ID** an.
-2. Issuer URL über den Kopieren-Button übernehmen.
+   EAS-Schlüssel; die Site-Karte zeigt danach die schreibgeschützte **Issuer URL** mit Kopieren-Knopf, **JWKS-URL**
+   und **Key-ID** unter „Technische Details“. Die passenden Schritte stehen jeweils direkt in der Karte.
+2. Issuer URL über den Kopieren-Button der Site-Karte übernehmen.
 3. In Tableau je Site: Settings → Connected Apps → New Connected App → OAuth 2.0 Trust. Name vergeben, Issuer URL
    einfügen, Enable connected app aktivieren. Tableau zeigt danach die **Site ID** (Site-LUID) an.
 4. Site ID in die jeweilige Site-Karte eintragen, Server-URL (global) sowie Username-Claim (global) eintragen,
    Integration aktivieren, speichern.
-5. **Konfiguration prüfen** je Site ausführen (kontaktiert Tableau nicht).
-6. **Verbindung als Nutzer prüfen** je Site ausführen.
+5. **Eingaben prüfen** je Site ausführen (kontaktiert Tableau nicht).
+6. **Verbindung testen** je Site ausführen.
 
 Ändert sich die Public URL der Middleware, ändert sich auch die Issuer-URL — sie muss dann in Tableau je Site
 nachgezogen werden. Vorausgesetzt: Tableau Server ab 2024.2 einschließlich bzw. Tableau Cloud.
@@ -106,7 +106,7 @@ Site den Schalter **„Serverseitige Daten erlauben“** aktivieren. Das bewirkt
    unabhängig von den übrigen Freigaben.
 
 Zusätzlich nötig, jeweils serverseitig geprüft: Enterprise-Lizenz mit `serverData`, die Freigabe
-**„Serverdaten“** je Person unter „Benutzerzugriff“ und die einmalige Einwilligung der Person in der
+**„Serverdaten“** je Person unter „Benutzer & Zugriff“ und die einmalige Einwilligung der Person in der
 Extension. Details zu Fehlercodes, Endpunkten und dem Audit-Log stehen in
 [tableau-server.md](tableau-server.md#serverseitiger-datenzugriff-w5).
 

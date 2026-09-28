@@ -19,7 +19,7 @@ Mensch bestätigt** — das Chat-Tool legt nie selbst eine Regel an.
 Jeder einzelne Lauf prüft erneut:
 
 1. Lizenz-Feature `watch` (setzt `serverData`, `tableauServer` und `sso` voraus).
-2. Freigaben „Tableau API“ und „Serverdaten“ der Regel-Eigentümerin/des Regel-Eigentümers unter „Benutzerzugriff“.
+2. Freigaben „Tableau API“ und „Serverdaten“ der Regel-Eigentümerin/des Regel-Eigentümers unter „Benutzer & Zugriff“.
 3. Deren Einwilligung zum serverseitigen Datenzugriff.
 4. Site-Schalter „Serverseitige Daten erlauben“.
 

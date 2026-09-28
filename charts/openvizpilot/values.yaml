@@ -222,7 +222,8 @@ oidc:
   issuer: ""
   clientId: ""
   scopes: "openid profile email"
-  # Nur für confidential clients (Keycloak "Client authentication: On") — public clients (PKCE) brauchen keins.
+  # Pflicht bei Microsoft Entra ID (Plattform "Web"); bei Keycloak nur für confidential clients
+  # ("Client authentication: On") — public clients (PKCE) brauchen keins.
   clientSecretSecret:
     existingSecret: ""
     key: OVP_OIDC_CLIENT_SECRET

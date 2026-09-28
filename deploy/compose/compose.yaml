@@ -1,0 +1,71 @@
+# OpenVizPilot auf einer Linux-VM ohne Kubernetes (Docker Compose).
+# Anleitung: docs/admin-deployment.md, Abschnitt „Alternative: Docker Compose“.
+#
+#   cp .env.example .env    # ausfüllen
+#   docker compose up -d                    # eigener Reverse Proxy davor
+#   docker compose --profile caddy up -d    # mitgelieferter HTTPS-Proxy (Caddy)
+
+name: openvizpilot
+
+services:
+  app:
+    # core: ghcr.io/bl0rb/openvizpilot · enterprise: ghcr.io/bl0rb/openvizpilot-enterprise
+    # (privat, vorher `docker login ghcr.io` mit dem Kunden-Lese-Token)
+    image: ${DEPLOY_IMAGE:-ghcr.io/bl0rb/openvizpilot}:${DEPLOY_VERSION:?DEPLOY_VERSION in .env setzen}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      OVP_PORT: "3000"
+      OVP_APP_VERSION: ${DEPLOY_VERSION}
+      OVP_DATABASE_URL: postgresql://openvizpilot:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env setzen}@db:5432/openvizpilot
+    ports:
+      # Default nur lokal — für einen Reverse Proxy auf einem anderen Host DEPLOY_BIND=0.0.0.0.
+      - "${DEPLOY_BIND:-127.0.0.1}:${DEPLOY_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # Das Image hat weder curl noch wget.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openvizpilot
+      POSTGRES_DB: openvizpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openvizpilot -d openvizpilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    profiles: [caddy]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DEPLOY_HOST: ${DEPLOY_HOST:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+
+volumes:
+  db-data:
+  caddy-data:

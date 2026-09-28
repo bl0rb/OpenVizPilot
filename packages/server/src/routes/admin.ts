@@ -19,6 +19,7 @@ import {
   describeLicense,
   describeTelemetry,
   EE_FEATURE_LABELS,
+  EE_STUB,
   hasFeature,
   loadLicenseFromEnv,
   verifyLease,
@@ -167,6 +168,27 @@ function bearerToken(header: string | undefined): string | null {
   if (!header?.startsWith('Bearer ')) return null;
   const token = header.slice('Bearer '.length).trim();
   return token.length > 0 ? token : null;
+}
+
+/** Öffentliche Releases (Core und Enterprise tragen dieselbe Versionsnummer). */
+export const RELEASES_API = 'https://api.github.com/repos/bl0rb/OpenVizPilot/releases/latest';
+export const RELEASES_PAGE = 'https://github.com/bl0rb/OpenVizPilot/releases';
+
+/**
+ * Ist `latest` neuer als `current`? null, wenn `current` keine Versionsnummer ist
+ * (z. B. „unbekannt“ bei einem Start ohne OVP_APP_VERSION). Vorab-Versionen (1.7.0-rc.1)
+ * zählen als älter als die zugehörige Version.
+ */
+export function isNewerVersion(latest: string, current: string): boolean | null {
+  const parse = (v: string) => /^v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.]+)?$/.exec(v.trim());
+  const a = parse(latest);
+  const b = parse(current);
+  if (!a || !b) return null;
+  for (let i = 1; i <= 3; i += 1) {
+    const diff = Number(a[i]) - Number(b[i]);
+    if (diff !== 0) return diff > 0;
+  }
+  return Boolean(b[4]) && !a[4];
 }
 
 export function createAdminRoute(
@@ -362,6 +384,53 @@ export function createAdminRoute(
 
   /** Wer gerade angemeldet ist — die Seite blendet danach den Admin-Schalter ein/aus. */
   app.get('/me', (c) => c.json(c.get('adminPrincipal')));
+
+  /** Installation auf einen Blick (Übersicht): Version, Edition, Umgebung, Datenbank, Laufzeit. */
+  app.get('/system', (c) =>
+    c.json({
+      version: config.appVersion,
+      edition: EE_STUB ? 'core' : 'enterprise',
+      environment: config.environment,
+      database: config.memoryDatabaseUrl ? 'postgres' : config.memoryDbPath ? 'sqlite' : null,
+      node: process.version,
+      startedAt: new Date(Date.now() - Math.round(process.uptime() * 1000)).toISOString(),
+      releasesUrl: RELEASES_PAGE,
+    }),
+  );
+
+  /**
+   * Update-Prüfung gegen die öffentlichen GitHub-Releases — NUR auf ausdrücklichen Klick in der
+   * Admin-UI, nie im Hintergrund: Die Installation meldet sich damit nirgends an und überträgt
+   * nichts außer der Anfrage selbst (ausgehend HTTPS auf api.github.com). Ergebnis 1 h gecacht.
+   */
+  let updateCache: { at: number; body: Record<string, unknown> } | null = null;
+  app.get('/update-check', async (c) => {
+    if (updateCache && Date.now() - updateCache.at < 60 * 60 * 1000) return c.json(updateCache.body);
+    try {
+      const res = await fetch(RELEASES_API, {
+        headers: { accept: 'application/vnd.github+json', 'user-agent': 'OpenVizPilot-Admin' },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { tag_name?: unknown; html_url?: unknown; published_at?: unknown };
+      const latest = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/, '') : '';
+      if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(latest)) throw new Error('unexpected release tag');
+      // Nur Links auf die eigene Release-Seite weiterreichen, nie eine beliebige URL aus der Antwort.
+      const url = typeof data.html_url === 'string' && data.html_url.startsWith(`${RELEASES_PAGE}/`) ? data.html_url : RELEASES_PAGE;
+      const body = {
+        current: config.appVersion,
+        latest,
+        newer: isNewerVersion(latest, config.appVersion),
+        url,
+        publishedAt: typeof data.published_at === 'string' ? data.published_at : null,
+      };
+      updateCache = { at: Date.now(), body };
+      return c.json(body);
+    } catch (err) {
+      logger.warn('update check failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'GitHub nicht erreichbar — bitte die Release-Seite direkt prüfen.', url: RELEASES_PAGE }, 502);
+    }
+  });
 
   app.post('/logout', async (c) => {
     const token = bearerToken(c.req.header('authorization'));
@@ -604,6 +673,8 @@ export function createAdminRoute(
       envDefaults: {
         mode: config.authMode,
         oidcProvider: config.oidc?.provider ?? null,
+        /** OVP_OIDC_CLIENT_SECRET gesetzt — gilt, solange im Admin kein eigenes Secret gespeichert ist. */
+        hasClientSecret: Boolean(config.oidcClientSecretEnv),
         hasLicense: Boolean(config.licenseEnv.OVP_LICENSE || config.licenseEnv.OVP_LICENSE_PATH),
         publicUrl: config.publicUrl,
       },

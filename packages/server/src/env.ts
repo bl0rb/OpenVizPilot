@@ -163,6 +163,12 @@ export interface AppConfig {
     clientSecret: string | null;
     scopes: string;
   } | null;
+  /**
+   * OVP_OIDC_CLIENT_SECRET für sich — auch ohne Env-Issuer/-Client-ID. Ergänzt eine in der
+   * Admin-UI gespeicherte OIDC-Konfiguration ohne eigenes Secret (Vault-Deployments), siehe
+   * auth-state.ts. Optional, damit bestehende Test-Konfigurationen gültig bleiben.
+   */
+  oidcClientSecretEnv?: string | null;
   /** Rohwerte für die Lizenzprüfung (ee/server/src/license.ts). */
   /**
    * Gegenstelle des Lizenz-Heartbeats (ee/). Fest eingebrannt — es gibt bewusst
@@ -276,6 +282,7 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
             scopes: e.OVP_OIDC_SCOPES.trim() || 'openid profile email',
           }
         : null,
+    oidcClientSecretEnv: e.OVP_OIDC_CLIENT_SECRET?.trim() ? e.OVP_OIDC_CLIENT_SECRET.trim() : null,
     telemetryEndpoint: HEARTBEAT_ENDPOINT,
     appVersion: e.OVP_APP_VERSION?.trim() || 'unbekannt',
     environment: e.OVP_ENVIRONMENT,

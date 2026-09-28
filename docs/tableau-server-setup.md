@@ -110,9 +110,23 @@ Zusätzlich nötig, jeweils serverseitig geprüft: Enterprise-Lizenz mit `server
 Extension. Details zu Fehlercodes, Endpunkten und dem Audit-Log stehen in
 [tableau-server.md](tableau-server.md#serverseitiger-datenzugriff-w5).
 
+## Datenquellen abfragen aktivieren (W8)
+
+Damit der Chat (vor allem der Untersuchen-Modus „Gesamte Tableau-Umgebung“) veröffentlichte
+Datenquellen mit eigenen Abfragen lesen kann, je Site zusätzlich den Schalter **„Datenquellen
+abfragen“** aktivieren. Voraussetzungen:
+
+1. Tableau Cloud oder Tableau Server ab 2025.1 (VizQL Data Service). Ältere Server antworten mit
+   `TABLEAU_VDS_UNAVAILABLE`; Suche und View-Daten funktionieren weiter.
+2. Die Connected App dieser Site erlaubt zusätzlich den Scope `tableau:viz_data_service:read`.
+3. Der jeweilige Tableau-Nutzer hat auf der Datenquelle die Berechtigung **„API-Zugriff“**.
+
+Zusätzlich gelten dieselben Freigaben wie oben (Lizenz `serverData`, Freigabe „Serverdaten“) und
+eine eigene, einmalige Einwilligung der Person zu Datenquellen-Abfragen in der Extension.
+
 ## Suche und Chat
 
-Die Chat-Tools (`tableau_server_search`, `tableau_metadata_search`, `tableau_metadata_field`, `tableau_view_data`), ihre Parameter und die geltenden Such-/Metadaten-Limits stehen in [tableau-server.md](tableau-server.md). Voraussetzung ist die per-Nutzer-Freigabe **Tableau-API** (siehe [user-approvals.md](user-approvals.md)) zusätzlich zu Lizenz, OIDC-Mapping und Site-Zuordnung.
+Die Chat-Tools (`tableau_server_search`, `tableau_metadata_search`, `tableau_metadata_field`, `tableau_datasource_search`, `tableau_view_data`, `tableau_datasource_fields`, `tableau_datasource_query`), ihre Parameter und die geltenden Such-/Metadaten-Limits stehen in [tableau-server.md](tableau-server.md). Voraussetzung ist die per-Nutzer-Freigabe **Tableau-API** (siehe [user-approvals.md](user-approvals.md)) zusätzlich zu Lizenz, OIDC-Mapping und Site-Zuordnung.
 
 Suchtreffer und Metadaten werden als Tool-Ergebnisse an den konfigurierten LLM-Anbieter übermittelt (Content-Namen, Tags, Owner-/Projektangaben, Quelllinks, Formeln). Das ist bei der Freigabe des Anbieters und seiner Datenverarbeitung zu berücksichtigen. Tableau-Tokens und Connected-App-Secrets werden nicht mitgesendet.
 

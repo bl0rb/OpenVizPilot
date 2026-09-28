@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
+import { CONTINUE_AFTER_LENGTH_PROMPT, MAX_CONTINUATIONS } from '../src/routes/chat';
 import { activated, testLicenseEnv } from './license-helper';
 import type { AppConfig } from '../src/env';
 import { createSqlitePersonalizationStore, EE_STUB } from '@openvizpilot/ee/server';
@@ -32,6 +33,8 @@ type FixtureResponse =
 let fixtureServer: http.Server;
 let fixtureUrl: string;
 let nextResponse: FixtureResponse = { kind: 'sse', chunks: [] };
+/** Streaming-Antworten der Reihe nach (vor nextResponse) — für mehrere Modellaufrufe in einem Request. */
+let sseQueue: Array<{ kind: 'sse'; chunks: unknown[] }> = [];
 /** Alle empfangenen /chat/completions-Bodies (auch der Extraktions-Call). */
 let receivedBodies: Array<Record<string, unknown>> = [];
 /** JSON-Antwort für non-streaming Calls (Memory-Extraktion). */
@@ -91,7 +94,8 @@ beforeAll(async () => {
           'content-type': 'text/event-stream',
           'cache-control': 'no-cache',
         });
-        for (const chunk of fixture.chunks) {
+        const sse = sseQueue.shift() ?? fixture;
+        for (const chunk of sse.chunks) {
           res.write(sseChunk(chunk));
         }
         res.write('data: [DONE]\n\n');
@@ -222,6 +226,36 @@ describe.skipIf(EE_STUB)('POST /api/chat', () => {
     };
     expect(done.finishReason).toBe('stop');
     expect(done.usage?.promptTokens).toBe(12);
+  });
+
+  it('continues an answer cut off at the output limit in the same stream, without new tool calls', async () => {
+    receivedBodies = [];
+    sseQueue = [
+      { kind: 'sse', chunks: [chunkDelta('Teil 1 '), { choices: [{ delta: {}, finish_reason: 'length' }] }] },
+      { kind: 'sse', chunks: [chunkDelta('Teil 2'), { choices: [{ delta: {}, finish_reason: 'stop' }] }] },
+    ];
+    const { events } = await postChat(validBody);
+    expect(events.filter((e) => e.event === 'delta').map((e) => (e.data as { content: string }).content)).toEqual(['Teil 1 ', 'Teil 2']);
+    const dones = events.filter((e) => e.event === 'done');
+    expect(dones).toHaveLength(1);
+    expect((dones[0]!.data as { finishReason: string }).finishReason).toBe('stop');
+    const streamed = receivedBodies.filter((body) => body.stream === true) as Array<{ messages: Array<{ role: string; content: string }>; tool_choice: string }>;
+    expect(streamed).toHaveLength(2);
+    expect(streamed[1]!.tool_choice).toBe('none');
+    expect(streamed[1]!.messages.slice(-2)).toEqual([
+      { role: 'assistant', content: 'Teil 1 ' },
+      { role: 'user', content: CONTINUE_AFTER_LENGTH_PROMPT },
+    ]);
+  });
+
+  it('stops continuing after MAX_CONTINUATIONS and reports the length limit', async () => {
+    receivedBodies = [];
+    const cut = { kind: 'sse' as const, chunks: [chunkDelta('x'), { choices: [{ delta: {}, finish_reason: 'length' }] }] };
+    sseQueue = Array.from({ length: MAX_CONTINUATIONS + 3 }, () => cut);
+    const { events } = await postChat(validBody);
+    expect(receivedBodies.filter((body) => body.stream === true)).toHaveLength(MAX_CONTINUATIONS + 1);
+    expect((events.find((e) => e.event === 'done')?.data as { finishReason: string }).finishReason).toBe('length');
+    sseQueue = [];
   });
 
   it('accumulates fragmented tool_calls into one complete event', async () => {

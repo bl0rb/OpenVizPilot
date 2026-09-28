@@ -126,6 +126,14 @@ des Modells, keine weitere Freigabe nötig. Ohne die Freigabe oder die Lizenz wi
 serverseitig auf „Nur dieses Dashboard“ zurückgestuft; die Extension zeigt dazu einen Hinweis in der
 Antwort statt eines eigenen Fehlerdialogs.
 
+**Datenquellen abfragen (W8):** Mit dem zusätzlichen Site-Schalter „Datenquellen abfragen“ darf das
+Modell veröffentlichte Datenquellen über den VizQL Data Service selbst abfragen (Felder,
+Aggregationen, Filter; keine `RAWSQL`/`SCRIPT`-Funktionen). Voraussetzung: Tableau Cloud oder Server
+ab 2025.1, Scope `tableau:viz_data_service:read` und die Tableau-Berechtigung „API-Zugriff“. Es
+gelten dieselbe Freigabe „Serverdaten“ und eine eigene Einwilligung der Person; höchstens 12
+Datenquellen-Aufrufe je Person und Dashboard in 2 Minuten. Jeder Aufruf erscheint im Audit mit der
+Datenquelle statt einer View.
+
 ## Watch (Dashboards beobachten und melden)
 
 > **Enterprise:** Lizenz-Feature `watch`, zusätzlich zu `serverData`, `tableauServer` und `sso`

@@ -13,7 +13,7 @@ signierten Lizenzschlüssel freigeschaltet und umfasst:
 | `mcp` | MCP-Quellen und Websuche mit zentraler Admin-Verwaltung und Bereichs-Freigaben |
 | `actions` | Dashboard-Aktionen aus dem Chat: Filter setzen/zurücksetzen, Parameter ändern, Marks markieren, Bereiche ein-/ausblenden |
 | `tableauServer` | Tableau-Server-Konfiguration, persönlicher Connected-App-Sign-in, Workbook-/View-Suche und Metadata-API (Feldsuche/-detail); benötigt OIDC und `sso`. |
-| `serverData` | Serverseitiger Datenzugriff (Watch/Cross-Dashboard): liest Summary-Daten einer Tableau-View außerhalb des aktuellen Dashboards im Namen des Nutzers; benötigt zusätzlich `tableauServer`/`sso`, den Site-Schalter „Serverseitige Daten erlauben“, die Freigabe „Serverdaten“ je Person und deren Einwilligung. |
+| `serverData` | Serverseitiger Datenzugriff (Watch/Cross-Dashboard): liest Summary-Daten einer Tableau-View außerhalb des aktuellen Dashboards im Namen des Nutzers und — mit Site-Schalter „Datenquellen abfragen“ — veröffentlichte Datenquellen über den VizQL Data Service; benötigt zusätzlich `tableauServer`/`sso`, den Site-Schalter „Serverseitige Daten erlauben“, die Freigabe „Serverdaten“ je Person und deren Einwilligung. |
 | `watch` | Watch: beobachtet eine Tableau-View nach Zeitplan im Namen des Nutzers und meldet Auffälligkeiten per Webhook, Microsoft Teams oder E-Mail; benötigt zusätzlich `serverData`, `tableauServer` und `sso` — siehe [docs/watch.md](watch.md). |
 
 Eine Lizenz kann alle oder einzelne davon enthalten (Feld `features`; fehlt es, gilt der volle

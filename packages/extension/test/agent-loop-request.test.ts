@@ -239,7 +239,7 @@ describe('ChatSession request contract', () => {
       expect(investigateCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReachedInvestigate'));
 
       // W7 Punkt 9: Umgebungsweite Untersuchung bekommt ein noch größeres
-      // Rundenbudget (16) — bis zu 5 fremde Views serverseitig lesen und
+      // Rundenbudget (24) — bis zu 5 fremde Views serverseitig lesen und
       // aggregieren braucht mehr Schritte als eine reine Dashboard-Untersuchung.
       captured.length = 0;
       const estateSession = new ChatSession();
@@ -258,7 +258,7 @@ describe('ChatSession request contract', () => {
         { backendUrl: '', mode: 'investigate-estate', getContext: async () => '# ctx', executeTool },
         estateCb,
       );
-      expect(TOOL_ROUNDS_BY_MODE['investigate-estate']).toBe(16);
+      expect(TOOL_ROUNDS_BY_MODE['investigate-estate']).toBe(24);
       expect(captured).toHaveLength(TOOL_ROUNDS_BY_MODE['investigate-estate'] + 1);
       expect(estateCb.onNotice).toHaveBeenCalledWith(t('app.chat.toolBudgetReachedInvestigate'));
     } finally {

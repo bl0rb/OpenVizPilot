@@ -14,13 +14,14 @@ import { streamChat } from './sse-client';
 
 /**
  * Rundenbudget je Modus (W3 Untersuchungsmodus: mehr Schritte für Plan +
- * Belege; W7 Umgebungsweite Untersuchung: noch mehr Schritte, da bis zu 5
- * fremde Views serverseitig gelesen und aggregiert werden müssen).
+ * Belege; W7/W8 Umgebungsweite Untersuchung: noch mehr Schritte, da Datenquellen
+ * gesucht, ihre Felder gelesen und mehrere eigene Abfragen gestellt bzw. bis zu
+ * 5 fremde Views serverseitig gelesen werden).
  */
 export const TOOL_ROUNDS_BY_MODE: Record<ChatMode, number> = {
   ask: 5,
   investigate: 12,
-  'investigate-estate': 16,
+  'investigate-estate': 24,
 };
 
 /** @deprecated Beibehalten für externe Referenzen — Budget ist jetzt modusabhängig, siehe TOOL_ROUNDS_BY_MODE. */

@@ -23,6 +23,11 @@ import {
   TABLEAU_METADATA_PROMPT_SECTION,
   TABLEAU_VIEW_DATA_TOOL,
   TABLEAU_VIEW_DATA_PROMPT_SECTION,
+  TABLEAU_DATASOURCE_SEARCH_TOOL,
+  TABLEAU_DATASOURCE_FIELDS_TOOL,
+  TABLEAU_DATASOURCE_QUERY_TOOL,
+  TABLEAU_DATASOURCE_PROMPT_SECTION,
+  TABLEAU_DATASOURCE_QUERY_PROMPT_SECTION,
   INVESTIGATE_ESTATE_PROMPT_SECTION,
   INVESTIGATE_ESTATE_DOWNGRADE_NOTICE,
   WATCH_PROPOSE_TOOL,
@@ -32,6 +37,13 @@ import type { MemoryStore } from '../memory/store';
 import { buildSystemPrompt, INVESTIGATE_PROMPT_SECTION, PROVENANCE_PROMPT_SECTION } from '../system-prompt';
 
 const HEARTBEAT_MS = 15_000;
+
+/** Höchstens so viele automatische Fortsetzungen einer am Ausgabelimit abgeschnittenen Antwort. */
+export const MAX_CONTINUATIONS = 3;
+
+/** Bitte an das Modell, eine am Ausgabelimit abgeschnittene Antwort nahtlos fortzusetzen. */
+export const CONTINUE_AFTER_LENGTH_PROMPT =
+  'Deine vorige Antwort wurde am Ausgabelimit abgeschnitten. Setze sie exakt an der Abbruchstelle fort — ohne Wiederholung, ohne Einleitung, im selben Format und in derselben Sprache.';
 
 /**
  * Upstream-Fehlertexte gehen NIE wörtlich an den Browser (CWE-209: sie können
@@ -296,7 +308,7 @@ export function createChatRoute(
 
           const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
           const tableauTools = tableauServerEnabled
-            ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS, ...(serverDataEnabled ? [TABLEAU_VIEW_DATA_TOOL] : []), ...(watchEnabled ? [WATCH_PROPOSE_TOOL] : [])]
+            ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS, TABLEAU_DATASOURCE_SEARCH_TOOL, ...(serverDataEnabled ? [TABLEAU_VIEW_DATA_TOOL, TABLEAU_DATASOURCE_FIELDS_TOOL, TABLEAU_DATASOURCE_QUERY_TOOL] : []), ...(watchEnabled ? [WATCH_PROPOSE_TOOL] : [])]
             : [];
           // Trust Layer (Kennzahlenkatalog, siehe shared/metrics.ts): Block und
           // Tool erscheinen nur, wenn der Admin tatsächlich Kennzahlen gepflegt
@@ -317,104 +329,128 @@ export function createChatRoute(
           // Enterprise (Feature "actions") — ohne Lizenz kennt das Modell die
           // Aktionssyntax gar nicht (siehe system-prompt.ts).
           const actionsLicensed = await hasEeFeature('actions');
-          const completion = await client.chat.completions.create(
-            {
-              model,
-              messages: [
-                {
-                  role: 'system',
-                  content: buildSystemPrompt(
-                    req.context,
-                    // Die Bausteine baut die Enterprise-Edition; ohne Lizenz sind
-                    // beide Eingaben leer und der Abschnitt entfällt komplett.
-                    personalizationPromptSection({ facts: memoryFacts, answerFocus }),
-                    req.authorContext,
-                    actionsLicensed,
-                    metricCatalogText,
-                  ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : '')
-                    + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION : '')
-                    + (serverDataEnabled ? TABLEAU_VIEW_DATA_PROMPT_SECTION : '')
-                    + (watchEnabled ? WATCH_PROMPT_SECTION : '')
-                    + (mode === 'investigate' || mode === 'investigate-estate' ? INVESTIGATE_PROMPT_SECTION : '')
-                    + (mode === 'investigate-estate' ? INVESTIGATE_ESTATE_PROMPT_SECTION : '')
-                    + (estateDowngraded ? INVESTIGATE_ESTATE_DOWNGRADE_NOTICE : '')
-                    + PROVENANCE_PROMPT_SECTION,
-                },
-                ...req.messages,
-              ],
-              stream: true,
-              stream_options: { include_usage: true },
-              // Tools werden IMMER mitgesendet (auch bei toolChoice "none"):
-              // die Historie kann tool-Messages enthalten, die manche Provider
-              // ohne Tool-Definitionen ablehnen. "none" verbietet nur neue Calls.
-              tools: [...toolDefinitions, ...tableauTools, ...metricTools, ...externalTools],
-              tool_choice: req.toolChoice === 'none' ? 'none' : 'auto',
-            },
-            { signal: abortSignal },
-          );
+          const systemPrompt = buildSystemPrompt(
+            req.context,
+            // Die Bausteine baut die Enterprise-Edition; ohne Lizenz sind
+            // beide Eingaben leer und der Abschnitt entfällt komplett.
+            personalizationPromptSection({ facts: memoryFacts, answerFocus }),
+            req.authorContext,
+            actionsLicensed,
+            metricCatalogText,
+          ) + (externalTools.length > 0 ? MCP_PROMPT_SECTION : '')
+            + (tableauServerEnabled ? TABLEAU_PROMPT_SECTION + TABLEAU_METADATA_PROMPT_SECTION + TABLEAU_DATASOURCE_PROMPT_SECTION : '')
+            + (serverDataEnabled ? TABLEAU_VIEW_DATA_PROMPT_SECTION + TABLEAU_DATASOURCE_QUERY_PROMPT_SECTION : '')
+            + (watchEnabled ? WATCH_PROMPT_SECTION : '')
+            + (mode === 'investigate' || mode === 'investigate-estate' ? INVESTIGATE_PROMPT_SECTION : '')
+            + (mode === 'investigate-estate' ? INVESTIGATE_ESTATE_PROMPT_SECTION : '')
+            + (estateDowngraded ? INVESTIGATE_ESTATE_DOWNGRADE_NOTICE : '')
+            + PROVENANCE_PROMPT_SECTION;
+          const tools = [...toolDefinitions, ...tableauTools, ...metricTools, ...externalTools];
 
-          await pipeChatStream(completion, {
-            onDelta: (content) => stream.writeSSE({ event: 'delta', data: JSON.stringify({ content }) }),
-            onToolCalls: async (toolCalls) => {
-              if (memoryStore) {
-                memoryStore
-                  .recordUsage(toolCalls.map((call) => ({ metric: 'tool_call', key: call.function.name })))
-                  .catch(() => undefined);
-              }
-              const external = mcp ? await mcp.approvals(authUser, req.dashboardKey, toolCalls, externalTools) : {};
-              return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls, ...(Object.keys(external).length > 0 ? { external } : {}) }) });
-            },
-            onDone: async (data) => {
-              const durationMs = Date.now() - started;
-              logger.info('chat done', {
+          // Erreicht eine Antwort das Ausgabelimit des Modells (finish_reason "length"), setzt die
+          // Middleware sie selbst fort: gleiche Unterhaltung plus bisheriger Text und die Bitte, an
+          // der Abbruchstelle weiterzuschreiben — im selben SSE-Stream, für die Extension nahtlos.
+          // Lange Untersuchungsberichte würden sonst mitten im Satz enden. Höchstens
+          // MAX_CONTINUATIONS Fortsetzungen, ohne neue Tool-Aufrufe (tool_choice "none").
+          let messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemPrompt },
+            ...req.messages,
+          ] as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+          for (let segment = 0; ; segment += 1) {
+            const segmentStarted = Date.now();
+            let segmentText = '';
+            let continueAnswer = false;
+            const completion = await client.chat.completions.create(
+              {
                 model,
-                durationMs,
-                finishReason: data.finishReason,
-                promptTokens: data.usage?.promptTokens,
-                completionTokens: data.usage?.completionTokens,
-                messages: req.messages.length,
-              });
-              // Betriebszahlen je Modell für die Admin-Übersicht (Aufrufe, Tokens, Antwortzeit) —
-              // wie chat_turn nur aggregierte Tageszähler, nie Inhalte oder Personen. Jede Runde
-              // (auch Tool-Runden) ist ein eigener Modellaufruf.
-              if (memoryStore) {
-                memoryStore.recordUsage([
-                  { metric: 'llm_call', key: model },
-                  { metric: 'llm_ms', key: model, count: durationMs },
-                  { metric: 'llm_tokens_in', key: model, count: data.usage?.promptTokens ?? 0 },
-                  { metric: 'llm_tokens_out', key: model, count: data.usage?.completionTokens ?? 0 },
-                ]).catch(() => undefined);
-              }
-              // Fakten-Extraktion nur am Turn-ENDE (nicht nach Tool-Runden),
-              // fire-and-forget mit günstigem Modell.
-              if (personalizationStore && req.userId && memoryLicensed && data.finishReason !== 'tool_calls') {
-                extractFactsInBackground({
-                  client,
-                  model: config.memoryModel,
-                  store: personalizationStore,
-                  userId: req.userId,
-                  messages: req.messages,
-                  logger,
+                messages,
+                stream: true,
+                stream_options: { include_usage: true },
+                // Tools werden IMMER mitgesendet (auch bei toolChoice "none"):
+                // die Historie kann tool-Messages enthalten, die manche Provider
+                // ohne Tool-Definitionen ablehnen. "none" verbietet nur neue Calls.
+                tools,
+                tool_choice: segment > 0 || req.toolChoice === 'none' ? 'none' : 'auto',
+              },
+              { signal: abortSignal },
+            );
+
+            await pipeChatStream(completion, {
+              onDelta: (content) => {
+                segmentText += content;
+                return stream.writeSSE({ event: 'delta', data: JSON.stringify({ content }) });
+              },
+              onToolCalls: async (toolCalls) => {
+                if (memoryStore) {
+                  memoryStore
+                    .recordUsage(toolCalls.map((call) => ({ metric: 'tool_call', key: call.function.name })))
+                    .catch(() => undefined);
+                }
+                const external = mcp ? await mcp.approvals(authUser, req.dashboardKey, toolCalls, externalTools) : {};
+                return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls, ...(Object.keys(external).length > 0 ? { external } : {}) }) });
+              },
+              onDone: async (data) => {
+                logger.info('chat done', {
+                  model,
+                  durationMs: Date.now() - started,
+                  finishReason: data.finishReason,
+                  promptTokens: data.usage?.promptTokens,
+                  completionTokens: data.usage?.completionTokens,
+                  messages: req.messages.length,
+                  ...(segment > 0 ? { continuation: segment } : {}),
                 });
-              }
-              await stream.writeSSE({ event: 'done', data: JSON.stringify(data) });
-            },
-            onError: async (data) => {
-              logger.warn('chat stream error', {
-                model,
-                durationMs: Date.now() - started,
-                source: data.source,
-              });
-              if (memoryStore) {
-                memoryStore.recordUsage([{ metric: 'chat_error', key: data.source }]).catch(() => undefined);
-              }
-              const safe =
-                data.source === 'upstream'
-                  ? { ...data, message: classifyUpstreamError(undefined, data.message) }
-                  : data;
-              await stream.writeSSE({ event: 'error', data: JSON.stringify(safe) });
-            },
-          });
+                // Betriebszahlen je Modell für die Admin-Übersicht (Aufrufe, Tokens, Antwortzeit) —
+                // wie chat_turn nur aggregierte Tageszähler, nie Inhalte oder Personen. Jede Runde
+                // (auch Tool-Runden und Fortsetzungen) ist ein eigener Modellaufruf.
+                if (memoryStore) {
+                  memoryStore.recordUsage([
+                    { metric: 'llm_call', key: model },
+                    { metric: 'llm_ms', key: model, count: Date.now() - segmentStarted },
+                    { metric: 'llm_tokens_in', key: model, count: data.usage?.promptTokens ?? 0 },
+                    { metric: 'llm_tokens_out', key: model, count: data.usage?.completionTokens ?? 0 },
+                  ]).catch(() => undefined);
+                }
+                if (data.finishReason === 'length' && segmentText && segment < MAX_CONTINUATIONS) {
+                  continueAnswer = true;
+                  return;
+                }
+                // Fakten-Extraktion nur am Turn-ENDE (nicht nach Tool-Runden),
+                // fire-and-forget mit günstigem Modell.
+                if (personalizationStore && req.userId && memoryLicensed && data.finishReason !== 'tool_calls') {
+                  extractFactsInBackground({
+                    client,
+                    model: config.memoryModel,
+                    store: personalizationStore,
+                    userId: req.userId,
+                    messages: req.messages,
+                    logger,
+                  });
+                }
+                await stream.writeSSE({ event: 'done', data: JSON.stringify(data) });
+              },
+              onError: async (data) => {
+                logger.warn('chat stream error', {
+                  model,
+                  durationMs: Date.now() - started,
+                  source: data.source,
+                });
+                if (memoryStore) {
+                  memoryStore.recordUsage([{ metric: 'chat_error', key: data.source }]).catch(() => undefined);
+                }
+                const safe =
+                  data.source === 'upstream'
+                    ? { ...data, message: classifyUpstreamError(undefined, data.message) }
+                    : data;
+                await stream.writeSSE({ event: 'error', data: JSON.stringify(safe) });
+              },
+            });
+            if (!continueAnswer || abortSignal.aborted) break;
+            messages = [
+              ...messages,
+              { role: 'assistant', content: segmentText },
+              { role: 'user', content: CONTINUE_AFTER_LENGTH_PROMPT },
+            ];
+          }
         } catch (err) {
           if (abortSignal.aborted) {
             logger.debug('chat aborted by client', { model, durationMs: Date.now() - started });

@@ -426,7 +426,7 @@ export function App(props: { dashboard: Dashboard }) {
             dashboardKey: dashboardKey || undefined,
             mode,
             getContext,
-            executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field', 'tableau_view_data', 'propose_watch_rule'].includes(call.function.name)
+            executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field', 'tableau_view_data', 'tableau_datasource_search', 'tableau_datasource_fields', 'tableau_datasource_query', 'propose_watch_rule'].includes(call.function.name)
               ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined, consent: consentGateRef.current })
               : call.function.name.startsWith('mcp__')
                 ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })

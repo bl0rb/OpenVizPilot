@@ -152,6 +152,7 @@ export const adminPageHtml = `<!doctype html>
   .user-access-table-wrapper { max-width: 100%; overflow-x: auto; }
   .user-access-identity { min-width: 180px; }
   .user-access-identity small { display: block; color: var(--text-muted); overflow-wrap: anywhere; }
+  #user-access-table thead th, #user-access-table .user-access-status { white-space: nowrap; }
   .user-access-checkbox { display: flex; justify-content: center; min-width: 44px; }
   .user-access-checkbox input { width: 18px; height: 18px; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; flex-shrink: 0; }
@@ -1889,6 +1890,7 @@ export const adminPageHtml = `<!doctype html>
       var email = document.createElement('td');
       email.textContent = u.email || '—';
       var status = document.createElement('td');
+      status.className = 'user-access-status';
       var ai = document.createElement('td');
       ai.className = 'col-access';
       var aiLabel = document.createElement('label');

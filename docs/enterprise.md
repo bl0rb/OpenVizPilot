@@ -93,7 +93,10 @@ Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der W
    Anmeldecode serverseitig einlöst (Backend-for-Frontend): Ohne Secret scheitert der Tausch mit AADSTS7000218,
    mit der Plattform **Single-page application** mit AADSTS9002327. Die Extension meldet dann „Anmeldung
    abgelehnt“, das Server-Log `oidc exchange failed` mit dem AADSTS-Code.
-4. Unter *Token configuration* optional die Claims `email` und `name` ergänzen (für die Anzeige).
+4. Name und E-Mail für die Freigabeliste liest die Middleware aus dem ID-Token (`name`, `email`, sonst `upn`,
+   `unique_name`, `preferred_username`). Fehlen sie dort, fragt sie beim Login einmal den `userinfo`-Endpunkt
+   (Microsoft Graph) ab — dafür reichen die delegierten Graph-Berechtigungen `openid`, `profile`, `email`. Optional
+   unter *Token configuration* `email` ergänzen, dann entfällt diese Abfrage.
 5. Werte:
 
 ```env

@@ -608,7 +608,9 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
       await pool.query(
         `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
          VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email`,
+         ON CONFLICT (id) DO UPDATE SET
+           display_name = CASE WHEN EXCLUDED.display_name <> '' THEN EXCLUDED.display_name ELSE user_access.display_name END,
+           email = CASE WHEN EXCLUDED.email <> '' THEN EXCLUDED.email ELSE user_access.email END`,
         [id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email],
       );
       const result = await pool.query('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = $1', [id]);

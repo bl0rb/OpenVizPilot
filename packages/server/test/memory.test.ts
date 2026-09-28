@@ -71,6 +71,17 @@ describe('sqlite memory store', () => {
     await store.close();
   });
 
+  it('keeps a stored name and e-mail when a later request brings empty profile claims', async () => {
+    const store = makeStore();
+    const identity = { provider: 'oidc' as const, issuer: 'https://login.microsoftonline.com/t/v2.0', subject: 'abc' };
+    await store.ensureUserAccess({ ...identity, displayName: 'Anna Beispiel', email: 'anna@firma.de' });
+    const again = await store.ensureUserAccess({ ...identity, displayName: '', email: '' });
+    expect(again).toMatchObject({ displayName: 'Anna Beispiel', email: 'anna@firma.de' });
+    const renamed = await store.ensureUserAccess({ ...identity, displayName: 'Anna Muster', email: '' });
+    expect(renamed).toMatchObject({ displayName: 'Anna Muster', email: 'anna@firma.de' });
+    await store.close();
+  });
+
   it('keeps different keys of one recordUsage batch as separate counters', async () => {
     const store = makeStore();
     await store.recordUsage([

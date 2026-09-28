@@ -498,7 +498,9 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       db.prepare(
         `INSERT INTO user_access (id, provider, issuer, subject, display_name, email)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO UPDATE SET display_name = excluded.display_name, email = excluded.email`
+         ON CONFLICT (id) DO UPDATE SET
+           display_name = CASE WHEN excluded.display_name <> '' THEN excluded.display_name ELSE display_name END,
+           email = CASE WHEN excluded.email <> '' THEN excluded.email ELSE email END`
       ).run(id, identity.provider, identity.issuer, identity.subject, identity.displayName, identity.email);
       const rows = db.prepare('SELECT id, provider, issuer, subject, display_name, email, ai, tableau_api, admin, server_data FROM user_access WHERE id = ?').all(id) as Array<Record<string, string | number>>;
       const row = rows[0]!;

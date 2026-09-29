@@ -97,7 +97,15 @@ export interface CheckScopeInput {
   question: string;
   signal?: AbortSignal;
   tableauServerEnabled?: boolean;
+  /** Watch (Beobachtungsregeln) ist für diese Person verfügbar — dann sind Regel-Wünsche Dashboard-Aufgaben. */
+  watchEnabled?: boolean;
 }
+
+/**
+ * Ohne diese Regel stuft der Filter „Benachrichtige mich per Teams, wenn …“ oder die kurze
+ * Antwort auf die Kanal-Rückfrage leicht als Verwaltungsaufgabe ohne Dashboard-Bezug ein.
+ */
+const WATCH_SCOPE_RULE = `\n\nZusatzregel bei aktivierter Beobachtung (Watch):\n- Wünsche, über Kennzahlen dauerhaft informiert zu werden, haben Dashboard-Bezug: z. B. "sag mir Bescheid, wenn …", "beobachte …", eine Regel, einen Alarm oder eine Benachrichtigung per Webhook, Microsoft Teams oder E-Mail einrichten — auch ohne genannte Kennzahl.\n- Ebenso kurze Antworten auf Rückfragen dazu (Kanal, Schwelle, Zeitplan), z. B. "per Teams" oder "täglich um 8".`;
 
 export async function checkScope(input: CheckScopeInput): Promise<ScopeVerdict> {
   // Gleiche Delimiter-Härtung wie in system-prompt.ts: Inhalte dürfen nicht
@@ -125,9 +133,9 @@ export async function checkScope(input: CheckScopeInput): Promise<ScopeVerdict> 
         temperature: 0,
         max_tokens: 5,
         messages: [
-          { role: 'system', content: input.tableauServerEnabled
+          { role: 'system', content: (input.tableauServerEnabled
             ? `${SCOPE_SYSTEM_PROMPT}\n\nZusatzregel bei aktivierter Tableau-Server-Suche:\n- Erlaube ausschließlich über tableau_server_search sowie tableau_metadata_search und tableau_metadata_field die Discovery zugänglicher Tableau-Arbeitsmappen, Ansichten und Analytics-Metadaten unabhängig vom aktuell geöffneten Dashboard, einschließlich anderer Projekte.\n- Erlaube auch ausdrücklich angefragte Server-Formel-, Felddefinitions- und Lineage-Erklärungen unabhängig vom Live-Dashboard; eine Formel kann RAWSQL-Funktionen als Metadaten enthalten und darf nur erklärt, niemals ausgeführt werden.\n- Rohdaten-Abfragen, SQL-Ausführung, separate Verbindungs-/SQL-Details, allgemeine Tableau-Server-Verwaltung und sonstige nicht dashboardbezogene Aufgaben bleiben außerhalb des Scopes.`
-            : SCOPE_SYSTEM_PROMPT },
+            : SCOPE_SYSTEM_PROMPT) + (input.watchEnabled ? WATCH_SCOPE_RULE : '') },
           {
             role: 'user',
             content: `Auszug aus dem Dashboard-Kontext:\n<dashboard_context>\n${contextExcerpt}\n</dashboard_context>${previousSection}\n\nNeueste Nutzernachricht:\n<frage>\n${question}\n</frage>`,

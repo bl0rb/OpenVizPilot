@@ -191,4 +191,25 @@ describe('Tableau Server scope extension', () => {
     });
     expect(disabledPrompt).not.toContain('Zusatzregel bei aktivierter Tableau-Server-Suche');
   });
+
+  it('treats Watch requests and answers to its follow-up questions as in scope only when Watch is enabled', async () => {
+    const promptFor = async (watchEnabled: boolean) => {
+      let prompt = '';
+      await checkScope({
+        client: fakeClient((body) => {
+          prompt = String((body.messages as Array<{ content: unknown }>)[0]!.content);
+          return 'JA';
+        }),
+        model: 'm', context: '', messages: userTurn, question: 'Benachrichtige mich per Teams', tableauServerEnabled: true, watchEnabled,
+      });
+      return prompt;
+    };
+    const enabled = await promptFor(true);
+    expect(enabled).toContain('Zusatzregel bei aktivierter Beobachtung (Watch)');
+    expect(enabled).toContain('Microsoft Teams');
+    expect(enabled).toContain('kurze Antworten auf Rückfragen');
+    // Die Tableau-Regel bleibt davor erhalten.
+    expect(enabled).toContain('Zusatzregel bei aktivierter Tableau-Server-Suche');
+    expect(await promptFor(false)).not.toContain('Beobachtung (Watch)');
+  });
 });

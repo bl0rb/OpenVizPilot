@@ -254,6 +254,7 @@ export function createChatRoute(
               question: scopeQuestion,
               signal: abortSignal,
               tableauServerEnabled,
+              watchEnabled,
             });
             if (abortSignal.aborted) return;
             if (verdict === 'out_of_scope') {

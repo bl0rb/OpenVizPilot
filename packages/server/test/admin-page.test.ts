@@ -91,9 +91,12 @@ describe('admin presentation', () => {
   });
 
   it('shows the Enterprise badge on the page title instead of a second heading in EE sections', () => {
-    for (const target of ['tableau-server-admin', 'mcp-admin', 'watch-admin', 'tableau-audit-admin']) {
+    for (const target of ['mcp-admin', 'watch-admin', 'tableau-audit-admin']) {
       expect(adminPageHtml).toContain(`<option value="${target}" data-ee="true">`);
     }
+    // Tableau Server: Navigation bleibt kurz, der Seitentitel nennt die REST-API-Verbindung (englisch).
+    expect(adminPageHtml).toContain('<option value="tableau-server-admin" data-ee="true" data-title="Tableau Server REST API Connection">Tableau Server</option>');
+    expect(adminPageHtml).toContain("document.getElementById('view-title-text').textContent = option.dataset.title || option.textContent;");
     expect(adminPageHtml).toContain('<span id="view-badge" class="view-badge" hidden>Enterprise</span>');
     expect(adminPageHtml).toContain("document.getElementById('view-badge').hidden = option.dataset.ee !== 'true';");
     // Kein Abschnitt wiederholt den Seitentitel sichtbar: die erste h2 je Abschnitt ist nur für Screenreader.
@@ -113,10 +116,14 @@ describe('admin presentation', () => {
     expect(adminPageHtml).toContain("pending + ' Personen warten auf Freigabe.'");
   });
 
-  it('shows LLM figures, endpoint reachability, version and a click-only update check on the overview', () => {
-    for (const id of ['kpi-questions', 'kpi-calls', 'kpi-tokens-in', 'kpi-tokens-out', 'kpi-latency', 'kpi-errors', 'sys-version', 'sys-edition', 'update-check', 'update-result', 'update-howto']) {
+  it('shows LLM figures first on the overview and version plus a click-only update check as tiles on the licence page', () => {
+    for (const id of ['kpi-questions', 'kpi-calls', 'kpi-tokens-in', 'kpi-tokens-out', 'kpi-latency', 'kpi-errors', 'sys-version', 'sys-edition', 'update-check', 'update-result']) {
       expect(adminPageHtml, id).toContain(`id="${id}"`);
     }
+    // LLM-Kennzahlen stehen vor dem Stand der Einrichtung; Version & Updates liegen als Kacheln unter „Lizenz & Aktivierung“.
+    expect(adminPageHtml).toMatch(/id="overview-admin"[\s\S]*?LLM-Betrieb \(letzte 7 Tage\)[\s\S]*?Stand der Einrichtung[\s\S]*?id="overview-list"/);
+    expect(adminPageHtml).toMatch(/<ul class="status-list" id="license-tiles">[\s\S]*?id="sys-version"[\s\S]*?id="update-check"[\s\S]*?<\/ul>/);
+    expect(adminPageHtml).not.toContain('id="update-howto"');
     expect(adminPageHtml).toContain('<li class="status-row" data-key="llm">');
     expect(adminPageHtml).toContain("adminFetch('/stats?days=7')");
     expect(adminPageHtml).toContain("adminFetch('/upstream-models')");
@@ -125,15 +132,18 @@ describe('admin presentation', () => {
     const loadAll = adminPageHtml.match(/function loadAll\(\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
     expect(loadAll).not.toContain('update-check');
     expect(adminPageHtml).toMatch(/getElementById\('update-check'\)\.addEventListener\('click'[\s\S]*?adminFetch\('\/update-check'\)/);
-    expect(adminPageHtml).toContain('helm upgrade openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot --version <span class="update-target">');
     // Nutzung zeigt sprechende Namen statt Metrik-IDs.
     expect(adminPageHtml).toContain("h3.textContent = metricLabels[metric] || metric;");
   });
 
   it('saves the licence separately from the sign-in settings', () => {
     expect(adminPageHtml).toContain('<button class="primary" id="save-license">Lizenz prüfen &amp; speichern</button>');
-    expect(adminPageHtml).toContain('<button class="primary" id="save-auth">Speichern</button>');
-    const saveAuth = adminPageHtml.match(/function saveAuth\(\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    // Anmeldung: Kacheln auf der Seite, je Einstellung ein eigener Formular-Dialog.
+    for (const id of ['auth-mode-dialog', 'auth-url-dialog', 'oidc-dialog']) expect(adminPageHtml).toContain(`<dialog id="${id}"`);
+    for (const id of ['auth-mode-edit', 'auth-url-edit', 'oidc-edit']) expect(adminPageHtml).toContain(`id="${id}"`);
+    expect(adminPageHtml).not.toContain('id="save-auth"');
+    const saveAuth = adminPageHtml.match(/function saveAuth\(dialog\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
+    expect(saveAuth).toContain('putAuthSettings(body, dialogBanner(dialog)');
     expect(saveAuth).not.toContain('license');
     // Die Lizenz-Karte speichert mit dem bereits gültigen Modus, nie mit dem Formularstand unter „Anmeldung“.
     expect(adminPageHtml).toContain('return putAuthSettings({ mode: mode, license: license }, licenseBanner, okText, loadInstallations);');
@@ -260,7 +270,9 @@ describe('admin page inline script', () => {
 
   it('renders separate local and SSO access controls with explicit grants', () => {
     expect(adminPageHtml).toContain('id="user-access-table"');
-    expect(adminPageHtml).toContain('id="user-access-refresh"');
+    // Kein Aktualisieren-Button: der Bereichswechsel lädt die Daten neu.
+    expect(adminPageHtml).not.toContain('id="user-access-refresh"');
+    expect(adminPageHtml).toContain("'users-admin': function () { loadUsers(); loadUserAccess(); },");
     expect(adminPageHtml).toContain("adminFetch('/user-access')");
     expect(adminPageHtml).toContain("adminFetch('/user-access/' + encodeURIComponent(u.id)");
     expect(adminPageHtml).toContain("{ ai: aiInput.checked, tableauApi: tableauInput.checked, serverData: serverDataInput.checked, admin: adminInput.checked }");

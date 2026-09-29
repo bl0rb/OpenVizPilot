@@ -161,6 +161,7 @@ export const adminPageHtml = `<!doctype html>
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   dialog input { min-height: 44px; }
   #metric-dialog { width: min(640px, calc(100% - 2rem)); }
+  dialog.dialog-wide { width: min(760px, calc(100% - 2rem)); }
   #metric-dialog input[aria-invalid="true"], #metric-dialog textarea[aria-invalid="true"] { border-color: var(--danger); }
   .metric-question-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0.5rem 0.75rem; align-items: end; border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem; margin: 0 0 0.6rem; }
   .metric-question-row label { display: grid; gap: 0.3rem; font-size: 13px; font-weight: 500; min-width: 0; }
@@ -171,6 +172,8 @@ export const adminPageHtml = `<!doctype html>
   .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 2px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
   .has-help:has(> .help-term:hover) > .help-tip, .has-help:focus-within > .help-tip, .has-help:has(+ :focus) > .help-tip, .has-help[aria-expanded="true"] > .help-tip { display: block; }
   .help-left .help-tip { left: auto; right: 0; }
+  /* Dialoge fokussieren beim Öffnen das erste Feld — dort Tooltip nur beim Überfahren, sonst verdeckt er den Titel. */
+  dialog .has-help:focus-within > .help-tip { display: none; }
   /* Über Formularfeldern erscheint der Tooltip oberhalb des Begriffs; in Tabellen
      bleibt er darunter, weil die Tabellenhülle (overflow) nach oben abschneidet. */
   label.has-help > .help-tip, legend.has-help > .help-tip { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 2px; }
@@ -183,10 +186,12 @@ export const adminPageHtml = `<!doctype html>
   .hint.error { color: var(--danger); font-weight: 600; }
   /* Titel, die der Seitentitel (h1) schon sichtbar trägt — nur für aria-labelledby und Screenreader. */
   .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  /* Statuszeilen (Übersicht, Voraussetzungen): Zustand immer als Wort im Chip, die Farbe unterstützt nur. */
-  .status-list { list-style: none; margin: 0.5rem 0 1.25rem; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  .status-row { display: grid; grid-template-columns: 9.5rem minmax(9rem, 13rem) minmax(0, 1fr) auto; gap: 0.35rem 1rem; align-items: center; padding: 0.75rem 1rem; border-top: 1px solid var(--border); font-size: 13px; }
-  .status-row:first-child { border-top: 0; }
+  /* Statuskacheln (Übersicht, Lizenz, Anmeldung, Voraussetzungen): gleiche Kachel wie .kpi —
+     Bezeichnung oben, Zustand immer als Wort im Chip, die Farbe unterstützt nur. */
+  .status-list { list-style: none; margin: 0.5rem 0 1.25rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 0.75rem; }
+  .status-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; min-width: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; }
+  .status-row .status-name { order: -1; }
+  .status-row > button, .status-row > .row { margin-top: auto; }
   .status-chip { justify-self: start; display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 12px; font-weight: 600; background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); white-space: nowrap; }
   .status-chip::before { content: '–'; font-weight: 700; }
   .status-chip[data-level="ok"] { background: var(--ok-bg); color: #1e5631; border-color: #cfe5d5; }
@@ -195,9 +200,9 @@ export const adminPageHtml = `<!doctype html>
   .status-chip[data-level="warn"]::before { content: '!'; }
   .status-chip[data-level="error"] { background: var(--danger-bg); color: var(--danger); border-color: #f5c9c4; }
   .status-chip[data-level="error"]::before { content: '✕'; }
-  .status-name { font-weight: 600; }
-  .status-detail { color: var(--text-muted); overflow-wrap: anywhere; }
-  .status-link { color: var(--accent); font-weight: 500; text-decoration: none; white-space: nowrap; }
+  .status-name { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .status-detail { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+  .status-link { margin-top: auto; color: var(--accent); font-weight: 500; text-decoration: none; white-space: nowrap; }
   .status-link:hover { text-decoration: underline; }
   .overview-heading { font-size: 15px; margin: 2rem 0 0.5rem; }
   .kv-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 0.75rem 1.25rem; margin: 0.5rem 0 1rem; }
@@ -205,11 +210,16 @@ export const adminPageHtml = `<!doctype html>
   .kv-list dt { font-size: 12px; color: var(--text-muted); }
   .kv-list dd { margin: 0.15rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr)); gap: 0.75rem; margin: 0.5rem 0 0.75rem; }
-  .kpi { display: grid; gap: 0.15rem; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  .kpi-value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .kpi-label { font-size: 12px; color: var(--text-muted); }
-  #update-howto pre { margin: 0.35rem 0 0.75rem; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-  #update-howto pre code { font-size: 12px; }
+  /* Kennzahl-Kachel — Bezeichnung oben, Wert darunter; Textwerte kleiner, Inaktives grau. */
+  .kpi { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .kpi-value { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .kpi-value.kpi-text { font-size: 15px; font-weight: 600; }
+  .kpi-label { order: -1; font-size: 12px; color: var(--text-muted); }
+  .kpi[data-level="off"] .kpi-value { color: var(--text-muted); font-weight: 500; }
+  .kpi[data-level="error"] .kpi-value { color: var(--danger); }
+  .kpi > button { align-self: flex-start; margin-top: 0.4rem; }
+  .kpi .status-detail:empty { display: none; }
+  .overview-heading:first-of-type { margin-top: 0.5rem; }
   #overview-llm-models { max-width: 640px; }
   .view-badge { display: inline-block; margin-left: 0.6rem; font-size: 11px; font-weight: 600; color: #4a35d6; background: #eeedff; border-radius: 4px; padding: 4px 7px; vertical-align: middle; }
   /* Nummerierte Einrichtungsschritte (Single Sign-On). */
@@ -220,9 +230,22 @@ export const adminPageHtml = `<!doctype html>
   .setup-flow > li + li::before { top: 1rem; }
   .setup-flow h3 { font-size: 14px; margin: 0.1rem 0 0.75rem; }
   .setup-flow .form-grid { margin-bottom: 0.75rem; }
-  .danger-zone { margin-top: 2rem; padding: 1rem 1.25rem; border: 1px solid #f5c9c4; border-radius: 8px; }
+  /* „Standard wiederherstellen“ am Ende eines Bereichs — überall gleich, Button direkt unter dem Text. */
+  .danger-zone { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
   .danger-zone h3 { font-size: 14px; margin: 0 0 0.25rem; }
   .danger-zone .hint { margin: 0 0 0.75rem; }
+  .danger-zone .form-actions { margin: 0; padding: 0; border: 0; }
+  /* Schalter mit Bezeichnung und Kurzbeschreibung rechts daneben. */
+  .switch-field { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 13px; }
+  .switch-field input { margin-top: 2px; }
+  .switch-field strong { display: block; font-weight: 600; }
+  .switch-field small { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+  /* Umschalter mit wenigen festen Werten (z. B. Zeitraum). */
+  .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .workspace .segmented button { border: 0; border-radius: 0; background: var(--surface); }
+  .workspace .segmented button + button { border-left: 1px solid var(--border); }
+  .workspace .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .section-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; margin: 0.5rem 0 1rem; }
   .stats-grid { display: flex; flex-wrap: wrap; gap: 1.25rem; }
   .stats-block { min-width: 220px; flex: 1 1 220px; }
   .stats-block h3 { font-size: 0.85rem; margin: 0 0 0.4rem; color: var(--text-muted); letter-spacing: 0; }
@@ -262,7 +285,8 @@ export const adminPageHtml = `<!doctype html>
   .workspace h2 small { font-size: 11px; font-weight: 600; color: #4a35d6; background: #eeedff; border-radius: 4px; padding: 4px 7px; margin-left: 6px; vertical-align: middle; }
   .workspace section { min-width: 0; }
   .workspace .hint { max-width: 85ch; line-height: 1.7; }
-  .workspace button { min-height: 38px; font-size: 13px; font-weight: 500; }
+  /* Eine Button-Größe für Arbeitsbereich, Dialoge und nachgeladene Buttons. */
+  .workspace button, dialog button { min-height: 38px; font-size: 13px; font-weight: 500; }
   .workspace input:not([type="checkbox"]), .workspace select { min-height: 38px; }
   .workspace th, .workspace td { padding: 0.7rem 0.6rem; }
   .workspace table { font-size: 13px; }
@@ -285,13 +309,6 @@ export const adminPageHtml = `<!doctype html>
   #gate .gate-caption { color: var(--text-muted); font-size: 12px; margin: 0 0 0.5rem; }
   #gate .gate-divider { margin: 1.75rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; text-align: center; }
   #gate #gate-sso .primary { margin-top: 1rem; }
-  /* Mittlere Breite: Name und Detail der Statuszeilen untereinander statt drei schmaler Spalten. */
-  @media (max-width: 1180px) {
-    .status-row { grid-template-columns: 9.5rem minmax(0, 1fr) auto; }
-    .status-name { grid-column: 2; grid-row: 1; }
-    .status-detail { grid-column: 2; grid-row: 2; }
-    .status-link { grid-column: 3; grid-row: 1 / span 2; }
-  }
   @media (max-width: 900px) {
     .admin-shell { grid-template-columns: 210px minmax(0, 1fr); }
     .workspace { padding: 1.75rem 1.5rem 3rem; }
@@ -314,8 +331,6 @@ export const adminPageHtml = `<!doctype html>
     #mcp-admin .mcp-entry { padding: 1rem; }
     #gate { margin: 2rem 1rem; padding: 1.5rem; }
     #commands-table, #playbook-commands-table { min-width: 680px; }
-    .status-row { grid-template-columns: auto minmax(0, 1fr); }
-    .status-detail, .status-link { grid-column: 1 / -1; grid-row: auto; }
     .setup-flow > li { padding-left: 2.1rem; }
   }
 </style>
@@ -400,7 +415,7 @@ export const adminPageHtml = `<!doctype html>
         <a href="#tableau-audit-admin">${adminIcon(ScrollText)}Serverzugriffe <span class="nav-ee">EE</span></a>
       </nav>
       <select id="admin-navigation" class="mobile-navigation" aria-label="Administrationsbereich">
-        <optgroup label="Einrichtung"><option value="overview-admin">Übersicht</option><option value="license-admin">Lizenz &amp; Aktivierung</option><option value="auth-admin">Anmeldung</option><option value="tableau-server-admin" data-ee="true">Tableau Server</option><option value="models-admin">Modelle</option></optgroup>
+        <optgroup label="Einrichtung"><option value="overview-admin">Übersicht</option><option value="license-admin">Lizenz &amp; Aktivierung</option><option value="auth-admin">Anmeldung</option><option value="tableau-server-admin" data-ee="true" data-title="Tableau Server REST API Connection">Tableau Server</option><option value="models-admin">Modelle</option></optgroup>
         <optgroup label="Zugriff"><option value="users-admin">Benutzer &amp; Zugriff</option><option value="mcp-admin" data-ee="true">MCP-Quellen</option></optgroup>
         <optgroup label="Inhalte"><option value="commands-admin">Slash-Befehle</option><option value="playbooks-admin">Dashboard-Analysen</option><option value="metrics-admin">Kennzahlen</option></optgroup>
         <optgroup label="Betrieb"><option value="extension-admin">Tableau-Extension</option><option value="usage-admin">Nutzung</option><option value="watch-admin" data-ee="true">Watch</option><option value="tableau-audit-admin" data-ee="true">Serverzugriffe</option></optgroup>
@@ -412,17 +427,6 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="overview-admin" aria-labelledby="overview-heading" hidden>
       <h2 id="overview-heading" class="visually-hidden">Übersicht</h2>
-      <p class="hint">Stand der Einrichtung — jede Zeile führt zum zuständigen Bereich.</p>
-      <ul class="status-list" id="overview-list" aria-live="polite">
-        <li class="status-row" data-key="license"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Lizenz &amp; Aktivierung</span><span class="status-detail"></span><a class="status-link" href="#license-admin">Öffnen</a></li>
-        <li class="status-row" data-key="publicUrl"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Öffentliche URL</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
-        <li class="status-row" data-key="auth"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Anmeldung</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
-        <li class="status-row" data-key="access"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Freigaben</span><span class="status-detail"></span><a class="status-link" href="#users-admin">Öffnen</a></li>
-        <li class="status-row" data-key="tableau"><span class="status-chip" data-level="off">Nicht aktiv</span><span class="status-name">Tableau Server</span><span class="status-detail">Enterprise-Funktion</span><a class="status-link" href="#tableau-server-admin">Öffnen</a></li>
-        <li class="status-row" data-key="models"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Modelle</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
-        <li class="status-row" data-key="llm"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">LLM-Endpunkt</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
-      </ul>
-
       <h3 class="overview-heading">LLM-Betrieb (letzte 7 Tage)</h3>
       <div class="kpi-grid" id="overview-llm" aria-live="polite">
         <div class="kpi"><span class="kpi-value" id="kpi-questions">–</span><span class="kpi-label">Fragen</span></div>
@@ -440,27 +444,17 @@ export const adminPageHtml = `<!doctype html>
       </div>
       <p class="hint">Anonyme Tageszähler ohne Inhalte, Details unter <a href="#usage-admin">Nutzung</a>. Modellaufrufe und Tokens werden ab Version 1.7.0 gezählt.</p>
 
-      <h3 class="overview-heading">Version &amp; Updates</h3>
-      <dl class="kv-list">
-        <div><dt>Installierte Version</dt><dd id="sys-version">–</dd></div>
-        <div><dt>Edition</dt><dd id="sys-edition">–</dd></div>
-        <div><dt>Umgebung</dt><dd id="sys-environment">–</dd></div>
-        <div><dt>Datenbank</dt><dd id="sys-database">–</dd></div>
-        <div><dt>Läuft seit</dt><dd id="sys-started">–</dd></div>
-      </dl>
-      <div class="row">
-        <button type="button" id="update-check">Auf Updates prüfen</button>
-        <span id="update-result" class="status-detail" role="status" aria-live="polite"></span>
-      </div>
-      <p class="hint">Die Prüfung fragt nur auf Klick die öffentlichen Releases ab (ausgehend HTTPS auf api.github.com) und überträgt nichts über diese Installation.</p>
-      <details class="setup-steps" id="update-howto">
-        <summary>So wird aktualisiert</summary>
-        <p>Kubernetes (Helm):</p>
-        <pre><code>helm upgrade openvizpilot oci://ghcr.io/bl0rb/charts/openvizpilot --version <span class="update-target">&lt;Version&gt;</span> --reuse-values</code></pre>
-        <p>Docker Compose: in der <code>.env</code> <code>DEPLOY_VERSION=<span class="update-target">&lt;Version&gt;</span></code> setzen, dann im Verzeichnis <code>deploy/compose</code>:</p>
-        <pre><code>docker compose pull &amp;&amp; docker compose --profile caddy up -d</code></pre>
-        <p>Die Datenbank passt die Middleware beim Start selbst an. Vor größeren Sprüngen die <a id="update-notes" href="https://github.com/bl0rb/OpenVizPilot/releases" target="_blank" rel="noopener">Release-Notes</a> lesen und ein Backup ziehen.</p>
-      </details>
+      <h3 class="overview-heading">Stand der Einrichtung</h3>
+      <p class="hint">Jede Kachel führt zum zuständigen Bereich.</p>
+      <ul class="status-list" id="overview-list" aria-live="polite">
+        <li class="status-row" data-key="license"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Lizenz &amp; Aktivierung</span><span class="status-detail"></span><a class="status-link" href="#license-admin">Öffnen</a></li>
+        <li class="status-row" data-key="publicUrl"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Öffentliche URL</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
+        <li class="status-row" data-key="auth"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Anmeldung</span><span class="status-detail"></span><a class="status-link" href="#auth-admin">Öffnen</a></li>
+        <li class="status-row" data-key="access"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Freigaben</span><span class="status-detail"></span><a class="status-link" href="#users-admin">Öffnen</a></li>
+        <li class="status-row" data-key="tableau"><span class="status-chip" data-level="off">Nicht aktiv</span><span class="status-name">Tableau Server</span><span class="status-detail">Enterprise-Funktion</span><a class="status-link" href="#tableau-server-admin">Öffnen</a></li>
+        <li class="status-row" data-key="models"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">Modelle</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
+        <li class="status-row" data-key="llm"><span class="status-chip" data-level="off">Lade …</span><span class="status-name">LLM-Endpunkt</span><span class="status-detail"></span><a class="status-link" href="#models-admin">Öffnen</a></li>
+      </ul>
     </section>
 
     ${mcpAdminSection}
@@ -490,7 +484,7 @@ export const adminPageHtml = `<!doctype html>
       <div class="row">
         <button id="add-command">+ Befehl hinzufügen</button>
         <button class="primary" id="save-commands">Speichern</button>
-        <button class="danger" id="reset-commands">Auf Standard zurücksetzen</button>
+        <button class="danger" id="reset-commands">Standard wiederherstellen</button>
       </div>
     </section>
 
@@ -498,9 +492,15 @@ export const adminPageHtml = `<!doctype html>
       <h2 id="license-heading" class="visually-hidden">Lizenz &amp; Aktivierung</h2>
       <p class="hint">Die Enterprise-Lizenz schaltet Single Sign-On, Tableau Server, MCP-Quellen und Watch frei. Ohne Lizenz laufen alle Core-Funktionen.</p>
       <p id="license-banner" class="banner" role="status"></p>
-      <ul class="status-list">
+      <ul class="status-list" id="license-tiles">
         <li class="status-row"><span class="status-chip" id="license-status-chip" data-level="off">Lade …</span><span class="status-name">Lizenz</span><span id="license-summary" class="status-detail">Lade …</span></li>
+        <li class="kpi"><span class="kpi-value kpi-text" id="sys-version">–</span><span class="kpi-label">Installierte Version</span><span id="update-result" class="status-detail" role="status" aria-live="polite"></span><button type="button" id="update-check">Auf Updates prüfen</button></li>
+        <li class="kpi"><span class="kpi-value kpi-text" id="sys-edition">–</span><span class="kpi-label">Edition</span></li>
+        <li class="kpi"><span class="kpi-value kpi-text" id="sys-environment">–</span><span class="kpi-label">Umgebung</span></li>
+        <li class="kpi"><span class="kpi-value kpi-text" id="sys-database">–</span><span class="kpi-label">Datenbank</span></li>
+        <li class="kpi"><span class="kpi-value kpi-text" id="sys-started">–</span><span class="kpi-label">Läuft seit</span></li>
       </ul>
+      <p class="hint">Die Update-Prüfung fragt nur auf Klick die öffentlichen Releases ab (ausgehend HTTPS auf api.github.com) und überträgt nichts über diese Installation.</p>
       <div id="license-card" hidden>
         <p id="license-pending" class="banner" role="alert"><strong>Installation noch nicht aktiviert — es laufen nur die Core-Funktionen.</strong> Enterprise-Funktionen schalten sich mit der ersten Aktivierung frei. Online: ausgehend HTTPS auf <code>werkworks.de</code> (Port 443) zulassen und „Jetzt aktualisieren“ klicken — der Heartbeat läuft auch sofort beim Start. Offline: unter „Offline-Aktivierung“ die Anfrage herunterladen, an WerkWorks senden und die Lease einfügen.</p>
         <p id="license-subscription-grace" class="banner error" role="status" hidden></p>
@@ -569,103 +569,20 @@ export const adminPageHtml = `<!doctype html>
     <section class="card" id="auth-admin" aria-labelledby="auth-heading" hidden>
       <h2 id="auth-heading" class="visually-hidden">Anmeldung</h2>
       <p class="hint">Wie sich Anwender in der Extension anmelden — mit Benutzerkonten (Core) oder per Single Sign-On (Enterprise).</p>
-      <ul class="status-list">
-        <li class="status-row"><span class="status-chip" id="auth-status-chip" data-level="off">Lade …</span><span class="status-name">Aktiver Modus</span><span id="auth-source" class="status-detail"></span></li>
-      </ul>
       <p id="auth-banner" class="banner"></p>
-      <div class="form-grid">
-        <label class="has-help"><span class="help-term">Anmeldemodus</span><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter „Benutzer &amp; Zugriff“. Benutzerkonten: Anmeldung mit den lokalen Konten aus „Benutzer &amp; Zugriff“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span>
-          <select id="auth-mode" aria-describedby="help-auth-mode">
-            <option value="none">Offen (kein Login)</option>
-            <option value="local">Benutzerkonten (Core-Edition)</option>
-            <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
-          </select>
-        </label>
-        <label class="has-help help-left"><span class="help-term">Öffentliche URL dieser Installation</span><span role="tooltip" id="help-auth-public-url" class="help-tip">HTTPS-Adresse, unter der die Browser diese Middleware erreichen, z. B. <code>https://chat.example.com</code>. Daraus entstehen die SSO-Redirect-URI und die Issuer-URL für Tableau OAuth 2.0 Trust.</span>
-          <input type="text" id="auth-public-url" placeholder="https://chat.example.com" autocomplete="off" aria-describedby="help-auth-public-url" />
-        </label>
-      </div>
-      <p id="auth-mode-none-hint" class="hint error" hidden>Ohne Anmeldung gibt es keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt.</p>
-      <div id="oidc-fields">
-        <p id="oidc-license-hint" class="banner error" role="status" hidden>Single Sign-On braucht eine gültige Enterprise-Lizenz mit „sso“. <a href="#license-admin">Zur Lizenz</a></p>
-        <ol class="setup-flow">
-          <li>
-            <h3>Redirect-URI beim Identity-Provider registrieren</h3>
-            <div class="form-grid">
-              <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Legt Issuer-Format und Claim-Zuordnung fest. „Anderer" funktioniert mit jedem Provider, der ein Discovery-Dokument unter <code>&lt;Issuer&gt;/.well-known/openid-configuration</code> liefert.</span>
-                <select id="oidc-provider" aria-describedby="help-oidc-provider">
-                  <option value="entra">Microsoft Entra ID</option>
-                  <option value="keycloak">Keycloak</option>
-                  <option value="generic">Anderer OIDC-Provider</option>
-                </select>
-              </label>
-              <label class="has-help" style="grid-column: 1 / -1;"><span class="help-term">Redirect-URI (Callback-URL)</span><span role="tooltip" id="help-oidc-redirect" class="help-tip">Genau diese Adresse beim Identity-Provider als Redirect-URI eintragen — Entra ID: Plattform „Web"; Keycloak: „Valid redirect URIs". Sie ergibt sich aus der öffentlichen URL oben und muss HTTPS sein.</span>
-                <span class="inline-field">
-                  <input type="text" id="oidc-redirect" readonly placeholder="Öffentliche URL oben eintragen" aria-describedby="help-oidc-redirect" />
-                  <button type="button" id="oidc-redirect-copy">Kopieren</button>
-                </span>
-              </label>
-            </div>
-            <details class="setup-steps" id="oidc-setup">
-              <summary>Anleitung für den gewählten Identity-Provider</summary>
-              <ol id="oidc-setup-entra">
-                <li>Entra Admin Center → <em>App-Registrierungen</em> → „Neue Registrierung": Name vergeben, Kontotyp „Nur Konten in diesem Organisationsverzeichnis".</li>
-                <li>Unter <em>Authentifizierung</em> → „Plattform hinzufügen" → <strong>Web</strong> → die Redirect-URI von oben eintragen. Nicht „Single-Page-Anwendung“: deren Codes löst Entra nur im Browser ein, die Middleware tauscht ihn aber serverseitig (Fehler AADSTS9002327).</li>
-                <li><em>Zertifikate &amp; Geheimnisse</em> → „Neuer geheimer Clientschlüssel“ → den <strong>Wert</strong> unten als <strong>Client-Secret</strong> eintragen oder per <code>OVP_OIDC_CLIENT_SECRET</code> setzen. Ohne Secret lehnt Entra den Code-Tausch ab (AADSTS7000218). Ablaufdatum notieren.</li>
-                <li>Auf der Übersichtsseite „Anwendungs-ID (Client)" → hier als <strong>Client-ID</strong>; „Verzeichnis-ID (Mandant)" → in die <strong>Issuer-URL</strong> <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> einsetzen.</li>
-                <li><em>API-Berechtigungen</em>: Microsoft Graph → <code>openid</code>, <code>profile</code>, <code>email</code> (delegiert), Admin-Einwilligung erteilen.</li>
-                <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden — die Identität erscheint unter „Benutzer &amp; Zugriff" und wird dort für Chat/Tableau freigeschaltet.</li>
-              </ol>
-              <ol id="oidc-setup-keycloak" hidden>
-                <li>Keycloak Admin Console → Realm wählen → <em>Clients</em> → „Create client": Typ OpenID Connect, Client-ID frei wählen (→ hier als <strong>Client-ID</strong>).</li>
-                <li>„Capability config": <em>Client authentication</em> <strong>Off</strong> (public client mit PKCE), „Standard flow" an. Bei „On" (confidential) das Secret aus dem Tab <em>Credentials</em> unten als Client-Secret eintragen.</li>
-                <li>„Login settings": <em>Valid redirect URIs</em> = Redirect-URI von oben, <em>Web origins</em> = öffentliche URL der Middleware.</li>
-                <li><strong>Issuer-URL</strong>: <code>https://&lt;keycloak-host&gt;/realms/&lt;realm&gt;</code>. Die Nutzer brauchen im Realm eine E-Mail-Adresse (Claim „email").</li>
-                <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden und die Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
-              </ol>
-              <ol id="oidc-setup-generic" hidden>
-                <li>Beim Provider einen OIDC-Client mit <em>Authorization Code Flow + PKCE</em> anlegen; Redirect-URI von oben registrieren.</li>
-                <li><strong>Issuer-URL</strong> = „issuer" aus <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>; <strong>Client-ID</strong> aus dem Client. Secret nur bei confidential clients.</li>
-                <li>Das ID-Token muss die Claims <code>sub</code>, <code>email</code> und <code>name</code> enthalten (Scopes <code>openid profile email</code>).</li>
-                <li>Lizenz mit „sso" unter „Lizenz &amp; Aktivierung", speichern, einmal per SSO anmelden, Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
-              </ol>
-            </details>
-          </li>
-          <li>
-            <h3>Werte vom Identity-Provider eintragen</h3>
-            <div class="form-grid">
-              <label class="has-help help-left"><span class="help-term">Issuer-URL</span><span role="tooltip" id="help-oidc-issuer" class="help-tip">Entra ID: <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> · Keycloak: <code>https://&lt;host&gt;/realms/&lt;realm&gt;</code> · sonst der „issuer"-Wert aus dem Discovery-Dokument — ohne Pfad-Suffix wie <code>/.well-known/…</code>.</span>
-                <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" aria-describedby="help-oidc-issuer" />
-              </label>
-              <label class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-oidc-client-id" class="help-tip">Entra ID: „Anwendungs-ID (Client)" der App-Registrierung · Keycloak: „Client ID" des Clients.</span>
-                <input type="text" id="oidc-client-id" autocomplete="off" aria-describedby="help-oidc-client-id" />
-              </label>
-              <label class="has-help"><span class="help-term">Client-Secret</span><span role="tooltip" id="help-oidc-client-secret" class="help-tip">Microsoft Entra ID: Pflicht — die Middleware löst den Anmeldecode serverseitig ein (Plattform „Web“). Keycloak und andere: leer lassen bei einem public client mit PKCE, ausfüllen bei „Client authentication: On“. Wird in der Datenbank gespeichert; alternativ <code>OVP_OIDC_CLIENT_SECRET</code> setzen — gilt, solange hier keins gespeichert ist.</span>
-                <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-oidc-client-secret" />
-              </label>
-              <p id="oidc-entra-secret-hint" class="hint error" style="grid-column: 1 / -1; margin: 0;" hidden>Entra ID braucht ein Client-Secret — ohne lehnt Entra die Anmeldung ab (AADSTS7000218).</p>
-              <label class="has-help help-left"><span class="help-term">Scopes</span><span role="tooltip" id="help-oidc-scopes" class="help-tip"><code>openid profile email</code> reicht: „email" liefert die Adresse für Tableau Cloud bzw. den Username-Claim, „profile" den Anzeigenamen unter „Benutzer &amp; Zugriff".</span>
-                <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" aria-describedby="help-oidc-scopes" />
-              </label>
-            </div>
-          </li>
-          <li>
-            <h3>Speichern und Personen freischalten</h3>
-            <p class="hint">Nach dem Speichern einmal in der Extension per SSO anmelden — die Person erscheint dann unter <a href="#users-admin">Benutzer &amp; Zugriff</a> zur Freigabe.</p>
-          </li>
-        </ol>
-      </div>
-      <div class="form-actions">
-        <button class="primary" id="save-auth">Speichern</button>
-      </div>
+      <ul class="status-list">
+        <li class="status-row"><span class="status-chip" id="auth-status-chip" data-level="off">Lade …</span><span class="status-name">Anmeldemodus</span><span id="auth-source" class="status-detail"></span><button type="button" id="auth-mode-edit">Ändern</button></li>
+        <li class="status-row"><span class="status-chip" id="auth-url-chip" data-level="off">Lade …</span><span class="status-name">Öffentliche URL</span><span id="auth-url-detail" class="status-detail"></span><button type="button" id="auth-url-edit">Ändern</button></li>
+        <li class="status-row"><span class="status-chip" id="oidc-status-chip" data-level="off">Lade …</span><span class="status-name">Single Sign-On (OIDC)</span><span id="oidc-detail" class="status-detail"></span><button type="button" id="oidc-edit">Einrichten</button></li>
+      </ul>
       <details class="setup-steps" id="auth-env-table" style="margin-top: 1.5rem;">
         <summary>Env-Variablen oder Admin-UI — wann was?</summary>
-        <p>Alles hier Gespeicherte landet in der Datenbank und hat Vorrang vor den Env-Variablen (oben steht „Quelle: Admin-UI" bzw. „Env-Defaults"). Env eignet sich für Deployments, deren Konfiguration aus Helm/Vault kommt; das Admin-UI für die Einrichtung von Hand. „Auf Env-Defaults zurücksetzen" löscht die Datenbank-Werte.</p>
+        <p>Alles hier Gespeicherte landet in der Datenbank und hat Vorrang vor den Env-Variablen (oben steht „Quelle: Admin-UI" bzw. „Env-Defaults"). Env eignet sich für Deployments, deren Konfiguration aus Helm/Vault kommt; das Admin-UI für die Einrichtung von Hand. „Standard wiederherstellen“ löscht die Datenbank-Werte.</p>
         <table>
           <tr><th>Einstellung</th><th>Env-Variable</th><th>Admin-UI</th></tr>
           <tr><td>Anmeldemodus</td><td><code>OVP_AUTH_MODE</code></td><td>Feld „Anmeldemodus"</td></tr>
           <tr><td>Öffentliche URL</td><td><code>OVP_PUBLIC_URL</code></td><td>Feld „Öffentliche URL"</td></tr>
-          <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Felder oben</td></tr>
+          <tr><td>Provider, Issuer, Client-ID, Scopes</td><td><code>OVP_OIDC_PROVIDER</code>, <code>OVP_OIDC_ISSUER</code>, <code>OVP_OIDC_CLIENT_ID</code>, <code>OVP_OIDC_SCOPES</code></td><td>Dialog „Single Sign-On“</td></tr>
           <tr><td>Client-Secret</td><td><code>OVP_OIDC_CLIENT_SECRET</code> (empfohlen bei Vault; gilt, solange im Feld keins gespeichert ist)</td><td>Feld „Client-Secret" (Datenbank)</td></tr>
           <tr><td>Lizenz</td><td><code>OVP_LICENSE</code> oder <code>OVP_LICENSE_PATH</code></td><td>„Lizenz &amp; Aktivierung“ → Lizenzschlüssel</td></tr>
           <tr><td>Umgebung</td><td><code>OVP_ENVIRONMENT</code> (nur per Env)</td><td>—</td></tr>
@@ -673,9 +590,11 @@ export const adminPageHtml = `<!doctype html>
         </table>
       </details>
       <div class="danger-zone">
-        <h3>Auf Env-Defaults zurücksetzen</h3>
+        <h3>Standard wiederherstellen</h3>
         <p class="hint">Löscht alle hier gespeicherten Anmelde- und Lizenzeinstellungen, auch den Lizenzschlüssel. Danach gelten nur die Env-Variablen.</p>
-        <button class="danger" id="reset-auth">Auf Env-Defaults zurücksetzen</button>
+        <div class="form-actions">
+          <button class="danger" id="reset-auth">Standard wiederherstellen</button>
+        </div>
       </div>
     </section>
 
@@ -683,11 +602,7 @@ export const adminPageHtml = `<!doctype html>
       <h2 id="users-heading" class="visually-hidden">Benutzer &amp; Zugriff</h2>
       <p class="hint">Wer Chat, Tableau API und Administration nutzen darf — für lokale Konten und SSO-Identitäten.</p>
       <fieldset class="form-section" id="user-access-section">
-        <legend class="has-help" aria-expanded="false"><span class="help-term">Zugriff je Person</span><span role="tooltip" id="help-access-legend" class="help-tip">Lokale Konten erscheinen automatisch; eine SSO-Identität erst, nachdem sich die Person einmal per Single Sign-On angemeldet hat — danach hier aktualisieren.</span></legend>
         <p id="user-access-banner" class="banner" role="status"></p>
-        <div class="form-actions">
-          <button type="button" id="user-access-refresh">Zugriffe aktualisieren</button>
-        </div>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
             <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Serverdaten</span><span role="tooltip" id="help-access-serverdata" class="help-tip">Erlaubt der Middleware, im Namen dieser Person Summary-Daten von Tableau-Views zu lesen — nur mit Site-Schalter und Einwilligung der Person; jede Abfrage steht im Audit unter Tableau Server.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span></th><th class="col-save"></th></tr></thead>
@@ -712,19 +627,10 @@ export const adminPageHtml = `<!doctype html>
             <tbody id="users-body"></tbody>
           </table>
         </div>
+        <div class="row">
+          <button type="button" id="create-user-open">+ Benutzer anlegen</button>
+        </div>
       </fieldset>
-      <form id="create-user-form">
-      <fieldset class="form-section"><legend class="has-help" aria-expanded="false"><span class="help-term">Benutzer anlegen</span><span role="tooltip" id="help-users-create" class="help-tip">Kann sich sofort anmelden, erhält aber erst nach Freigabe unter „Zugriff je Person“ Zugriff auf Chat oder Tableau API.</span></legend>
-      <div class="form-grid">
-        <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
-        <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
-        <label for="new-password" class="has-help"><span class="help-term">Passwort (mindestens 10 Zeichen)</span><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required aria-describedby="help-users-password" /></label>
-      </div>
-      <div class="form-actions">
-        <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
-      </div>
-      </fieldset>
-      </form>
 
     </section>
 
@@ -735,7 +641,6 @@ export const adminPageHtml = `<!doctype html>
       <div class="row" style="margin-bottom: 0.75rem;">
         <label for="playbook-key" class="has-help"><span class="help-term">Dashboard:</span><span role="tooltip" id="help-playbook-key" class="help-tip">Eingebundene Dashboards erscheinen automatisch nach dem ersten angemeldeten Start — auch ohne Chatfragen; die Zuordnung wird im Workbook gespeichert.</span></label>
         <select id="playbook-key" style="flex: 1 1 260px;" aria-describedby="help-playbook-key"><option value="">Dashboard auswählen …</option></select>
-        <button id="playbook-refresh">Dashboards aktualisieren</button>
       </div>
       <p id="playbook-status" class="hint"></p>
       <fieldset id="playbook-editor" class="form-section" disabled><legend>Analysen bearbeiten (erst nach Dashboard-Auswahl oben verfügbar)</legend>
@@ -787,7 +692,7 @@ export const adminPageHtml = `<!doctype html>
       <div class="row">
         <button id="add-metric">+ Kennzahl</button>
         <button class="primary" id="save-metrics">Speichern</button>
-        <button class="danger" id="reset-metrics">Zurücksetzen</button>
+        <button class="danger" id="reset-metrics">Standard wiederherstellen</button>
       </div>
     </section>
 
@@ -812,7 +717,7 @@ export const adminPageHtml = `<!doctype html>
         <button id="add-model">+ Modell hinzufügen</button>
         <button id="lookup-models">Vom Endpunkt laden</button>
         <button class="primary" id="save-models">Speichern</button>
-        <button class="danger" id="reset-models">Auf Endpunkt-Liste zurücksetzen</button>
+        <button class="danger" id="reset-models">Standard wiederherstellen</button>
       </div>
       <div id="lookup-results" class="row" style="margin-top: 0.75rem;"></div>
     </section>
@@ -832,13 +737,12 @@ export const adminPageHtml = `<!doctype html>
     <section class="card" id="usage-admin" aria-labelledby="usage-heading" hidden>
       <h2 id="usage-heading" class="visually-hidden">Nutzung</h2>
       <p class="hint">Anonym: aggregierte Zähler ohne Nutzerbezug und ohne Inhalte.</p>
-      <div class="row" style="margin-bottom: 1rem;">
-        <label for="stats-days">Zeitraum:</label>
-        <select id="stats-days">
-          <option value="7">7 Tage</option>
-          <option value="30" selected>30 Tage</option>
-          <option value="90">90 Tage</option>
-        </select>
+      <div class="section-toolbar">
+        <div class="segmented" id="stats-days" role="group" aria-label="Zeitraum">
+          <button type="button" data-days="30" aria-pressed="true">30 Tage</button>
+          <button type="button" data-days="90" aria-pressed="false">90 Tage</button>
+          <button type="button" data-days="180" aria-pressed="false">180 Tage</button>
+        </div>
         <span>Chat-Turns gesamt: <span class="total-turns" id="total-turns">–</span></span>
       </div>
       <p id="stats-banner" class="banner"></p>
@@ -865,6 +769,138 @@ export const adminPageHtml = `<!doctype html>
     </div>
   </div>
 </main>
+<dialog id="auth-mode-dialog" aria-labelledby="auth-mode-dialog-title">
+  <form id="auth-mode-form">
+    <h2 id="auth-mode-dialog-title">Anmeldemodus</h2>
+    <div class="form-grid">
+      <label class="has-help"><span class="help-term">Anmeldemodus</span><span role="tooltip" id="help-auth-mode" class="help-tip">Offen: keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt, auch mit Häkchen unter „Benutzer &amp; Zugriff“. Benutzerkonten: Anmeldung mit den lokalen Konten aus „Benutzer &amp; Zugriff“. Single Sign-On: Firmenkonto (Entra ID/Keycloak), braucht eine gültige Lizenz.</span>
+        <select id="auth-mode" aria-describedby="help-auth-mode">
+          <option value="none">Offen (kein Login)</option>
+          <option value="local">Benutzerkonten (Core-Edition)</option>
+          <option value="oidc">Single Sign-On per OIDC (Enterprise)</option>
+        </select>
+      </label>
+    </div>
+    <p id="auth-mode-none-hint" class="hint error" hidden>Ohne Anmeldung gibt es keine Anwenderidentität — Chat und Tableau API bleiben für alle gesperrt.</p>
+    <p id="oidc-license-hint" class="banner error" role="status" hidden>Single Sign-On braucht eine gültige Enterprise-Lizenz mit „sso“. <a href="#license-admin">Zur Lizenz</a></p>
+    <p id="auth-mode-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" data-dialog-cancel>Abbrechen</button>
+      <button type="submit" class="primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="auth-url-dialog" aria-labelledby="auth-url-dialog-title">
+  <form id="auth-url-form">
+    <h2 id="auth-url-dialog-title">Öffentliche URL</h2>
+    <div class="form-grid">
+      <label class="has-help help-left"><span class="help-term">Öffentliche URL dieser Installation</span><span role="tooltip" id="help-auth-public-url" class="help-tip">HTTPS-Adresse, unter der die Browser diese Middleware erreichen, z. B. <code>https://chat.example.com</code>. Daraus entstehen die SSO-Redirect-URI und die Issuer-URL für Tableau OAuth 2.0 Trust.</span>
+        <input type="text" id="auth-public-url" placeholder="https://chat.example.com" autocomplete="off" aria-describedby="help-auth-public-url" />
+      </label>
+    </div>
+    <p id="auth-url-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" data-dialog-cancel>Abbrechen</button>
+      <button type="submit" class="primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="oidc-dialog" class="dialog-wide" aria-labelledby="oidc-dialog-title">
+  <form id="oidc-form">
+    <h2 id="oidc-dialog-title">Single Sign-On einrichten</h2>
+    <ol class="setup-flow">
+      <li>
+        <h3>Redirect-URI beim Identity-Provider registrieren</h3>
+        <div class="form-grid">
+          <label class="has-help"><span class="help-term">Identity-Provider</span><span role="tooltip" id="help-oidc-provider" class="help-tip">Legt Issuer-Format und Claim-Zuordnung fest. „Anderer" funktioniert mit jedem Provider, der ein Discovery-Dokument unter <code>&lt;Issuer&gt;/.well-known/openid-configuration</code> liefert.</span>
+            <select id="oidc-provider" aria-describedby="help-oidc-provider">
+              <option value="entra">Microsoft Entra ID</option>
+              <option value="keycloak">Keycloak</option>
+              <option value="generic">Anderer OIDC-Provider</option>
+            </select>
+          </label>
+          <label class="has-help" style="grid-column: 1 / -1;"><span class="help-term">Redirect-URI (Callback-URL)</span><span role="tooltip" id="help-oidc-redirect" class="help-tip">Genau diese Adresse beim Identity-Provider als Redirect-URI eintragen — Entra ID: Plattform „Web"; Keycloak: „Valid redirect URIs". Sie ergibt sich aus der öffentlichen URL dieser Installation und muss HTTPS sein.</span>
+            <span class="inline-field">
+              <input type="text" id="oidc-redirect" readonly placeholder="Zuerst die öffentliche URL eintragen" aria-describedby="help-oidc-redirect" />
+              <button type="button" id="oidc-redirect-copy">Kopieren</button>
+            </span>
+          </label>
+        </div>
+        <details class="setup-steps" id="oidc-setup">
+          <summary>Anleitung für den gewählten Identity-Provider</summary>
+          <ol id="oidc-setup-entra">
+            <li>Entra Admin Center → <em>App-Registrierungen</em> → „Neue Registrierung": Name vergeben, Kontotyp „Nur Konten in diesem Organisationsverzeichnis".</li>
+            <li>Unter <em>Authentifizierung</em> → „Plattform hinzufügen" → <strong>Web</strong> → die Redirect-URI von oben eintragen. Nicht „Single-Page-Anwendung“: deren Codes löst Entra nur im Browser ein, die Middleware tauscht ihn aber serverseitig (Fehler AADSTS9002327).</li>
+            <li><em>Zertifikate &amp; Geheimnisse</em> → „Neuer geheimer Clientschlüssel“ → den <strong>Wert</strong> unten als <strong>Client-Secret</strong> eintragen oder per <code>OVP_OIDC_CLIENT_SECRET</code> setzen. Ohne Secret lehnt Entra den Code-Tausch ab (AADSTS7000218). Ablaufdatum notieren.</li>
+            <li>Auf der Übersichtsseite „Anwendungs-ID (Client)" → hier als <strong>Client-ID</strong>; „Verzeichnis-ID (Mandant)" → in die <strong>Issuer-URL</strong> <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> einsetzen.</li>
+            <li><em>API-Berechtigungen</em>: Microsoft Graph → <code>openid</code>, <code>profile</code>, <code>email</code> (delegiert), Admin-Einwilligung erteilen.</li>
+            <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden — die Identität erscheint unter „Benutzer &amp; Zugriff" und wird dort für Chat/Tableau freigeschaltet.</li>
+          </ol>
+          <ol id="oidc-setup-keycloak" hidden>
+            <li>Keycloak Admin Console → Realm wählen → <em>Clients</em> → „Create client": Typ OpenID Connect, Client-ID frei wählen (→ hier als <strong>Client-ID</strong>).</li>
+            <li>„Capability config": <em>Client authentication</em> <strong>Off</strong> (public client mit PKCE), „Standard flow" an. Bei „On" (confidential) das Secret aus dem Tab <em>Credentials</em> unten als Client-Secret eintragen.</li>
+            <li>„Login settings": <em>Valid redirect URIs</em> = Redirect-URI von oben, <em>Web origins</em> = öffentliche URL der Middleware.</li>
+            <li><strong>Issuer-URL</strong>: <code>https://&lt;keycloak-host&gt;/realms/&lt;realm&gt;</code>. Die Nutzer brauchen im Realm eine E-Mail-Adresse (Claim „email").</li>
+            <li>Die Lizenz unter „Lizenz &amp; Aktivierung" muss „sso" enthalten. Speichern, dann in der Extension einmal per SSO anmelden und die Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
+          </ol>
+          <ol id="oidc-setup-generic" hidden>
+            <li>Beim Provider einen OIDC-Client mit <em>Authorization Code Flow + PKCE</em> anlegen; Redirect-URI von oben registrieren.</li>
+            <li><strong>Issuer-URL</strong> = „issuer" aus <code>&lt;Issuer&gt;/.well-known/openid-configuration</code>; <strong>Client-ID</strong> aus dem Client. Secret nur bei confidential clients.</li>
+            <li>Das ID-Token muss die Claims <code>sub</code>, <code>email</code> und <code>name</code> enthalten (Scopes <code>openid profile email</code>).</li>
+            <li>Lizenz mit „sso" unter „Lizenz &amp; Aktivierung", speichern, einmal per SSO anmelden, Identität unter „Benutzer &amp; Zugriff" freischalten.</li>
+          </ol>
+        </details>
+      </li>
+      <li>
+        <h3>Werte vom Identity-Provider eintragen</h3>
+        <div class="form-grid">
+          <label class="has-help help-left"><span class="help-term">Issuer-URL</span><span role="tooltip" id="help-oidc-issuer" class="help-tip">Entra ID: <code>https://login.microsoftonline.com/&lt;Tenant-ID&gt;/v2.0</code> · Keycloak: <code>https://&lt;host&gt;/realms/&lt;realm&gt;</code> · sonst der „issuer"-Wert aus dem Discovery-Dokument — ohne Pfad-Suffix wie <code>/.well-known/…</code>.</span>
+            <input type="text" id="oidc-issuer" placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" autocomplete="off" aria-describedby="help-oidc-issuer" />
+          </label>
+          <label class="has-help"><span class="help-term">Client-ID</span><span role="tooltip" id="help-oidc-client-id" class="help-tip">Entra ID: „Anwendungs-ID (Client)" der App-Registrierung · Keycloak: „Client ID" des Clients.</span>
+            <input type="text" id="oidc-client-id" autocomplete="off" aria-describedby="help-oidc-client-id" />
+          </label>
+          <label class="has-help"><span class="help-term">Client-Secret</span><span role="tooltip" id="help-oidc-client-secret" class="help-tip">Microsoft Entra ID: Pflicht — die Middleware löst den Anmeldecode serverseitig ein (Plattform „Web“). Keycloak und andere: leer lassen bei einem public client mit PKCE, ausfüllen bei „Client authentication: On“. Wird in der Datenbank gespeichert; alternativ <code>OVP_OIDC_CLIENT_SECRET</code> setzen — gilt, solange hier keins gespeichert ist.</span>
+            <input type="password" id="oidc-client-secret" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-oidc-client-secret" />
+          </label>
+          <p id="oidc-entra-secret-hint" class="hint error" style="grid-column: 1 / -1; margin: 0;" hidden>Entra ID braucht ein Client-Secret — ohne lehnt Entra die Anmeldung ab (AADSTS7000218).</p>
+          <label class="has-help help-left"><span class="help-term">Scopes</span><span role="tooltip" id="help-oidc-scopes" class="help-tip"><code>openid profile email</code> reicht: „email" liefert die Adresse für Tableau Cloud bzw. den Username-Claim, „profile" den Anzeigenamen unter „Benutzer &amp; Zugriff".</span>
+            <input type="text" id="oidc-scopes" value="openid profile email" autocomplete="off" aria-describedby="help-oidc-scopes" />
+          </label>
+        </div>
+      </li>
+      <li>
+        <h3>Speichern und Personen freischalten</h3>
+        <p class="hint">Nach dem Speichern den Anmeldemodus auf „Single Sign-On“ stellen und einmal in der Extension per SSO anmelden — die Person erscheint dann unter <a href="#users-admin">Benutzer &amp; Zugriff</a> zur Freigabe.</p>
+      </li>
+    </ol>
+    <p id="oidc-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" data-dialog-cancel>Abbrechen</button>
+      <button type="submit" class="primary">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="create-user-dialog" aria-labelledby="create-user-title">
+  <form id="create-user-form">
+    <h2 id="create-user-title">Benutzer anlegen</h2>
+    <p class="hint">Kann sich sofort anmelden, erhält aber erst nach Freigabe in der Zugriffstabelle unter „Benutzer &amp; Zugriff“ Zugriff auf Chat oder Tableau API.</p>
+    <div class="form-grid">
+      <label for="new-username">Benutzername<input type="text" id="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required /></label>
+      <label for="new-display-name">Anzeigename (optional)<input type="text" id="new-display-name" autocomplete="off" /></label>
+      <label for="new-password" class="has-help"><span class="help-term">Passwort (mindestens 10 Zeichen)</span><span role="tooltip" id="help-users-password" class="help-tip">Wird nur als Hash gespeichert.</span><input type="password" id="new-password" autocomplete="new-password" minlength="10" required aria-describedby="help-users-password" /></label>
+    </div>
+    <p id="create-user-banner" class="banner" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" data-dialog-cancel>Abbrechen</button>
+      <button class="primary" id="create-user" type="submit">Benutzer anlegen</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="user-password-dialog" aria-labelledby="user-password-title">
   <form id="user-password-form">
     <h2 id="user-password-title">Passwort ändern</h2>
@@ -1022,6 +1058,20 @@ export const adminPageHtml = `<!doctype html>
     el.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   }
 
+  /** Meldungsfeld eines Formular-Dialogs: <dialog id="x-dialog"> → <p id="x-banner">. */
+  function dialogBanner(dialog) {
+    return document.getElementById(dialog.id.replace(/-dialog$/, '-banner'));
+  }
+  /** Formular-Dialog öffnen: alte Meldung weg, dann modal anzeigen. */
+  function openFormDialog(dialog) {
+    var banner = dialogBanner(dialog);
+    if (banner) showBanner(banner, '', '');
+    dialog.showModal();
+  }
+  document.querySelectorAll('[data-dialog-cancel]').forEach(function (button) {
+    button.addEventListener('click', function () { button.closest('dialog').close(); });
+  });
+
   function showGate(message) {
     if (passwordDialog && passwordDialog.open) passwordDialog.close();
     app.style.display = 'none';
@@ -1126,7 +1176,8 @@ export const adminPageHtml = `<!doctype html>
       if (link.hash === '#' + selected) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
-    document.getElementById('view-title-text').textContent = option.textContent;
+    // Seitentitel darf vom Navigationseintrag abweichen (data-title).
+    document.getElementById('view-title-text').textContent = option.dataset.title || option.textContent;
     // Enterprise-Bereiche tragen das Badge am Seitentitel statt einer zweiten Überschrift im Inhalt.
     document.getElementById('view-badge').hidden = option.dataset.ee !== 'true';
     document.getElementById('view-group').textContent = option.parentElement.label;
@@ -1135,7 +1186,35 @@ export const adminPageHtml = `<!doctype html>
       document.getElementById('view-title').focus({ preventScroll: true });
     }
   }
-  window.addEventListener('hashchange', function () { selectAdminView(true); });
+  window.addEventListener('hashchange', function () {
+    selectAdminView(true);
+    if (app.style.display !== 'none') refreshView(document.getElementById('admin-navigation').value);
+  });
+
+  /**
+   * Beim Wechsel in einen Bereich dessen Daten neu laden — wie beim Aufruf einer eigenen Seite,
+   * deshalb gibt es keine Aktualisieren-Buttons. Bereiche mit ungespeicherten Änderungen bleiben
+   * unangetastet. Die Enterprise-Loader fehlen im Core-Build (ee-stub), daher typeof.
+   */
+  function refreshView(id) {
+    var tableau = function () { if (typeof loadTableauServer === 'function' && !tableauServerDirty) loadTableauServer(false); };
+    var loaders = {
+      'overview-admin': function () { loadOverviewLlm(); loadLlmEndpoint(); loadAuth(); loadUserAccess(); loadModels(); tableau(); },
+      'license-admin': function () { loadAuth(); loadSystem(); },
+      'auth-admin': loadAuth,
+      'tableau-server-admin': tableau,
+      'models-admin': loadModels,
+      'users-admin': function () { loadUsers(); loadUserAccess(); },
+      'mcp-admin': function () { if (typeof loadMcp === 'function' && !mcpDirty) loadMcp(); },
+      'commands-admin': loadCommands,
+      'playbooks-admin': function () { if (!playbookIsDirty()) loadPlaybooks(); },
+      'metrics-admin': function () { if (!metricsDirty) loadMetrics(); },
+      'usage-admin': loadStats,
+      'watch-admin': function () { if (typeof loadWatch === 'function') loadWatch(); },
+      'tableau-audit-admin': function () { if (typeof loadTableauAudit === 'function') loadTableauAudit(); }
+    };
+    if (loaders[id]) loaders[id]();
+  }
   document.getElementById('admin-navigation').addEventListener('change', function (event) { location.hash = event.target.value; });
 
   // ---------- Übersicht ----------
@@ -1251,10 +1330,7 @@ export const adminPageHtml = `<!doctype html>
           result.appendChild(link);
           return;
         }
-        document.getElementById('update-notes').href = link.href;
         if (d.newer) {
-          Array.prototype.forEach.call(document.querySelectorAll('.update-target'), function (el) { el.textContent = d.latest; });
-          document.getElementById('update-howto').open = true;
           result.textContent = 'Version ' + d.latest + ' verfügbar' + (d.publishedAt ? ' (seit ' + fmtDate(d.publishedAt) + ')' : '') + ' — ';
           link.textContent = 'Release-Notes';
           result.appendChild(link);
@@ -1412,14 +1488,14 @@ export const adminPageHtml = `<!doctype html>
   });
 
   document.getElementById('reset-commands').addEventListener('click', function () {
-    if (!confirm('Wirklich auf die eingebauten Standard-Befehle zurücksetzen?')) return;
+    if (!confirm('Standard wiederherstellen? Die eigenen Slash-Befehle werden gelöscht; danach gelten die eingebauten Standard-Befehle.')) return;
     adminFetch('/commands', { method: 'DELETE' })
       .then(function (res) {
         if (!res.ok) {
-          showBanner(commandsBanner, 'Zurücksetzen fehlgeschlagen.', 'error');
+          showBanner(commandsBanner, 'Wiederherstellen fehlgeschlagen.', 'error');
           return;
         }
-        showBanner(commandsBanner, 'Auf Standard zurückgesetzt.', 'ok');
+        showBanner(commandsBanner, 'Standard wiederhergestellt.', 'ok');
         return loadCommands();
       })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
@@ -1430,7 +1506,6 @@ export const adminPageHtml = `<!doctype html>
   var authMode = document.getElementById('auth-mode');
   var authSource = document.getElementById('auth-source');
   var authBanner = document.getElementById('auth-banner');
-  var oidcFields = document.getElementById('oidc-fields');
   var oidcProvider = document.getElementById('oidc-provider');
   var oidcIssuer = document.getElementById('oidc-issuer');
   var oidcClientId = document.getElementById('oidc-client-id');
@@ -1453,7 +1528,7 @@ export const adminPageHtml = `<!doctype html>
   }
   authPublicUrl.addEventListener('input', updateRedirectPreview);
   document.getElementById('oidc-redirect-copy').addEventListener('click', function () {
-    if (!oidcRedirect.value) { authPublicUrl.focus(); return; }
+    if (!oidcRedirect.value) { showBanner(document.getElementById('oidc-banner'), 'Zuerst unter „Öffentliche URL“ die Adresse dieser Installation eintragen.', 'error'); return; }
     var button = this;
     navigator.clipboard.writeText(oidcRedirect.value).then(function () {
       button.textContent = 'Kopiert';
@@ -1621,7 +1696,6 @@ export const adminPageHtml = `<!doctype html>
 
   /** Schaltet die OIDC-Schritte und die sichtbaren Hinweise passend zum gewählten Modus. */
   function updateOidcVisibility() {
-    oidcFields.hidden = authMode.value !== 'oidc';
     document.getElementById('auth-mode-none-hint').hidden = authMode.value !== 'none';
     var lic = lastAuthData && lastAuthData.effective.license || { status: 'none' };
     var hasSso = lic.status === 'valid' && (lic.features || []).indexOf('sso') !== -1;
@@ -1641,8 +1715,11 @@ export const adminPageHtml = `<!doctype html>
     var authLevel = eff.blockedReason ? 'error' : eff.mode === 'none' ? 'warn' : 'ok';
     setStatusChip(authStatusChip, authLevel, eff.blockedReason ? 'Blockiert' : eff.mode === 'none' ? 'Offen' : 'Aktiv');
     overviewSet('auth', authLevel, eff.blockedReason ? 'Blockiert: ' + eff.blockedReason : modeText);
-    if (eff.publicUrl) overviewSet('publicUrl', 'ok', eff.publicUrl);
-    else overviewSet('publicUrl', eff.mode === 'oidc' ? 'error' : 'off', 'Nicht gesetzt — nötig für Single Sign-On und Tableau OAuth 2.0 Trust.');
+    var urlLevel = eff.publicUrl ? 'ok' : eff.mode === 'oidc' ? 'error' : 'off';
+    var urlText = eff.publicUrl || 'Nicht gesetzt — nötig für Single Sign-On und Tableau OAuth 2.0 Trust.';
+    overviewSet('publicUrl', urlLevel, urlText);
+    setStatusChip(document.getElementById('auth-url-chip'), urlLevel, eff.publicUrl ? 'Gesetzt' : 'Nicht gesetzt');
+    document.getElementById('auth-url-detail').textContent = urlText;
     var lic = eff.license || { status: 'none' };
     var licState = licenseLevel(lic);
     setStatusChip(licenseStatusChip, licState.level, licState.label);
@@ -1657,6 +1734,13 @@ export const adminPageHtml = `<!doctype html>
       oidcClientId.value = oidc.clientId;
       oidcScopes.value = oidc.scopes || 'openid profile email';
     }
+    var hasSso = lic.status === 'valid' && (lic.features || []).indexOf('sso') !== -1;
+    var providerLabels = { entra: 'Microsoft Entra ID', keycloak: 'Keycloak', generic: 'Anderer OIDC-Provider' };
+    setStatusChip(document.getElementById('oidc-status-chip'), !oidc ? 'off' : hasSso ? 'ok' : 'warn', !oidc ? 'Nicht eingerichtet' : hasSso ? 'Eingerichtet' : 'Lizenz fehlt');
+    document.getElementById('oidc-detail').textContent = oidc
+      ? (providerLabels[oidc.provider] || oidc.provider) + ' · ' + oidc.issuer + (hasSso ? '' : ' — braucht eine Lizenz mit „sso“.')
+      : 'Firmenkonto per Entra ID, Keycloak oder anderem OIDC-Provider — braucht eine Lizenz mit „sso“.';
+    document.getElementById('oidc-edit').textContent = oidc ? 'Bearbeiten' : 'Einrichten';
     // Die Anleitung ist aufgeklappt, solange noch kein Identity-Provider eingetragen ist.
     document.getElementById('oidc-setup').open = !oidc;
     oidcClientSecret.value = '';
@@ -1730,8 +1814,12 @@ export const adminPageHtml = `<!doctype html>
       .catch(function () { showBanner(banner, 'Speichern fehlgeschlagen', 'error'); });
   }
 
-  /** Anmeldung speichern: Modus, öffentliche URL und OIDC — der Lizenzschlüssel bleibt unberührt. */
-  function saveAuth() {
+  /**
+   * Anmeldung speichern: Modus, öffentliche URL und OIDC — der Lizenzschlüssel bleibt unberührt.
+   * Jeder Dialog speichert den ganzen Stand; die Felder der anderen Dialoge tragen dabei den
+   * gespeicherten Wert, weil jedes Schließen sie aus lastAuthData zurücksetzt.
+   */
+  function saveAuth(dialog) {
     var body = { mode: authMode.value };
     if (oidcIssuer.value.trim() || oidcClientId.value.trim()) {
       body.oidc = {
@@ -1743,7 +1831,11 @@ export const adminPageHtml = `<!doctype html>
       if (oidcClientSecret.value) body.oidc.clientSecret = oidcClientSecret.value;
     }
     body.publicUrl = authPublicUrl.value.trim();
-    return putAuthSettings(body, authBanner, 'Gespeichert — gilt sofort für alle Anmeldungen.');
+    var okText = 'Gespeichert — gilt sofort für alle Anmeldungen.';
+    return putAuthSettings(body, dialogBanner(dialog), okText, function () {
+      dialog.close();
+      showBanner(authBanner, okText, 'ok');
+    });
   }
 
   /**
@@ -1768,7 +1860,16 @@ export const adminPageHtml = `<!doctype html>
     return putAuthSettings({ mode: mode, license: license }, licenseBanner, okText, loadInstallations);
   }
 
-  document.getElementById('save-auth').addEventListener('click', function () { saveAuth(); });
+  [['auth-mode-edit', 'auth-mode-dialog'], ['auth-url-edit', 'auth-url-dialog'], ['oidc-edit', 'oidc-dialog']].forEach(function (pair) {
+    var dialog = document.getElementById(pair[1]);
+    document.getElementById(pair[0]).addEventListener('click', function () { openFormDialog(dialog); });
+    dialog.querySelector('form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      saveAuth(dialog);
+    });
+    // Abbrechen verwirft ungespeicherte Eingaben — sonst speichert der nächste Dialog sie mit.
+    dialog.addEventListener('close', function () { if (lastAuthData) renderAuth(lastAuthData); });
+  });
   document.getElementById('save-license').addEventListener('click', function () {
     var token = licenseToken.value.trim();
     if (!token) { licenseToken.focus(); showBanner(licenseBanner, 'Bitte zuerst den Lizenzschlüssel einfügen.', 'error'); return; }
@@ -1843,8 +1944,8 @@ export const adminPageHtml = `<!doctype html>
     if (!window.confirm('Alle Anmelde- und Lizenzeinstellungen der Admin-UI verwerfen (auch den hier gespeicherten Lizenzschlüssel) und die Env-Defaults verwenden?')) return;
     adminFetch('/auth-settings', { method: 'DELETE' })
       .then(function (res) { return res.json(); })
-      .then(function (data) { renderAuth(data); showBanner(authBanner, 'Zurückgesetzt auf Env-Defaults.', 'ok'); })
-      .catch(function () { showBanner(authBanner, 'Zurücksetzen fehlgeschlagen', 'error'); });
+      .then(function (data) { renderAuth(data); showBanner(authBanner, 'Standard wiederhergestellt — es gelten die Env-Variablen.', 'ok'); })
+      .catch(function () { showBanner(authBanner, 'Wiederherstellen fehlgeschlagen', 'error'); });
   });
 
   // ---------- Benutzerkonten ----------
@@ -1994,18 +2095,18 @@ export const adminPageHtml = `<!doctype html>
       });
   }
 
-  function userAction(path, options, okText) {
+  function userAction(path, options, okText, errorBanner) {
     return adminFetch(path, options)
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
         if (!result.ok) {
-          showBanner(usersBanner, errorText(result.data, 'Aktion fehlgeschlagen'), 'error');
+          showBanner(errorBanner || usersBanner, errorText(result.data, 'Aktion fehlgeschlagen'), 'error');
           return false;
         }
         showBanner(usersBanner, okText, 'ok');
         return loadUsers().then(loadUserAccess).then(function () { return true; });
       })
-      .catch(function () { showBanner(usersBanner, 'Aktion fehlgeschlagen', 'error'); });
+      .catch(function () { showBanner(errorBanner || usersBanner, 'Aktion fehlgeschlagen', 'error'); });
   }
 
   function renderUsers(users) {
@@ -2073,12 +2174,6 @@ export const adminPageHtml = `<!doctype html>
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
   }
 
-  document.getElementById('user-access-refresh').addEventListener('click', function () {
-    var button = document.getElementById('user-access-refresh');
-    button.disabled = true;
-    loadUserAccess().finally(function () { button.disabled = false; });
-  });
-
   var passwordDialog = document.getElementById('user-password-dialog');
   var passwordForm = document.getElementById('user-password-form');
   var passwordBanner = document.getElementById('user-password-banner');
@@ -2111,6 +2206,9 @@ export const adminPageHtml = `<!doctype html>
       });
   });
 
+  var createUserDialog = document.getElementById('create-user-dialog');
+  document.getElementById('create-user-open').addEventListener('click', function () { openFormDialog(createUserDialog); });
+  createUserDialog.addEventListener('close', function () { document.getElementById('create-user-form').reset(); });
   document.getElementById('create-user-form').addEventListener('submit', function (event) {
     event.preventDefault();
     var button = document.getElementById('create-user');
@@ -2118,18 +2216,15 @@ export const adminPageHtml = `<!doctype html>
     var username = document.getElementById('new-username').value.trim();
     var displayName = document.getElementById('new-display-name').value.trim();
     var password = document.getElementById('new-password').value;
+    var banner = document.getElementById('create-user-banner');
     if (!username || !password) {
-      showBanner(usersBanner, 'Benutzername und Passwort angeben.', 'error');
+      showBanner(banner, 'Benutzername und Passwort angeben.', 'error');
       return;
     }
     button.disabled = true;
-    userAction('/users', jsonRequest('POST', { username: username, displayName: displayName, password: password }), 'Benutzer angelegt.')
-      .then(function (ok) {
-        if (!ok) return;
-        document.getElementById('new-username').value = '';
-        document.getElementById('new-display-name').value = '';
-        document.getElementById('new-password').value = '';
-      }).finally(function () { button.disabled = false; });
+    userAction('/users', jsonRequest('POST', { username: username, displayName: displayName, password: password }), 'Benutzer angelegt.', banner)
+      .then(function (ok) { if (ok) createUserDialog.close(); })
+      .finally(function () { button.disabled = false; });
   });
 
   // ---------- Playbooks pro Dashboard ----------
@@ -2189,7 +2284,6 @@ export const adminPageHtml = `<!doctype html>
     playbookPending = pending;
     playbookEditor.disabled = pending || !selectedPlaybookKey;
     playbookKey.disabled = pending;
-    document.getElementById('playbook-refresh').disabled = pending;
   }
 
   window.addEventListener('beforeunload', function (event) {
@@ -2246,7 +2340,6 @@ export const adminPageHtml = `<!doctype html>
     showBanner(playbooksBanner, !key ? '' : entry ? 'Standardanalysen geladen.' : 'Für dieses Dashboard gelten bisher die globalen Standards. Hier eigene Analysen ergänzen.', 'ok');
   }
   playbookKey.addEventListener('change', selectPlaybook);
-  document.getElementById('playbook-refresh').addEventListener('click', loadPlaybooks);
 
   document.getElementById('playbook-add-command').addEventListener('click', function () {
     commandRowInto(playbookCommandsBody, { name: '', description: '', argHint: '', template: '' });
@@ -2307,6 +2400,8 @@ export const adminPageHtml = `<!doctype html>
   // ---------- Kennzahlen ----------
 
   var metricsState = { metrics: [], source: 'default' };
+  /** Ungespeicherte Änderungen — dann lädt der Bereichswechsel die Liste nicht neu. */
+  var metricsDirty = false;
   var metricsBody = document.getElementById('metrics-body');
   var metricsSource = document.getElementById('metrics-source');
   var metricsBanner = document.getElementById('metrics-banner');
@@ -2317,6 +2412,7 @@ export const adminPageHtml = `<!doctype html>
   var metricDraftQuestions = [];
 
   function metricsChanged() {
+    metricsDirty = true;
     showBanner(metricsBanner, 'Ungespeicherte Änderungen.', '');
     metricsBanner.style.display = 'block';
   }
@@ -2388,6 +2484,7 @@ export const adminPageHtml = `<!doctype html>
       .then(function (res) { return res.json(); })
       .then(function (data) {
         metricsState = { metrics: data.metrics || [], source: data.source };
+        metricsDirty = false;
         renderMetrics();
       })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
@@ -2549,14 +2646,14 @@ export const adminPageHtml = `<!doctype html>
   });
 
   document.getElementById('reset-metrics').addEventListener('click', function () {
-    if (!confirm('Alle Kennzahlen löschen?')) return;
+    if (!confirm('Standard wiederherstellen? Alle hier gepflegten Kennzahlen werden gelöscht.')) return;
     adminFetch('/metrics', { method: 'DELETE' })
       .then(function (res) {
         if (!res.ok) {
-          showBanner(metricsBanner, 'Zurücksetzen fehlgeschlagen.', 'error');
+          showBanner(metricsBanner, 'Wiederherstellen fehlgeschlagen.', 'error');
           return;
         }
-        showBanner(metricsBanner, 'Katalog gelöscht.', 'ok');
+        showBanner(metricsBanner, 'Standard wiederhergestellt.', 'ok');
         return loadMetrics();
       })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
@@ -2693,14 +2790,14 @@ export const adminPageHtml = `<!doctype html>
   });
 
   document.getElementById('reset-models').addEventListener('click', function () {
-    if (!confirm('Eigenen Modell-Katalog löschen? Danach gilt wieder die Endpunkt-Liste.')) return;
+    if (!confirm('Standard wiederherstellen? Der eigene Modell-Katalog wird gelöscht; danach gilt wieder die Endpunkt-Liste.')) return;
     adminFetch('/models', { method: 'DELETE' })
       .then(function (res) {
         if (!res.ok) {
-          showBanner(modelsBanner, 'Zurücksetzen fehlgeschlagen.', 'error');
+          showBanner(modelsBanner, 'Wiederherstellen fehlgeschlagen.', 'error');
           return;
         }
-        showBanner(modelsBanner, 'Zurückgesetzt — es gilt die Endpunkt-Liste.', 'ok');
+        showBanner(modelsBanner, 'Standard wiederhergestellt — es gilt die Endpunkt-Liste.', 'ok');
         return loadModels();
       })
       .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
@@ -2763,12 +2860,17 @@ export const adminPageHtml = `<!doctype html>
   var statsBanner = document.getElementById('stats-banner');
   var totalTurns = document.getElementById('total-turns');
   var statsDays = document.getElementById('stats-days');
+  /** Gewählter Zeitraum = der gedrückte Button im Umschalter. */
+  function selectedStatsDays() {
+    var pressed = statsDays.querySelector('[aria-pressed="true"]');
+    return pressed ? pressed.dataset.days : '30';
+  }
 
   function loadStats() {
     showBanner(statsBanner, '', 'ok');
     statsGrid.innerHTML = '';
     totalTurns.textContent = '–';
-    adminFetch('/stats?days=' + encodeURIComponent(statsDays.value))
+    adminFetch('/stats?days=' + encodeURIComponent(selectedStatsDays()))
       .then(function (res) { return res.json(); })
       .then(function (data) {
         renderStats(data.rows || []);
@@ -2859,7 +2961,12 @@ export const adminPageHtml = `<!doctype html>
     });
   }
 
-  statsDays.addEventListener('change', loadStats);
+  statsDays.querySelectorAll('button').forEach(function (button) {
+    button.addEventListener('click', function () {
+      statsDays.querySelectorAll('button').forEach(function (other) { other.setAttribute('aria-pressed', String(other === button)); });
+      loadStats();
+    });
+  });
 
   // ---------- Gate: Token / Ersteinrichtung / Login ----------
 

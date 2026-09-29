@@ -90,7 +90,7 @@ import { resolveUserAccess } from '../user-access';
  */
 
 const MIN_STATS_DAYS = 1;
-const MAX_STATS_DAYS = 90;
+const MAX_STATS_DAYS = 180;
 const DEFAULT_STATS_DAYS = 30;
 
 const passwordBodySchema = z.object({ password: z.string().min(1).max(200) });

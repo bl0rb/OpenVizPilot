@@ -420,45 +420,78 @@ body {
   gap: 8px;
 }
 
-.mode-switch {
+/* Modus- und Umfang-Schalter immer nebeneinander; bei schmaler Extension
+   kürzen die Labels mit "…" statt umzubrechen. */
+.mode-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Höhere Spezifität als ".composer button" (border-radius/padding), damit der
+   Schalter nicht die generische Send/Stop-Button-Form erbt. */
+.composer .mode-toggle {
   display: inline-flex;
-  align-self: flex-start;
-  border: 1px solid #b6c6d2;
-  border-radius: 8px;
-  padding: 2px;
-  gap: 2px;
-}
-
-/* Höhere Spezifität als ".composer button" (border-radius/padding), damit die
-   Segmented-Control kompakt bleibt statt die generische Send/Stop-Button-Form
-   zu erben. */
-.mode-switch .mode-option {
-  border: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+  border-radius: 0;
   background: transparent;
-  color: #666;
-  border-radius: 6px;
-  padding: 3px 10px;
-  font: inherit;
+  color: #444;
   font-size: 12px;
-  cursor: pointer;
 }
 
-.mode-switch .mode-option:hover:not(:disabled) {
-  background: #eef4f8;
+/* "Untersuchen" bleibt lesbar; gekürzt wird nur das längere Umfang-Label. */
+.composer .mode-toggle:first-child {
+  flex-shrink: 0;
 }
 
-.mode-switch .mode-option:disabled {
-  opacity: 0.5;
+.composer .mode-toggle:disabled {
+  opacity: 0.45;
   cursor: default;
 }
 
-.mode-switch .mode-option-active {
-  background: #1a699e;
-  color: #fff;
+.mode-toggle:focus-visible {
+  outline: 2px solid #1a699e;
+  outline-offset: 2px;
 }
 
-.mode-switch .mode-option-active:hover:not(:disabled) {
+.mode-toggle-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: #b6c6d2;
+  transition: background 0.15s;
+}
+
+.mode-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.mode-toggle[aria-checked='true'] .mode-toggle-track {
   background: #1a699e;
+}
+
+.mode-toggle[aria-checked='true'] .mode-toggle-track::after {
+  transform: translateX(12px);
+}
+
+.mode-toggle-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .slash-menu {

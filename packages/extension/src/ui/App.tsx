@@ -547,7 +547,7 @@ export function App(props: { dashboard: Dashboard }) {
   // Vorschlagsfragen für den leeren Zustand — client-seitig, ohne LLM-Call.
   // Reihenfolge: vom User gespeicherte Standardfragen (★-Präfix), dann die
   // Starter aus dem Admin-Playbook dieses Dashboards, dann generische
-  // Vorschläge — insgesamt max. 6 Chips, ohne Dubletten.
+  // Vorschläge — insgesamt max. 3 Chips, ohne Dubletten.
   const starters = useMemo(() => {
     const names = dashboard.worksheets.map((w) => w.name);
     const generic = [
@@ -569,7 +569,7 @@ export function App(props: { dashboard: Dashboard }) {
       ...savedQuestions.map((q) => `★ ${q}`),
       ...dedupe(playbookStarters),
       ...dedupe(generic),
-    ].slice(0, 10);
+    ].slice(0, 3);
   }, [dashboard, prefs, playbookStarters]);
 
   // Speichert eine gestellte Frage als Standardfrage für dieses Dashboard

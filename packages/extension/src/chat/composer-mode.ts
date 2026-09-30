@@ -1,20 +1,9 @@
 import type { ChatMode } from '@openvizpilot/shared';
 
 /**
- * Reine Logik der Modus-Segmented-Control im Composer (W3 Untersuchungsmodus)
+ * Reine Logik der Modus-Schalter im Composer (W3 Untersuchungsmodus)
  * — bewusst ohne Preact/DOM-Bezug, damit sie ohne jsdom testbar bleibt.
  */
-
-export const CHAT_MODE_ORDER: readonly ChatMode[] = ['ask', 'investigate'];
-
-/**
- * Untersuchen-Umfang (W7 Punkt 6): "Nur dieses Dashboard" vs. "Gesamte
- * Tableau-Umgebung" — ein zweiter Umschalter, der nur sichtbar ist, wenn der
- * primäre Modus Untersuchen ist (siehe isInvestigateMode) UND
- * features.serverData lizenziert/freigegeben ist. Beide Werte sind reguläre
- * ChatMode-Werte (der Umfang ist der Modus, den der Server sieht).
- */
-export const ESTATE_SCOPE_ORDER: readonly ChatMode[] = ['investigate', 'investigate-estate'];
 
 /** true für 'investigate' UND 'investigate-estate' — beide zeigen die Untersuchen-Ansicht (Plan, mehr Schritte, Fazit). */
 export function isInvestigateMode(mode: ChatMode): boolean {
@@ -28,48 +17,18 @@ export function placeholderKeyForMode(mode: ChatMode): string {
   return 'composer.placeholder';
 }
 
-/** i18n-Key für das Label der primären Segmented-Control-Option (Fragen/Untersuchen). */
-export function modeLabelKey(mode: ChatMode): string {
-  return isInvestigateMode(mode) ? 'composer.mode.investigate' : 'composer.mode.ask';
-}
-
-/** i18n-Key für das Label des Umfangs-Umschalters (W7 Punkt 6). */
-export function scopeLabelKey(scope: ChatMode): string {
-  return scope === 'investigate-estate' ? 'composer.scope.estate' : 'composer.scope.dashboard';
-}
-
-function cycleOrder<T>(order: readonly T[], current: T, key: string): T | null {
-  const idx = order.indexOf(current);
-  switch (key) {
-    case 'ArrowRight':
-    case 'ArrowDown':
-      return order[(idx + 1) % order.length]!;
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      return order[(idx - 1 + order.length) % order.length]!;
-    case 'Home':
-      return order[0]!;
-    case 'End':
-      return order[order.length - 1]!;
-    default:
-      return null;
-  }
+/** Kippschalter "Untersuchen": an → 'investigate' (Umfang Dashboard), aus → 'ask'. */
+export function toggleInvestigate(mode: ChatMode): ChatMode {
+  return isInvestigateMode(mode) ? 'ask' : 'investigate';
 }
 
 /**
- * Tastaturnavigation für die primäre Segmented-Control (role="radiogroup"):
- * Pfeiltasten wechseln zwischen den beiden Modi, Home/End springen an den
- * Anfang/Ende. Gibt null zurück, wenn die Taste die Auswahl nicht ändert
- * (dann soll der Aufrufer die Taste nicht abfangen). Ein aktiver
- * Umgebungs-Umfang ('investigate-estate') zählt dabei als 'investigate'.
+ * Kippschalter "Gesamte Tableau-Umgebung" (W7 Punkt 6): aus = "Nur dieses
+ * Dashboard". Nur sichtbar, wenn der primäre Modus Untersuchen ist (siehe
+ * isInvestigateMode) UND features.serverData lizenziert/freigegeben ist.
+ * Beide Werte sind reguläre ChatMode-Werte (der Umfang ist der Modus, den der
+ * Server sieht).
  */
-export function nextChatMode(current: ChatMode, key: string): ChatMode | null {
-  const base: ChatMode = current === 'investigate-estate' ? 'investigate' : current;
-  return cycleOrder(CHAT_MODE_ORDER, base, key);
-}
-
-/** Tastaturnavigation für den Umfangs-Umschalter (W7 Punkt 6) — analog zu nextChatMode. */
-export function nextEstateScope(current: ChatMode, key: string): ChatMode | null {
-  const base: ChatMode = current === 'investigate-estate' ? 'investigate-estate' : 'investigate';
-  return cycleOrder(ESTATE_SCOPE_ORDER, base, key);
+export function toggleEstateScope(mode: ChatMode): ChatMode {
+  return mode === 'investigate-estate' ? 'investigate' : 'investigate-estate';
 }

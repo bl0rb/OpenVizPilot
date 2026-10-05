@@ -16,7 +16,7 @@
     "@openvizpilot/shared": "*",
     "dompurify": "^3.4.15",
     "marked": "^18.0.13",
-    "preact": "^10.24.0"
+    "preact": "^11.0.0"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.0",

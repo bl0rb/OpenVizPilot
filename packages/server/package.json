@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.3",
     "@hono/zod-validator": "^0.9.1",
     "@openvizpilot/ee": "0.1.0",
     "@openvizpilot/shared": "*",

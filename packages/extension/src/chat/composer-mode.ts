@@ -23,7 +23,7 @@ export function toggleInvestigate(mode: ChatMode): ChatMode {
 }
 
 /**
- * Kippschalter "Gesamte Tableau-Umgebung" (W7 Punkt 6): aus = "Nur dieses
+ * Kippschalter "Gesamte Umgebung" (W7 Punkt 6): aus = "Nur dieses
  * Dashboard". Nur sichtbar, wenn der primäre Modus Untersuchen ist (siehe
  * isInvestigateMode) UND features.serverData lizenziert/freigegeben ist.
  * Beide Werte sind reguläre ChatMode-Werte (der Umfang ist der Modus, den der

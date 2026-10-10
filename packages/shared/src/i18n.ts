@@ -58,7 +58,7 @@ const MESSAGES: Record<SupportedLocale, Record<string, string>> = {
     'composer.mode.investigateTooltip': 'Untersuchen: Analyseplan, mehr Schritte, Fazit mit Hauptursache',
     'composer.scopeLabel': 'Umfang',
     'composer.scope.dashboard': 'Nur dieses Dashboard',
-    'composer.scope.estate': 'Gesamte Tableau-Umgebung',
+    'composer.scope.estate': 'Gesamte Umgebung',
     'composer.scope.estateTooltip': 'Liest bis zu 5 Views anderer Workbooks serverseitig in deinem Namen — nach einmaliger Zustimmung; jede Abfrage steht im Audit.',
     'message.empty.onboardingPrompt': 'Welchen Fokus sollen die Antworten für dieses Dashboard haben?',
     'message.empty.startPrompt': 'Stelle eine Frage zum geöffneten Dashboard — oder starte mit einem Vorschlag:',
@@ -95,12 +95,32 @@ const MESSAGES: Record<SupportedLocale, Record<string, string>> = {
     'settings.apiTokenPlaceholder': '(nur wenn die Middleware einen Token verlangt)',
     'settings.apiTokenHint': 'Dieser Token ersetzt keine persönliche KI-/API-Freigabe — er ist ein optionales, gemeinsames Middleware-Passwort für alle Nutzer dieses Workbooks.',
     'settings.model': 'Modell',
+    'settings.language': 'Sprache',
+    'settings.languageHint': 'Gilt sofort und nur für dich in diesem Browser.',
     'settings.modelDefault': 'Standard ({label})',
     'settings.modelDefaultFallback': 'Standard ({label})',
     'settings.modelServerDefault': 'Server-Default',
     'settings.dashboardContext': 'Dashboard-Kontext / Glossar (für alle Nutzer dieses Workbooks)',
     'settings.dashboardContextPlaceholder': 'z. B. KPI-Definitionen, Abkürzungen, fachliche Hinweise…',
     'settings.dashboardContextHint': 'Personalisiert Antworten inhaltlich (Begriffe, Schwerpunkte) — ändert keine Sicherheitsregeln. Speichern ins Workbook ist nur im Bearbeitungsmodus möglich.',
+    'settings.maxToolRounds': 'Max. Tool-Runden pro Antwort (für dieses Dashboard)',
+    'settings.maxToolRoundsPlaceholder': 'Standard (je Modus {ask} / {investigate} / {estate})',
+    'settings.maxToolRoundsHint': 'Begrenzt, wie oft das Modell pro Frage Werkzeuge aufrufen darf ({min}–{max}). Leer = Standard.',
+    'common.cancel': 'Abbrechen',
+    'app.confirm.resetRegistrationTitle': 'Dashboard-Zuordnung zurücksetzen?',
+    'app.confirm.mcpTitle': 'Externe Datenübertragung freigeben?',
+    'app.confirm.mcpAccept': 'Freigeben',
+    'app.transcript.question': 'Frage',
+    'app.transcript.step': 'Analyse-Schritt',
+    'message.tool.groupSummary': '{count} Analyse-Schritte',
+    'message.savedStandardTitle': 'Bereits als Standardfrage gespeichert',
+    'message.args.rows': '{count} Zeilen',
+    'message.args.columns': '{count} Spalten',
+    'settings.dashboardSectionTitle': 'Dieses Dashboard',
+    'settings.viewerSessionHint': 'Gilt nur für diese Sitzung — ins Workbook speichern können nur Autoren im Bearbeitungsmodus.',
+    'settings.maxToolRoundsInvalid': 'Bitte eine ganze Zahl von {min} bis {max} eingeben oder leer lassen.',
+    'settings.connectionTitle': 'Verbindung (Backend-URL, API-Token)',
+    'settings.unsavedChanges': 'Ungespeicherte Änderungen',
     'settings.save': 'Speichern',
     'settings.saving': 'Speichert …',
     'settings.saved': 'Gespeichert.',
@@ -263,7 +283,7 @@ const MESSAGES: Record<SupportedLocale, Record<string, string>> = {
     'composer.mode.investigateTooltip': 'Investigate: analysis plan, more steps, conclusion with a root cause',
     'composer.scopeLabel': 'Scope',
     'composer.scope.dashboard': 'Only this dashboard',
-    'composer.scope.estate': 'Entire Tableau environment',
+    'composer.scope.estate': 'Entire environment',
     'composer.scope.estateTooltip': 'Reads up to 5 views from other workbooks server-side on your behalf — after a one-time consent; every query is logged in the audit trail.',
     'message.empty.onboardingPrompt': 'Which focus should the answers for this dashboard have?',
     'message.empty.startPrompt': 'Ask a question about the open dashboard — or start from a suggestion:',
@@ -300,11 +320,31 @@ const MESSAGES: Record<SupportedLocale, Record<string, string>> = {
     'settings.apiTokenPlaceholder': '(only if the middleware requires a token)',
     'settings.apiTokenHint': 'This token does not replace a personal AI/API approval — it is an optional shared middleware password for all users of this workbook.',
     'settings.model': 'Model',
+    'settings.language': 'Language',
+    'settings.languageHint': 'Applies immediately and only to you in this browser.',
     'settings.modelDefault': 'Default ({label})',
     'settings.modelServerDefault': 'Server default',
     'settings.dashboardContext': 'Dashboard context / glossary (for all users of this workbook)',
     'settings.dashboardContextPlaceholder': 'e.g. KPI definitions, abbreviations, domain hints…',
     'settings.dashboardContextHint': 'Adds content-level personalization (terms, emphasis) — it does not change security rules. Saving into the workbook is only possible in edit mode.',
+    'settings.maxToolRounds': 'Max tool rounds per answer (for this dashboard)',
+    'settings.maxToolRoundsPlaceholder': 'Default ({ask} / {investigate} / {estate} by mode)',
+    'settings.maxToolRoundsHint': 'Limits how often the model may call tools per question ({min}–{max}). Empty = default.',
+    'common.cancel': 'Cancel',
+    'app.confirm.resetRegistrationTitle': 'Reset dashboard assignment?',
+    'app.confirm.mcpTitle': 'Allow external data transfer?',
+    'app.confirm.mcpAccept': 'Allow',
+    'app.transcript.question': 'Question',
+    'app.transcript.step': 'Analysis step',
+    'message.tool.groupSummary': '{count} analysis steps',
+    'message.savedStandardTitle': 'Already saved as a starter question',
+    'message.args.rows': '{count} rows',
+    'message.args.columns': '{count} columns',
+    'settings.dashboardSectionTitle': 'This dashboard',
+    'settings.viewerSessionHint': 'Applies to this session only — only authors in edit mode can save to the workbook.',
+    'settings.maxToolRoundsInvalid': 'Enter a whole number from {min} to {max}, or leave empty.',
+    'settings.connectionTitle': 'Connection (backend URL, API token)',
+    'settings.unsavedChanges': 'Unsaved changes',
     'settings.save': 'Save',
     'settings.saving': 'Saving …',
     'settings.saved': 'Saved.',
@@ -421,7 +461,15 @@ export function normalizeLocale(locale?: string | null): SupportedLocale {
   return 'en';
 }
 
+/** Vom Nutzer gewählte Sprache (Extension) — hat Vorrang vor der Browsersprache, die in Tableau meist Englisch ist. */
+let localeOverride: SupportedLocale | null = null;
+
+export function setLocaleOverride(locale: SupportedLocale | null): void {
+  localeOverride = locale;
+}
+
 export function getCurrentLocale(): SupportedLocale {
+  if (localeOverride) return localeOverride;
   const navigatorLike = globalThis as typeof globalThis & { navigator?: { language?: string } };
   if (typeof navigatorLike.navigator?.language === 'string') {
     return normalizeLocale(navigatorLike.navigator.language);

@@ -1,5 +1,5 @@
 import { MAX_MESSAGE_CHARS, t, type ChatMode, type SlashCommand } from '@openvizpilot/shared';
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   isInvestigateMode,
   placeholderKeyForMode,
@@ -24,6 +24,24 @@ export function Composer(props: {
   const [text, setText] = useState('');
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mitwachsendes Eingabefeld (2 bis ca. 6 Zeilen), danach scrollt es.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight + 2, 120)}px`;
+  }, [text]);
+
+  // Erklärung des aktiven Modus als sichtbarer Text statt nur im Tooltip
+  // (per Tastatur/Touch sonst unerreichbar — UI-Review P0).
+  const modeHint =
+    props.mode === 'investigate-estate'
+      ? t('composer.scope.estateTooltip')
+      : isInvestigateMode(props.mode)
+        ? t('composer.mode.investigateTooltip')
+        : null;
 
   // Slash-Menü: sichtbar, solange nur der Befehlsname getippt wird
   // (bis zum ersten Leerzeichen) und es passende Befehle gibt.
@@ -81,6 +99,7 @@ export function Composer(props: {
           disabled={props.disabled}
           class="mode-toggle"
           title={t('composer.mode.investigateTooltip')}
+          aria-describedby="composer-mode-desc-investigate"
           onClick={() => props.onModeChange(toggleInvestigate(props.mode))}
         >
           <span class="mode-toggle-track" aria-hidden="true" />
@@ -96,6 +115,7 @@ export function Composer(props: {
             disabled={props.disabled || !isInvestigateMode(props.mode)}
             class="mode-toggle"
             title={t('composer.scope.estateTooltip')}
+            aria-describedby="composer-mode-desc-estate"
             onClick={() => props.onModeChange(toggleEstateScope(props.mode))}
           >
             <span class="mode-toggle-track" aria-hidden="true" />
@@ -103,22 +123,28 @@ export function Composer(props: {
           </button>
         )}
       </div>
+      <span id="composer-mode-desc-investigate" class="sr-only">{t('composer.mode.investigateTooltip')}</span>
+      <span id="composer-mode-desc-estate" class="sr-only">{t('composer.scope.estateTooltip')}</span>
+      {modeHint && <p class="mode-hint">{modeHint}</p>}
       <div class="composer-input-row">
         <textarea
+          ref={textareaRef}
           value={text}
           disabled={props.disabled}
           placeholder={t(placeholderKeyForMode(props.mode))}
           aria-label={t(placeholderKeyForMode(props.mode))}
-          role="combobox"
-          aria-haspopup="listbox"
+          // Kein role="combobox": ein <textarea> darf laut ARIA in HTML nur
+          // "textbox" sein (Preact 11 typisiert das so). Autovervollständigung
+          // wird über aria-autocomplete/-controls/-activedescendant angesagt.
           aria-autocomplete="list"
-          aria-expanded={menu.length > 0}
-          aria-controls="composer-slash-menu"
+          aria-controls={menu.length > 0 ? 'composer-slash-menu' : undefined}
           aria-activedescendant={menu.length > 0 ? `slash-option-${menuIndex}` : undefined}
           rows={2}
           maxLength={MAX_MESSAGE_CHARS}
           onInput={(e) => updateText((e.target as HTMLTextAreaElement).value)}
           onKeyDown={(e) => {
+            // Enter während einer IME-Komposition bestätigt nur die Eingabe.
+            if (e.isComposing) return;
             if (menu.length > 0) {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();

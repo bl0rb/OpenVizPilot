@@ -19,3 +19,6 @@ keys/
 
 # Artefakte lokaler Browser-Werkzeuge
 .playwright-mcp/
+
+# Locally generated campaign assets
+output/

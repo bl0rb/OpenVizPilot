@@ -112,7 +112,7 @@ Extension. Details zu Fehlercodes, Endpunkten und dem Audit-Log stehen in
 
 ## Datenquellen abfragen aktivieren (W8)
 
-Damit der Chat (vor allem der Untersuchen-Modus „Gesamte Tableau-Umgebung“) veröffentlichte
+Damit der Chat (vor allem der Untersuchen-Modus „Gesamte Umgebung“) veröffentlichte
 Datenquellen mit eigenen Abfragen lesen kann, je Site zusätzlich den Schalter **„Datenquellen
 abfragen“** aktivieren. Voraussetzungen:
 

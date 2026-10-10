@@ -1,4 +1,4 @@
-import type { Suggestions } from '@openvizpilot/shared';
+import { t, type Suggestions } from '@openvizpilot/shared';
 import type { WatchRuleProposal } from '@openvizpilot/ee/extension';
 
 /** UI-Modell des Chat-Verlaufs (nicht identisch mit der LLM-Historie). */
@@ -41,9 +41,9 @@ export function summarizeToolArgs(argsJson: string): string | undefined {
     const args = JSON.parse(argsJson) as Record<string, unknown>;
     const parts: string[] = [];
     if (typeof args.worksheet === 'string') parts.push(`„${args.worksheet}"`);
-    if (typeof args.maxRows === 'number') parts.push(`${args.maxRows} Zeilen`);
+    if (typeof args.maxRows === 'number') parts.push(t('message.args.rows', undefined, { count: args.maxRows }));
     if (Array.isArray(args.columns) && args.columns.length > 0) {
-      parts.push(`${args.columns.length} Spalten`);
+      parts.push(t('message.args.columns', undefined, { count: args.columns.length }));
     }
     return parts.length > 0 ? parts.join(' · ') : undefined;
   } catch {

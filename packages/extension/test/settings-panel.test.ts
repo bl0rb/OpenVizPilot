@@ -7,6 +7,7 @@ const saved: ExtensionSettings = {
   model: 'gpt',
   apiToken: 'tok',
   dashboardContext: 'Kontext',
+  maxToolRounds: '',
 };
 
 // UI-Review P1-3: nur bei tatsächlich ungespeicherten Eingaben soll "Zurück

@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { t } from '@openvizpilot/shared';
 import { eventType, getTableau, type FormattingSheet } from './tableau/api';
 import { applyWorkbookFormatting } from './tableau/formatting';
+import { applyLocale, loadStoredLocale } from './locale';
 import { App } from './ui/App';
 import './ui/styles.css';
 
@@ -26,6 +27,9 @@ function showFatal(root: HTMLElement, message: string): void {
 async function bootstrap(): Promise<void> {
   const root = document.getElementById('app');
   if (!root) return;
+  // Gewählte Sprache vor dem ersten Rendern setzen — auch Startfehler erscheinen dann darin.
+  const storedLocale = loadStoredLocale();
+  if (storedLocale) applyLocale(storedLocale);
 
   const useMock = import.meta.env.MODE === 'mock' || import.meta.env.VITE_MOCK === '1';
   if (useMock) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isAllowedBackendUrl, loadSettings, saveSettings } from '../src/settings';
+import { isAllowedBackendUrl, isValidMaxToolRounds, loadSettings, parseMaxToolRounds, saveSettings } from '../src/settings';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -25,7 +25,7 @@ describe('isAllowedBackendUrl', () => {
 });
 
 describe('saveSettings', () => {
-  const settings = { backendUrl: '', model: '', apiToken: '', dashboardContext: '' };
+  const settings = { backendUrl: '', model: '', apiToken: '', dashboardContext: '', maxToolRounds: '' };
 
   it('reports a localized message and does not persist for an invalid backend URL', async () => {
     const { save } = tableau();
@@ -52,6 +52,17 @@ describe('saveSettings', () => {
 describe('loadSettings', () => {
   it('falls back to empty settings when the tableau global is unavailable', () => {
     vi.unstubAllGlobals();
-    expect(loadSettings()).toEqual({ backendUrl: '', model: '', apiToken: '', dashboardContext: '' });
+    expect(loadSettings()).toEqual({ backendUrl: '', model: '', apiToken: '', dashboardContext: '', maxToolRounds: '' });
+  });
+});
+
+describe('maxToolRounds', () => {
+  it('accepts empty or whole numbers from 1 to 50 only', () => {
+    expect(['', ' ', '1', '50'].every(isValidMaxToolRounds)).toBe(true);
+    expect(['0', '51', 'abc', '2.5', '-3'].some(isValidMaxToolRounds)).toBe(false);
+  });
+  it('parses to undefined for empty input', () => {
+    expect(parseMaxToolRounds('')).toBeUndefined();
+    expect(parseMaxToolRounds('8')).toBe(8);
   });
 });

@@ -74,10 +74,13 @@ Rohzeilen der View.
 
 - **Webhook**: `POST` mit JSON-Payload, ausschließlich HTTPS, 10 Sekunden Timeout, keine
   Weiterleitungen. Das Ziel muss zur admin-verwalteten Host-Allowlist passen (exakter Host oder
-  Suffix, Default `webhook.office.com` und `logic.azure.com`) und darf kein privates Netz sein
+  Suffix, Default `webhook.office.com`, `logic.azure.com` und `environment.api.powerplatform.com`
+  für Teams-Workflows) und darf kein privates Netz sein
   (RFC1918, CGNAT, `localhost`, Link-Local, IPv6-ULA — dieselbe Adressprüfung wie beim
   Tableau-Server-Transport; die Allowlist wird bei jeder Zustellung erneut geprüft).
-- **Microsoft Teams**: ein Incoming Webhook (gleiche Host-Regel wie oben) mit einer Adaptive Card
+- **Microsoft Teams**: ein Incoming Webhook bzw. Teams-Workflow „Bei Empfang einer Webhookanforderung
+  in einem Kanal posten“ (gleiche Host-Regel wie oben; Installationen mit gespeicherten Watch-Einstellungen
+  tragen `environment.api.powerplatform.com` selbst in die Allowlist ein) mit einer Adaptive Card
   (Titel, Fakten für Wert/Schwelle/Zeitpunkt, Button „Analyse öffnen“).
 - **E-Mail**: nur wenn die Admin-Einstellung „E-Mail-Versand“ aktiv **und** SMTP konfiguriert ist
   (`OVP_SMTP_URL`, `OVP_SMTP_FROM` — siehe unten). Betreff `[OpenVizPilot] <Regelname>`, Text- und

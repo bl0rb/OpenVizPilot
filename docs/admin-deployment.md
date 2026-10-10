@@ -118,7 +118,7 @@ umkehrbares Pseudonym, Site, View, Zeilenzahl, Dauer, Status), 90 Tage lang, ein
 unter „Tableau Server“. Widerruf: Freigabe „Serverdaten“ abschalten löscht zusätzlich die
 gespeicherte Einwilligung — die Person muss danach erneut zustimmen.
 
-Die **umgebungsweite Untersuchung** (Untersuchen-Modus, Umfang „Gesamte Tableau-Umgebung“, W7)
+Die **umgebungsweite Untersuchung** (Untersuchen-Modus, Umfang „Gesamte Umgebung“, W7)
 nutzt denselben Pfad und dieselben drei Hürden: das Modell darf dabei höchstens 5 Views pro Turn
 lesen, und die Route begrenzt zusätzlich auf höchstens 8 `tableau_view_data`-Aufrufe je Person und
 Dashboard innerhalb von 2 Minuten (`429 budget_exhausted`) — ein reiner Schutz vor Endlosschleifen

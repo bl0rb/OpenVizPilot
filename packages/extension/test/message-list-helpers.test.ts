@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  groupToolItems,
   INITIAL_LIVE_ANNOUNCEMENT,
   isNearBottom,
   nextLiveAnnouncement,
@@ -63,5 +64,14 @@ describe('nextLiveAnnouncement', () => {
   it('leaves the announcement unchanged when there is no assistant message yet', () => {
     const userOnly: ChatItem = { kind: 'user', id: 2, text: 'hi' };
     expect(nextLiveAnnouncement(INITIAL_LIVE_ANNOUNCEMENT, [userOnly])).toBe(INITIAL_LIVE_ANNOUNCEMENT);
+  });
+});
+
+describe('groupToolItems', () => {
+  const tool = (id: number): ChatItem => ({ kind: 'tool', id, callId: `c${id}`, name: 'get_filters', status: 'done' });
+  it('groups consecutive tool steps and keeps single steps as items', () => {
+    const blocks = groupToolItems([tool(1), tool(2), { kind: 'notice', id: 3, text: 'x' }, tool(4)]);
+    expect(blocks.map((b) => b.kind)).toEqual(['tool-group', 'item', 'item']);
+    expect(blocks[0]?.kind === 'tool-group' && blocks[0].tools.length).toBe(2);
   });
 });

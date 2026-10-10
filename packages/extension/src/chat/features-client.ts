@@ -14,7 +14,7 @@ export interface EeFeatures {
   actions: boolean;
   /** OpenViz Watch (W6): Dashboards beobachten und bei Auffälligkeiten melden — setzt serverData voraus. */
   watch: boolean;
-  /** Serverseitiger Datenzugriff (W5) je Person freigegeben + lizenziert — schaltet u. a. den Untersuchen-Umfang „Gesamte Tableau-Umgebung" frei (W7). */
+  /** Serverseitiger Datenzugriff (W5) je Person freigegeben + lizenziert — schaltet u. a. den Untersuchen-Umfang „Gesamte Umgebung" frei (W7). */
   serverData: boolean;
 }
 

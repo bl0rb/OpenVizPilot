@@ -3,6 +3,7 @@ import { WatchProposalCard, type WatchRuleProposal } from '@openvizpilot/ee/exte
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { buildMarkdownExport, type ChatItem } from './items';
 import { renderMarkdown } from './markdown';
+import { Icon } from './icons';
 
 /** Ab welchem Abstand zum unteren Rand (px) automatisches Folgen aktiv bleibt (P1 Nr. 1). */
 export const STICK_TO_BOTTOM_THRESHOLD_PX = 40;
@@ -58,6 +59,51 @@ function downloadMarkdown(filename: string, content: string): void {
 }
 
 type AssistantItem = Extract<ChatItem, { kind: 'assistant' }>;
+type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
+
+export type RenderBlock = { kind: 'item'; item: ChatItem } | { kind: 'tool-group'; id: number; tools: ToolItem[] };
+
+/**
+ * Fasst aufeinanderfolgende Analyse-Schritte zu einer Gruppe zusammen, damit
+ * lange Untersuchungen (bis zu 50 Tool-Runden) den Verlauf nicht fluten
+ * (UI-Review P1). Einzelne Schritte bleiben eigenständig.
+ */
+export function groupToolItems(items: ChatItem[]): RenderBlock[] {
+  const blocks: RenderBlock[] = [];
+  let run: ToolItem[] = [];
+  const flush = () => {
+    if (run.length === 1) blocks.push({ kind: 'item', item: run[0]! });
+    else if (run.length > 1) blocks.push({ kind: 'tool-group', id: run[0]!.id, tools: run });
+    run = [];
+  };
+  for (const item of items) {
+    if (item.kind === 'tool') {
+      run.push(item);
+      continue;
+    }
+    flush();
+    blocks.push({ kind: 'item', item });
+  }
+  flush();
+  return blocks;
+}
+
+function ToolStep(props: { item: ToolItem }) {
+  const { item } = props;
+  return (
+    <details class={`tool-chip tool-${item.status}`}>
+      <summary>
+        {item.status === 'running' ? <span class="spinner" aria-hidden="true" /> : <Icon name="check" />}{' '}
+        {toolStepLabel(item.name)}
+        <span class="tool-state"> · {item.status === 'running' ? t('message.tool.running') : t('message.tool.done')}</span>
+        {item.argsSummary && <span class="tool-args"> · {item.argsSummary}</span>}
+      </summary>
+      {/* Technischer Tool-Name bleibt in den ausklappbaren Details (P2 Nr. 9). */}
+      <div class="tool-tech">{item.name}</div>
+      {item.preview && <pre>{item.preview}</pre>}
+    </details>
+  );
+}
 
 export interface LiveAnnouncement {
   /** id der Assistant-Message, für die zuletzt „wird erstellt“ gemeldet wurde (null = keine offene Meldung). */
@@ -110,6 +156,8 @@ export function MessageList(props: {
   onAction: (action: DashboardAction) => void;
   /** Speichert eine User-Frage als Standardfrage (☆-Button); undefined = kein Button (keine User-ID). */
   onSaveStandard?: (text: string) => void;
+  /** Bereits gespeicherte Standardfragen — deren Stern erscheint gefüllt. */
+  savedQuestions?: string[];
   /** OpenViz Watch (W6): nur gesetzt, wenn das Feature lizenziert ist (Defense in Depth zum Server-Gate) — sonst erscheint nie eine Karte. */
   watch?: {
     signedInEmail?: string;
@@ -203,24 +251,47 @@ export function MessageList(props: {
           )}
         </div>
       )}
-      {props.items.map((item) => {
+      {groupToolItems(props.items).map((block) => {
+        if (block.kind === 'tool-group') {
+          const running = block.tools.find((tool) => tool.status === 'running');
+          return (
+            <details key={`g${block.id}`} class={`tool-chip tool-group${running ? ' tool-running' : ''}`}>
+              <summary>
+                {running ? <span class="spinner" aria-hidden="true" /> : <Icon name="check" />}{' '}
+                {t('message.tool.groupSummary', undefined, { count: block.tools.length })}
+                {running && <span class="tool-state"> · {toolStepLabel(running.name)}</span>}
+              </summary>
+              <div class="tool-group-list">
+                {block.tools.map((tool) => (
+                  <ToolStep key={tool.id} item={tool} />
+                ))}
+              </div>
+            </details>
+          );
+        }
+        const item = block.item;
         switch (item.kind) {
           case 'user':
             return (
               <div key={item.id} class="msg-row-user">
                 <div class="msg msg-user">{item.text}</div>
-                {props.onSaveStandard && (
-                   <button
-                  type="button"
-                  class="btn-icon btn-star"
-                  title={t('message.saveStandardTitle')}
-                  aria-label={t('message.saveStandardTitle')}
-                  disabled={props.busy}
-                  onClick={() => props.onSaveStandard?.(item.text)}
-                   >
-                    ☆
-                  </button>
-                )}
+                {props.onSaveStandard && (() => {
+                  const saved = props.savedQuestions?.some((q) => q.trim() === item.text.trim()) ?? false;
+                  const label = saved ? t('message.savedStandardTitle') : t('message.saveStandardTitle');
+                  return (
+                    <button
+                      type="button"
+                      class={`btn-icon btn-star${saved ? ' btn-star-saved' : ''}`}
+                      title={label}
+                      aria-label={label}
+                      aria-pressed={saved}
+                      disabled={props.busy || saved}
+                      onClick={() => props.onSaveStandard?.(item.text)}
+                    >
+                      <Icon name="star" filled={saved} />
+                    </button>
+                  );
+                })()}
               </div>
             );
           case 'assistant': {
@@ -230,7 +301,8 @@ export function MessageList(props: {
               <div key={item.id} class="assistant-group">
                 <div class="msg msg-assistant">
                   {item.text === '' ? (
-                   <span class="thinking" role="status" aria-live="polite">{t('message.thinking')}</span>
+                   // Kein eigenes role="status": Beginn/Ende meldet die zentrale Live-Region oben.
+                   <span class="thinking">{t('message.thinking')}</span>
                   ) : (
                     <div
                       class="markdown"
@@ -245,16 +317,18 @@ export function MessageList(props: {
                     <button
                       type="button"
                       class="btn-icon btn-download"
+                      title={t('message.downloadMarkdown')}
+                      aria-label={t('message.downloadMarkdown')}
                       onClick={() => {
                         const { filename, content } = buildMarkdownExport(item);
                         downloadMarkdown(filename, content);
                       }}
                     >
-                      {t('message.downloadMarkdown')}
+                      <Icon name="download" />
                     </button>
                     {item.verifiedMetrics?.map((name) => (
                       <span key={name} class="verified-metric" role="note">
-                        ✓ {t('message.verifiedMetric')}: {name}
+                        <Icon name="check" /> {t('message.verifiedMetric')}: {name}
                       </span>
                     ))}
                   </div>
@@ -271,19 +345,7 @@ export function MessageList(props: {
             );
           }
           case 'tool':
-            return (
-              <details key={item.id} class={`tool-chip tool-${item.status}`}>
-                <summary>
-                  <span aria-hidden="true">{item.status === 'running' ? '⚙️' : '✓'}</span>{' '}
-                  {toolStepLabel(item.name)}
-                  <span class="tool-state"> · {item.status === 'running' ? t('message.tool.running') : t('message.tool.done')}</span>
-                  {item.argsSummary && <span class="tool-args"> · {item.argsSummary}</span>}
-                </summary>
-                {/* Technischer Tool-Name bleibt in den ausklappbaren Details (P2 Nr. 9). */}
-                <div class="tool-tech">{item.name}</div>
-                {item.preview && <pre>{item.preview}</pre>}
-              </details>
-            );
+            return <ToolStep key={item.id} item={item} />;
           case 'suggestions':
             return (
               <div key={item.id} class="chips-row">
@@ -295,7 +357,7 @@ export function MessageList(props: {
                     disabled={props.busy}
                     onClick={() => props.onAction(a)}
                   >
-                    <span class="chip-label">⚡ {a.label}</span>
+                    <span class="chip-label"><Icon name="zap" /> {a.label}</span>
                     <span class="chip-detail">{describeAction(a)}</span>
                   </button>
                 ))}

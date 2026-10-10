@@ -99,7 +99,7 @@ export async function executeMcpTool(_input: {
   baseUrl: string;
   apiToken?: string;
   signal?: AbortSignal;
-  confirm: (message: string) => boolean;
+  confirm: (message: string) => boolean | Promise<boolean>;
 }): Promise<string> {
   return 'Nicht verfügbar in der Core-Edition.';
 }

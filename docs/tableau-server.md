@@ -65,7 +65,7 @@ Dauer, Status, Zweck. Nie Klartext-Nutzer, nie die gelesenen Daten selbst. Einse
 
 ### Umgebungsweite Untersuchung (W7, Cross-Dashboard)
 
-Im Untersuchen-Modus kann die Extension den Umfang „Gesamte Tableau-Umgebung“ wählen
+Im Untersuchen-Modus kann die Extension den Umfang „Gesamte Umgebung“ wählen
 (`mode: 'investigate-estate'`, `packages/shared/src/schemas.ts`). Der Kern hängt dafür zusätzlich
 `INVESTIGATE_ESTATE_PROMPT_SECTION` an — aber NUR wenn dieselben Hürden wie oben (Lizenz-Feature
 `serverData` UND Freigabe der Person) erfüllt sind; sonst wird der Modus serverseitig auf

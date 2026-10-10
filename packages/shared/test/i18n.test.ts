@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLocale, t } from '../src/i18n';
+import { getCurrentLocale, normalizeLocale, setLocaleOverride, t } from '../src/i18n';
 
 describe('i18n helpers', () => {
   it('normalizes German and English locales', () => {
@@ -16,5 +16,14 @@ describe('i18n helpers', () => {
   it('interpolates placeholders', () => {
     expect(t('app.starters.worksheet', 'de', { name: 'Revenue' })).toBe('Was zeigt „Revenue”?');
     expect(t('app.starters.worksheet', 'en', { name: 'Revenue' })).toBe('What does “Revenue” show?');
+  });
+
+  it('prefers the language chosen in the extension over the browser language', () => {
+    setLocaleOverride('de');
+    expect(getCurrentLocale()).toBe('de');
+    expect(t('settings.language')).toBe('Sprache');
+    setLocaleOverride('en');
+    expect(t('settings.language')).toBe('Language');
+    setLocaleOverride(null);
   });
 });

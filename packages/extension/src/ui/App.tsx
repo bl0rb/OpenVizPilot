@@ -7,6 +7,7 @@ import {
   type SlashCommand,
   type ToolCall,
   type ModelOption,
+  type SupportedLocale,
 } from '@openvizpilot/shared';
 // Personalisierung (User-Memory, gespeicherte eigene Abfragen) ist eine
 // Enterprise-Funktion: Schema, Regeln und Client liegen in ee/.
@@ -25,7 +26,8 @@ import { ChatSession } from '../chat/agent-loop';
 import { ensureDashboardKey, registerDashboard } from '../tableau/dashboard-registration';
 import { loadSlashCommands, sendUsageEvents } from '../chat/commands-client';
 import { expandSlashCommand } from '../chat/slash-commands';
-import { isAllowedBackendUrl, loadSettings, saveSettings, type ExtensionSettings } from '../settings';
+import { isAllowedBackendUrl, loadSettings, parseMaxToolRounds, saveSettings, type ExtensionSettings } from '../settings';
+import { chooseLocale, loadStoredLocale } from '../locale';
 import { executeDashboardAction } from '../tableau/actions';
 import { getTableau, type Dashboard } from '../tableau/api';
 import { buildContextSnapshot } from '../tableau/context-snapshot';
@@ -35,12 +37,15 @@ import { createServerDataConsentGate, executeMcpTool, executeTableauTool, Server
 import { setConfigureHandler } from '../main';
 import { reducer } from './chat-reducer';
 import { Composer } from './Composer';
+import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';
+import { Icon } from './icons';
 import { summarizeToolArgs } from './items';
 import { MessageList } from './MessageList';
 import { SettingsPanel } from './SettingsPanel';
 import type { AuthConfigResponse, AuthSession } from '@openvizpilot/shared';
 import { clearSession, fetchAuthConfig, fetchUserAccess, isAuthRequiredError, loadSession, logoutRemote, saveSession, type UserAccess } from '../chat/auth-session';
 import { fetchFeatures, NO_EE_FEATURES, type EeFeatures } from '../chat/features-client';
+import { LanguageChooser } from './LanguageChooser';
 import { LoginGate } from './LoginGate';
 
 /** Ladezustand der Dashboard-Präferenzen — siehe Kommentar bei useState unten. */
@@ -53,6 +58,13 @@ export function App(props: { dashboard: Dashboard }) {
   const { dashboard } = props;
   const [items, dispatch] = useReducer(reducer, []);
   const [busy, setBusy] = useState(false);
+  // Sprache: beim ersten Start fragen (null), danach gespeichert — siehe locale.ts.
+  // Der Zustand löst beim Wechsel das Neurendern aller t()-Texte aus.
+  const [locale, setLocale] = useState<SupportedLocale | null>(() => loadStoredLocale());
+  const changeLocale = useCallback((next: SupportedLocale) => {
+    chooseLocale(next);
+    setLocale(next);
+  }, []);
   // Fragen vs. Untersuchen (W3) — Session-Zustand, optional über localStorage
   // gemerkt (wie andere reine Viewer-Präferenzen); scheitert das (privates
   // Fenster, deaktiviertes Storage), gilt einfach der Default 'ask'.
@@ -98,6 +110,14 @@ export function App(props: { dashboard: Dashboard }) {
     [],
   );
   const consentGateRef = useRef(createServerDataConsentGate(showServerDataConsentDialog));
+  // Bestätigungen (Zuordnung zurücksetzen, MCP-Freigabe) laufen über einen
+  // eigenen <dialog> statt window.confirm — siehe ConfirmDialog.tsx.
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const askConfirm = useCallback(
+    (title: string, message: string, confirmLabel: string) =>
+      new Promise<boolean>((resolve) => setConfirmRequest({ title, message, confirmLabel, resolve })),
+    [],
+  );
   // Zentral (Admin-UI) verwaltete Slash-Befehle — Fallback: eingebaute
   // Defaults, solange der Server nicht erreichbar ist oder nichts
   // konfiguriert hat (siehe commands-client.ts).
@@ -105,16 +125,17 @@ export function App(props: { dashboard: Dashboard }) {
   // Starter aus dem Admin-Playbook dieses Dashboards (vor den generischen).
   const [playbookStarters, setPlaybookStarters] = useState<string[]>([]);
   const [playbookKey, setPlaybookKey] = useState<string | null>(null);
-  const [registrationMessage, setRegistrationMessage] = useState(t('app.registration.loading'));
+  // i18n-Schlüssel statt fertigem Text — folgt so einem Sprachwechsel in den Einstellungen.
+  const [registrationMessageKey, setRegistrationMessage] = useState('app.registration.loading');
 
   useEffect(() => {
     let cancelled = false;
     void ensureDashboardKey().then((key) => {
       if (cancelled) return;
       setPlaybookKey(key);
-      if (!key) setRegistrationMessage(t('app.registration.dashboardCopyHint'));
+      if (!key) setRegistrationMessage('app.registration.dashboardCopyHint');
     }).catch(() => {
-      if (!cancelled) setRegistrationMessage(t('app.registration.saveFailed'));
+      if (!cancelled) setRegistrationMessage('app.registration.saveFailed');
     });
     return () => { cancelled = true; };
   }, [dashboard]);
@@ -328,8 +349,8 @@ export function App(props: { dashboard: Dashboard }) {
         if (playbookKey) {
           const registered = await registerDashboard(baseUrl, apiToken || undefined, playbookKey, dashboard);
           if (!cancelled) setRegistrationMessage(registered
-           ? t('app.registration.available')
-           : t('app.registration.unavailable'));
+           ? 'app.registration.available'
+           : 'app.registration.unavailable');
         }
         if (cancelled) return;
         const loaded = await loadSlashCommands(baseUrl, apiToken || undefined, playbookKey || undefined);
@@ -425,11 +446,12 @@ export function App(props: { dashboard: Dashboard }) {
             answerFocus,
             dashboardKey: dashboardKey || undefined,
             mode,
+            maxToolRounds: parseMaxToolRounds(settings.maxToolRounds),
             getContext,
             executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field', 'tableau_view_data', 'tableau_datasource_search', 'tableau_datasource_fields', 'tableau_datasource_query', 'propose_watch_rule'].includes(call.function.name)
               ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined, consent: consentGateRef.current })
               : call.function.name.startsWith('mcp__')
-                ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => window.confirm(message) })
+                ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => askConfirm(t('app.confirm.mcpTitle'), message, t('app.confirm.mcpAccept')) })
                 : executeToolCall(call, dashboard, { baseUrl, apiToken: apiToken || undefined }),
           },
           {
@@ -469,7 +491,7 @@ export function App(props: { dashboard: Dashboard }) {
         )
         .finally(() => setBusy(false));
     },
-    [session, baseUrl, apiToken, settings.model, userId, authorContext, answerFocus, mode, getContext, dashboard, logout, features.actions, authReady],
+    [session, baseUrl, apiToken, settings.model, settings.maxToolRounds, userId, authorContext, answerFocus, mode, getContext, dashboard, logout, features.actions, authReady, askConfirm],
   );
 
   const send = useCallback(
@@ -570,7 +592,7 @@ export function App(props: { dashboard: Dashboard }) {
       ...dedupe(playbookStarters),
       ...dedupe(generic),
     ].slice(0, 3);
-  }, [dashboard, prefs, playbookStarters]);
+  }, [dashboard, prefs, playbookStarters, locale]);
 
   // Speichert eine gestellte Frage als Standardfrage für dieses Dashboard
   // (☆-Button an jeder User-Message, siehe MessageList). undefined ohne
@@ -631,10 +653,10 @@ export function App(props: { dashboard: Dashboard }) {
   const copyTranscript = useCallback(() => {
     const lines: string[] = [`# OpenVizPilot — ${dashboard.name}`, ''];
     for (const item of items) {
-      if (item.kind === 'user') lines.push(`**Frage:** ${item.text}`, '');
+      if (item.kind === 'user') lines.push(`**${t('app.transcript.question')}:** ${item.text}`, '');
       else if (item.kind === 'assistant' && item.text) lines.push(item.text, '');
       else if (item.kind === 'tool') {
-        lines.push(`> Analyse-Schritt: ${item.name}${item.argsSummary ? ` (${item.argsSummary})` : ''}`, '');
+        lines.push(`> ${t('app.transcript.step')}: ${item.name}${item.argsSummary ? ` (${item.argsSummary})` : ''}`, '');
       }
     }
     const markdown = lines.join('\n');
@@ -665,7 +687,7 @@ export function App(props: { dashboard: Dashboard }) {
     } catch {
       report(fallbackCopy());
     }
-  }, [items, dashboard]);
+  }, [items, dashboard, locale]);
 
   const onSaveSettings = useCallback(async (next: ExtensionSettings) => {
     // Erst nach dem Speicherversuch übernehmen (Workbook-Erfolg oder bewusster
@@ -702,7 +724,7 @@ export function App(props: { dashboard: Dashboard }) {
             disabled={busy}
             onClick={copyTranscript}
           >
-            ⧉
+            <Icon name="copy" />
           </button>
         )}
         {authSession && (
@@ -713,7 +735,7 @@ export function App(props: { dashboard: Dashboard }) {
             aria-label={t('app.header.logoutTitle')}
             onClick={logout}
           >
-            ⎋
+            <Icon name="logout" />
           </button>
         )}
         <button
@@ -724,21 +746,27 @@ export function App(props: { dashboard: Dashboard }) {
           // Nur öffnen: ein blindes Umschalten würde die Verwerfen-/
           // Weiterbearbeiten-Entscheidung im Panel umgehen (UI-Review P1-3) —
           // Schließen läuft ausschließlich über "Zurück zum Chat" dort.
+          // Vor der ersten Sprachwahl hätte der Klick keine sichtbare Wirkung.
+          disabled={locale === null}
           onClick={() => setSettingsOpen(true)}
         >
-          ⚙
+          <Icon name="settings" />
         </button>
       </header>
-      {settingsOpen ? (
+      {locale === null ? (
+        <LanguageChooser onChoose={changeLocale} />
+      ) : settingsOpen ? (
         <SettingsPanel
+          locale={locale}
+          onLocaleChange={changeLocale}
           settings={settings}
-          registrationMessage={registrationMessage}
+          registrationMessage={t(registrationMessageKey)}
           registrationKey={playbookKey}
           onResetRegistration={async () => {
-            if (!window.confirm(t('app.confirm.resetRegistration'))) return;
+            if (!(await askConfirm(t('app.confirm.resetRegistrationTitle'), t('app.confirm.resetRegistration'), t('settings.resetRegistrationButton')))) return;
             const key = await ensureDashboardKey(true);
             if (key) { setPlaybookKey(key); setPlaybookStarters([]); }
-            else setRegistrationMessage(t('app.confirm.resetRegistrationDisabled'));
+            else setRegistrationMessage('app.confirm.resetRegistrationDisabled');
           }}
           models={models}
           defaultModel={defaultModel}
@@ -785,6 +813,7 @@ export function App(props: { dashboard: Dashboard }) {
             onSend={send}
             onAction={runDashboardAction}
             onSaveStandard={onSaveStandard}
+            savedQuestions={typeof prefs === 'object' && prefs !== null ? prefs.questions : undefined}
             watch={
               features.watch
                 ? { signedInEmail: authSession?.user.email, onCreate: onCreateWatchRule, onDiscard: onDiscardWatchProposal }
@@ -808,7 +837,7 @@ export function App(props: { dashboard: Dashboard }) {
                 {t('app.selection.evaluate', undefined, { worksheet: selectionIn })}
               </button>
               <button type="button" class="btn-icon" title={t('app.selection.hideTitle')} aria-label={t('app.selection.hideTitle')} onClick={() => setSelectionIn(null)}>
-                ×
+                <Icon name="close" />
               </button>
             </div>
           )}
@@ -824,6 +853,14 @@ export function App(props: { dashboard: Dashboard }) {
           />
         </>
       )}
+      <ConfirmDialog
+        request={confirmRequest}
+        onClose={(accepted) => {
+          const resolve = confirmRequest?.resolve;
+          setConfirmRequest(null);
+          resolve?.(accepted);
+        }}
+      />
       <ServerDataConsentDialog
         open={consentPrompt !== null}
         message={consentPrompt?.message ?? ''}

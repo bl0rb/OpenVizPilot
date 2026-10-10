@@ -68,6 +68,8 @@ export interface AgentDeps {
   dashboardKey?: string;
   /** Untersuchungsmodus vs. normaler Chat (Default 'ask') — steuert Rundenbudget und Server-Prompt-Abschnitt. */
   mode?: ChatMode;
+  /** Überschreibt das Rundenbudget je Modus (Workbook-Einstellung). */
+  maxToolRounds?: number;
   getContext(): Promise<string>;
   executeTool(call: ToolCall, approval?: NonNullable<ToolCallsEventData['external']>[string], signal?: AbortSignal): Promise<string>;
 }
@@ -113,7 +115,7 @@ export class ChatSession {
       }
 
       let toolChoice: 'auto' | 'none' = 'auto';
-      const maxRounds = TOOL_ROUNDS_BY_MODE[deps.mode ?? 'ask'];
+      const maxRounds = deps.maxToolRounds ?? TOOL_ROUNDS_BY_MODE[deps.mode ?? 'ask'];
       for (let round = 1; ; round++) {
         cb.onRoundStart();
         let assistantText = '';

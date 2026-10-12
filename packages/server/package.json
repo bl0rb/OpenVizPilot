@@ -16,7 +16,7 @@
     "@openvizpilot/ee": "0.1.0",
     "@openvizpilot/shared": "*",
     "hono": "^4.13.13",
-    "lucide": "^1.52.0",
+    "lucide": "^1.54.0",
     "openai": "^7.30.0",
     "pg": "^8.23.1",
     "zod": "^4.6.5"

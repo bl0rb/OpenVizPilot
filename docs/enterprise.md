@@ -314,7 +314,7 @@ Lizenzen stellt der WerkWorks-Lizenzgenerator direkt aus (Format, Vertrauensanke
 Upgrade-Hinweis für ältere Lizenzen: [ee/README.md](../ee/README.md)):
 
 ```bash
-certfleet-license generate --product openvizpilot \
+werkworks-license generate --product openvizpilot \
   --licensee "Beispiel GmbH" --tier enterprise --days 365 \
   --out beispiel.openvizpilot-license
 ```

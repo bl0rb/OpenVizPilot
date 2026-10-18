@@ -605,7 +605,7 @@ export const adminPageHtml = `<!doctype html>
         <p id="user-access-banner" class="banner" role="status"></p>
         <div class="user-access-table-wrapper">
           <table id="user-access-table">
-            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Serverdaten</span><span role="tooltip" id="help-access-serverdata" class="help-tip">Erlaubt der Middleware, im Namen dieser Person Summary-Daten von Tableau-Views zu lesen — nur mit Site-Schalter und Einwilligung der Person; jede Abfrage steht im Audit unter Tableau Server.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span></th><th class="col-save"></th></tr></thead>
+            <thead><tr><th>Identität</th><th>E-Mail</th><th>Status</th><th class="col-access has-help" aria-expanded="false"><span class="help-term">AI-Chat</span><span role="tooltip" id="help-access-ai" class="help-tip">Schaltet die Chat-Nutzung frei.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Tableau API</span><span role="tooltip" id="help-access-tableau" class="help-tip">Schaltet den Zugriff auf Tableau-Server-Inhalte aus dem Chat frei; ohne Häkchen weist die Extension die Anfrage ab, auch nach erfolgreicher Anmeldung.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Serverdaten</span><span role="tooltip" id="help-access-serverdata" class="help-tip">Erlaubt der Middleware, im Namen dieser Person Summary-Daten von Tableau-Views zu lesen — nur mit Site-Schalter und Einwilligung der Person; jede Abfrage steht im Audit unter Tableau Server.</span></th><th class="col-access has-help help-left" aria-expanded="false"><span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen und selbst Admins ernennen.</span></th><th class="col-save"></th></tr></thead>
             <tbody id="user-access-body"></tbody>
           </table>
         </div>
@@ -2033,9 +2033,6 @@ export const adminPageHtml = `<!doctype html>
       adminInput.type = 'checkbox';
       adminInput.setAttribute('role', 'switch');
       adminInput.checked = u.admin === true;
-      // Nur der initiale Admin vergibt die Rolle — delegierte Admins sehen den Schalter nur lesend.
-      var canGrantAdmin = Boolean(adminMe && adminMe.role === 'initial');
-      adminInput.disabled = !canGrantAdmin;
       adminInput.setAttribute('aria-label', 'Admin für ' + (u.displayName || u.email || u.id));
       adminLabel.appendChild(adminInput);
       adminCell.appendChild(adminLabel);
@@ -2062,7 +2059,7 @@ export const adminPageHtml = `<!doctype html>
             overviewAccess(users);
           })
           .catch(function (error) { showBanner(userAccessBanner, error.message || 'Zugriff konnte nicht gespeichert werden.', 'error'); })
-          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; serverDataInput.disabled = false; adminInput.disabled = !canGrantAdmin; });
+          .finally(function () { save.disabled = false; aiInput.disabled = false; tableauInput.disabled = false; serverDataInput.disabled = false; adminInput.disabled = false; });
       });
       actions.appendChild(save);
       tr.appendChild(identity);

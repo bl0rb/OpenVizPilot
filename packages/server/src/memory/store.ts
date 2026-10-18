@@ -77,13 +77,13 @@ export interface UserAccess extends UserAccessIdentity {
   id: string;
   ai: boolean;
   tableauApi: boolean;
-  /** Delegierter Admin: darf /admin bedienen, aber die Admin-Rolle nicht vergeben. */
+  /** Delegierter Admin: darf /admin bedienen und die Admin-Rolle vergeben. */
   admin: boolean;
   /**
    * Freigabe „Serverdaten" (W5): erlaubt der Middleware, im Namen dieser
    * Person Summary-Daten von Tableau-Views serverseitig zu lesen — setzt
    * zusätzlich den Site-Schalter und die Einwilligung der Person voraus.
-   * Jeder Admin darf dies setzen (anders als `admin`).
+   * Jeder Admin darf dies setzen.
    */
   serverData: boolean;
 }

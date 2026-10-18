@@ -284,10 +284,9 @@ describe('admin page inline script', () => {
     expect(adminPageHtml).toContain('return loadUsers().then(loadUserAccess)');
   });
 
-  it('shows the admin role switch read-only for delegated admins and announces the signed-in admin', () => {
-    expect(adminPageHtml).toContain('<span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen; Admin-Rolle vergeben kann nur der initiale Admin (Token bzw. Admin-Konto).</span>');
-    expect(adminPageHtml).toContain("var canGrantAdmin = Boolean(adminMe && adminMe.role === 'initial');");
-    expect(adminPageHtml).toContain('adminInput.disabled = !canGrantAdmin;');
+  it('lets every admin use the admin role switch and announces the signed-in admin', () => {
+    expect(adminPageHtml).toContain('<span class="help-term">Admin</span><span role="tooltip" id="help-access-admin" class="help-tip">Darf die Administration bedienen und selbst Admins ernennen.</span>');
+    expect(adminPageHtml).not.toContain('canGrantAdmin');
     expect(adminPageHtml).toContain("adminFetch('/me')");
     expect(adminPageHtml).toContain('<span id="admin-identity" hidden></span>');
     expect(adminPageHtml).toContain("'Angemeldet als ' + me.name");

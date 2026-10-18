@@ -162,11 +162,14 @@ describe.skipIf(EE_STUB)('local user login (open core)', () => {
     const list = (await (await app.request('/api/admin/user-access', { headers: asAnna })).json()) as { users: Array<{ id: string; admin: boolean }> };
     expect(list.users.find((u) => u.id === idOf('anna'))?.admin).toBe(true);
 
-    // Delegierter Admin: Freigaben ja, Admin-Rolle nein — weder vergeben noch (sich selbst) entziehen.
-    const grant = await put(asAnna, idOf('bob'), { ai: true, tableauApi: false, admin: true });
-    expect(grant.status).toBe(403);
-    expect(((await grant.json()) as { code: string }).code).toBe('initial_admin_required');
-    expect((await put(asAnna, idOf('anna'), { ai: false, tableauApi: false, admin: false })).status).toBe(403);
+    // Delegierter Admin: vergibt Freigaben und ernennt bzw. entzieht selbst Admins — nur nicht sich selbst.
+    const selfRevoke = await put(asAnna, idOf('anna'), { ai: false, tableauApi: false, admin: false });
+    expect(selfRevoke.status).toBe(403);
+    expect(((await selfRevoke.json()) as { code: string }).code).toBe('self_revoke');
+    expect((await put(asAnna, idOf('anna'), { ai: true, tableauApi: false, admin: true })).status).toBe(200);
+    expect(await instance.memoryStore!.getUserAccess(idOf('anna'))).toMatchObject({ ai: true, admin: true });
+    expect((await put(asAnna, idOf('bob'), { ai: true, tableauApi: false, admin: true })).status).toBe(200);
+    expect(await instance.memoryStore!.getUserAccess(idOf('bob'))).toMatchObject({ ai: true, admin: true });
     expect((await put(asAnna, idOf('bob'), { ai: true, tableauApi: false, admin: false })).status).toBe(200);
     expect((await put(asAnna, idOf('bob'), { ai: true, tableauApi: true })).status).toBe(200);
     expect(await instance.memoryStore!.getUserAccess(idOf('bob'))).toMatchObject({ ai: true, tableauApi: true, admin: false });

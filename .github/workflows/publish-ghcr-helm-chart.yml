@@ -56,6 +56,32 @@ jobs:
           fi
           echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
 
+      # Release-Gate: Chart nur aus einem Core-Export publizieren. Das Chart und
+      # das Enterprise-Image entstehen in zwei Repos; nur der Export-Bot
+      # (enterprise-export-core.yml) setzt den Tag erst, nachdem das
+      # Enterprise-Image gebaut ist. Ein von Hand im Core-Repo gesetzter v*-Tag
+      # (1.7.8: Dependabot-Merge) erzeugte sonst ein Chart ohne passendes
+      # Enterprise-Image → ImagePullBackOff bei image.edition=enterprise.
+      - name: Require a core-export release commit
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          BOT_EMAIL: werkworks-release@users.noreply.github.com
+        run: |
+          TAG="v${VERSION}"
+          git fetch --depth=1 origin "refs/tags/${TAG}:refs/tags/${TAG}" || {
+            echo "::error title=Release-Gate::Tag ${TAG} existiert nicht im Repository."
+            exit 1
+          }
+          SHA="$(git rev-list -n1 "${TAG}")"
+          AUTHOR="$(git log -1 --format=%ae "${SHA}")"
+          SUBJECT="$(git log -1 --format=%s "${SHA}")"
+          if [ "${AUTHOR}" != "${BOT_EMAIL}" ] || [ "${SUBJECT}" != "Core release ${TAG}" ]; then
+            echo "::error title=Release-Gate::Tag ${TAG} zeigt auf '${SUBJECT}' (${AUTHOR}), nicht auf einen Core-Export-Commit. Charts werden nur aus enterprise-export-core.yml publiziert — Tag im Core-Repo nicht von Hand setzen."
+            exit 1
+          fi
+          echo "Release-Gate OK: ${TAG} → ${SHA} (${SUBJECT})"
+
       - name: Install Helm
         shell: bash
         run: |

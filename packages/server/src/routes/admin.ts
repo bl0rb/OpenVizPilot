@@ -160,6 +160,8 @@ export interface AdminPrincipal {
   role: 'initial' | 'delegated';
   name: string;
   provider: 'token' | 'admin' | 'local' | 'oidc';
+  /** Access-Record-ID des delegierten Admins (nicht über /me ausgeliefert). */
+  userId?: string;
 }
 
 export type AdminEnv = { Variables: { adminPrincipal: AdminPrincipal } };
@@ -235,7 +237,7 @@ export function createAdminRoute(
     const record = await resolveUserAccess(memoryStore, identity);
     if (!record) return null;
     if (!record.admin) return 'not_admin';
-    return { role: 'delegated', name: record.displayName || record.email || record.subject, provider: record.provider };
+    return { role: 'delegated', name: record.displayName || record.email || record.subject, provider: record.provider, userId: record.id };
   };
 
   // Weder statisches Token noch Store für den Passwort-Modus: alles 404.
@@ -383,7 +385,10 @@ export function createAdminRoute(
   });
 
   /** Wer gerade angemeldet ist — die Seite blendet danach den Admin-Schalter ein/aus. */
-  app.get('/me', (c) => c.json(c.get('adminPrincipal')));
+  app.get('/me', (c) => {
+    const { role, name, provider } = c.get('adminPrincipal');
+    return c.json({ role, name, provider });
+  });
 
   /** Installation auf einen Blick (Übersicht): Version, Edition, Umgebung, Datenbank, Laufzeit. */
   app.get('/system', (c) =>
@@ -947,20 +952,16 @@ export function createAdminRoute(
     const id = c.req.param('id');
     if (!/^[a-f0-9]{64}$/.test(id)) return c.json({ error: 'Ungültige Benutzer-ID' }, 400);
     try {
+      // Initiale wie delegierte Admins vergeben und entziehen die Admin-Rolle —
+      // nur die eigene Rolle kann sich ein delegierter Admin nicht entziehen.
       const { admin, ...grants } = c.req.valid('json');
-      const initial = c.get('adminPrincipal').role === 'initial';
-      if (admin !== undefined && !initial) {
-        // Delegierte Admins dürfen die Rolle weder vergeben noch entziehen —
-        // ein unverändert mitgesendetes `admin` ist in Ordnung.
-        const current = await memoryStore.getUserAccess(id);
-        if (!current) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
-        if (current.admin !== admin) {
-          return c.json({ error: 'Die Admin-Rolle kann nur der initiale Admin (Token bzw. Admin-Konto) vergeben', code: 'initial_admin_required' }, 403);
-        }
+      const principal = c.get('adminPrincipal');
+      if (admin === false && principal.userId === id) {
+        return c.json({ error: 'Die eigene Admin-Rolle kann nicht entzogen werden', code: 'self_revoke' }, 403);
       }
-      const update = initial && admin !== undefined ? { ...grants, admin } : grants;
+      const update = admin !== undefined ? { ...grants, admin } : grants;
       if (!await memoryStore.setUserAccess(id, update)) return c.json({ error: 'Benutzer nicht gefunden' }, 404);
-      logger.info('user access updated', { id, ...update });
+      logger.info('user access updated', { id, ...update, actor: principal.name, actorProvider: principal.provider });
       return c.json({ ok: true });
     } catch {
       return c.json({ error: 'Freigaben konnten nicht gespeichert werden' }, 503);

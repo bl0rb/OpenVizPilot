@@ -14,7 +14,7 @@
   "dependencies": {
     "@openvizpilot/ee": "0.1.0",
     "@openvizpilot/shared": "*",
-    "dompurify": "^3.4.15",
+    "dompurify": "^3.4.17",
     "marked": "^18.1.0",
     "preact": "^11.0.1"
   },

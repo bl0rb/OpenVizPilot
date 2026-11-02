@@ -186,10 +186,9 @@ export function createApp(config: AppConfig): {
       // dafür braucht es 'unsafe-inline'.
       c.res.headers.set(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'" + (c.req.path === '/admin' ? "; frame-ancestors 'none'; font-src 'self' data:" : ''),
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" + (c.req.path === '/admin' ? "; font-src 'self' data:" : ''),
       );
-      // /auth/callback läuft auch im Tableau-Dialog (Frame) und ist rein inert — nur /admin ist rahmenfrei.
-      if (c.req.path === '/admin') c.res.headers.set('X-Frame-Options', 'DENY');
+      c.res.headers.set('X-Frame-Options', 'DENY');
     } else {
       c.res.headers.set(
         'Content-Security-Policy',

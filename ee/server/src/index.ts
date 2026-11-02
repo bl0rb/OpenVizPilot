@@ -12,7 +12,7 @@
  * Muss zur öffentlichen API von ee/server/src/index.ts passen — Drift fällt
  * in der Enterprise-CI (Export-Workflow) auf, nicht hier.
  */
-import type { AuthConfigResponse } from '@openvizpilot/shared';
+import type { AuthConfigResponse, Metric, ToolCall } from '@openvizpilot/shared';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { sign as signEd25519, type KeyObject } from 'node:crypto';
 
@@ -327,6 +327,10 @@ export class OidcClient {
   }
 
   async verifyIdToken(_token: string, _now?: number): Promise<VerifiedUser> {
+    throw new OidcError('Single Sign-On ist eine Enterprise-Funktion.', 'config');
+  }
+
+  async verifyAccessToken(_token: string, _options: { audience: string; requiredScopes?: readonly string[] }, _now?: number): Promise<VerifiedUser> {
     throw new OidcError('Single Sign-On ist eine Enterprise-Funktion.', 'config');
   }
 
@@ -739,6 +743,8 @@ export interface ServerDataAuditStore {
   record(entry: { userAccessId: string; siteId: string; viewId: string; dashboardKey?: string | null; rows: number; durationMs: number; status: string; purpose: string }): Promise<void>;
   list(options?: { limit?: number }): Promise<ServerDataAuditEntry[]>;
   count30d(): Promise<number>;
+  /** Fehlt im Stub: ohne Enterprise gibt es keine Einwilligung für Datenquellen-Abfragen. */
+  getDatasourceConsent?(userAccessId: string): Promise<Date | null>;
 }
 
 function emptyServerDataAuditStore(): ServerDataAuditStore {
@@ -754,6 +760,10 @@ function emptyServerDataAuditStore(): ServerDataAuditStore {
     },
   };
 }
+
+/** Einwilligungstexte wie in ee/: die Desktop-Route des Kerns gibt sie in `/session` mit aus. */
+export const SERVER_DATA_CONSENT_TEXT = 'OpenVizPilot liest auf deine Chat-Anfrage hin Summary-Daten einzelner Tableau-Views serverseitig in deinem Namen, mit deinen Tableau-Berechtigungen. Die Daten dienen nur der Antwort und werden nicht gespeichert; 90 Tage lang bleiben nur Audit-Metadaten (Pseudonym, Site, View, Zeilenzahl, Zeit, Status). Widerruf jederzeit über den Admin (Benutzer & Zugriff → Serverdaten).';
+export const DATASOURCE_CONSENT_TEXT = 'OpenVizPilot liest auf deine Chat-Anfrage hin Summary-Daten von Tableau-Views und fragt veröffentlichte Datenquellen ab — serverseitig in deinem Namen, mit deinen Tableau-Berechtigungen. Nichts davon wird gespeichert; 90 Tage bleiben nur Audit-Metadaten (Pseudonym, Site, Quelle, Zeilen, Zeit, Status). Widerruf über den Admin (Benutzer & Zugriff → Serverdaten).';
 
 export function createSqliteServerDataAuditStore(_db: unknown, _installation: unknown, _options?: unknown): ServerDataAuditStore {
   return emptyServerDataAuditStore();
@@ -1051,3 +1061,61 @@ export const watchAdminSection = `
       <h2 id="watch-heading" class="visually-hidden">Watch</h2>
       <p>${EE_NOTICE}</p>
     </section>`;
+
+// ------------------------------------------------------------ Desktop ------
+
+/** Desktop-App (Enterprise): ohne Lizenz nie verfügbar — der Kern antwortet mit 402. */
+export type DesktopMode = 'ask' | 'investigate';
+export type DesktopConsentScope = 'views' | 'datasource';
+export interface DesktopToolDefinition {
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+export type DesktopAgentDeniedReason = 'oidc_required' | 'approval_required' | 'tableau_unavailable';
+export interface DesktopAgentDenied {
+  reason: DesktopAgentDeniedReason;
+}
+export interface DesktopAgent {
+  tools: DesktopToolDefinition[];
+  systemPrompt: string;
+  maxRounds: number;
+  serverData: boolean;
+  execute(call: ToolCall, options?: { signal?: AbortSignal; onConsentRequired?(scope: DesktopConsentScope, text: string): void }): Promise<string>;
+}
+export interface DesktopAgentInput {
+  user: VerifiedUser | undefined;
+  access: { ai?: boolean; tableauApi?: boolean; serverData?: boolean; id?: string; consent?: { get(userAccessId: string): Promise<Date | null> } } | undefined;
+  tableau: TableauService | null;
+  hasFeature(feature: EeFeature): Promise<boolean>;
+  mode: DesktopMode;
+  metricCatalog(): Promise<readonly Metric[] | null>;
+}
+export async function buildDesktopAgent(_input: DesktopAgentInput): Promise<DesktopAgent | DesktopAgentDenied> {
+  return { reason: 'tableau_unavailable' };
+}
+
+// --------------------------------------------------------- Tableau-MCP ----
+
+/** MCP-Server für die Tableau-Tools (Enterprise): im Stub nie konfiguriert — 404 wie jede unbekannte Route. */
+export interface TableauMcpConfig {
+  audience: string;
+  requiredScopes: string[];
+}
+export interface TableauMcpAccess {
+  issuer: string | null;
+  publicUrl: string | null;
+  oidc: OidcClient | null;
+  ready: boolean;
+}
+export const TABLEAU_MCP_PATH = '/api/tableau-mcp';
+export function requireMcpAccessToken(_config: TableauMcpConfig | null, _access: () => Promise<TableauMcpAccess>, _log?: AuthLog): MiddlewareHandler<AuthVariables> {
+  return async (c) => c.json({ error: 'Nicht autorisiert' }, 401);
+}
+export function createProtectedResourceRoute(_config: TableauMcpConfig | null, _access: () => Promise<TableauMcpAccess>): Hono {
+  return new Hono();
+}
+export function createTableauMcpRoute(_deps: unknown): Hono<AuthVariables> {
+  const app = new Hono<AuthVariables>();
+  app.all('*', (c) => c.json({ error: 'Tableau-MCP ist eine Enterprise-Funktion.', code: 'license_required' }, 402));
+  return app;
+}

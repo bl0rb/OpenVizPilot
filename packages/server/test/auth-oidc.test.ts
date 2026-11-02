@@ -93,7 +93,7 @@ function oidcConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     environment: 'test',
     smtpUrl: null,
     smtpFrom: null,
-    watchEnabled: true,
+    watchEnabled: true, tableauMcp: null,
     licenseEnv,
     licenseTrustedKeys,
     leaseTrustedKeys: TEST_LEASE_TRUSTED_KEYS,

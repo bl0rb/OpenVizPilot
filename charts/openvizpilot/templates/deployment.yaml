@@ -89,6 +89,12 @@ spec:
                   name: {{ . }}
                   key: {{ $.Values.oidc.clientSecretSecret.key }}
             {{- end }}
+            {{- with .Values.oidc.mcpAudience }}
+            - name: OVP_OIDC_MCP_AUDIENCE
+              value: {{ . | quote }}
+            - name: OVP_OIDC_MCP_SCOPES
+              value: {{ $.Values.oidc.mcpScopes | quote }}
+            {{- end }}
             {{- end }}
             {{- with .Values.license.existingSecret }}
             - name: OVP_LICENSE

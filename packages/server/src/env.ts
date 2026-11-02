@@ -113,6 +113,10 @@ const envSchema = z.object({
   OVP_SMTP_FROM: z.string().optional(),
   /** Globaler Schalter für die Watch-Engine (Default an) — zusätzlich zur Lizenz und zur Admin-Einstellung „global an/aus". */
   OVP_WATCH_ENABLED: emptyAsUnset(z.enum(['true', 'false']).default('true')),
+  /** Tableau-MCP (Enterprise): Audience der Access-Tokens der MCP-Ressource beim IdP; leer = Endpunkt aus. Siehe docs/tableau-mcp.md. */
+  OVP_OIDC_MCP_AUDIENCE: z.string().optional(),
+  /** Tableau-MCP: Scopes, die jedes Access-Token tragen muss (leerzeichengetrennt); leer = Default `tableau.read` — nie „kein Scope“. */
+  OVP_OIDC_MCP_SCOPES: z.string().optional(),
 });
 
 export interface AppConfig {
@@ -199,6 +203,23 @@ export interface AppConfig {
   smtpFrom: string | null;
   /** Globaler Schalter für die Watch-Engine (OVP_WATCH_ENABLED, Default an). */
   watchEnabled: boolean;
+  /**
+   * MCP-Server für die Tableau-Tools (Enterprise, /api/tableau-mcp): Audience der Access-Tokens
+   * (OVP_OIDC_MCP_AUDIENCE — App-ID-URI/Client-ID der MCP-Ressource beim IdP, NICHT die client_id der
+   * Extension) und erforderliche Scopes (OVP_OIDC_MCP_SCOPES, leerzeichengetrennt; ohne Angabe
+   * `tableau.read`). Scopes sind nie leer: Ein App-only-Token (Client Credentials) trägt keinen
+   * delegierten Scope und bleibt so draußen — nur Personen. null = aus.
+   */
+  tableauMcp: { audience: string; requiredScopes: string[] } | null;
+}
+
+/** Scope, den Tableau-MCP-Tokens ohne OVP_OIDC_MCP_SCOPES tragen müssen (docs/tableau-mcp.md). */
+export const DEFAULT_MCP_SCOPE = 'tableau.read';
+
+/** Leerzeichengetrennte Scopes; leer → DEFAULT_MCP_SCOPE, nie eine leere Liste (fail closed, siehe AppConfig.tableauMcp). */
+function mcpScopes(value: string | undefined): string[] {
+  const scopes = (value ?? '').split(/\s+/).filter(Boolean);
+  return scopes.length > 0 ? scopes : [DEFAULT_MCP_SCOPE];
 }
 
 function splitCsv(value: string | undefined): string[] {
@@ -293,5 +314,8 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
     smtpUrl: e.OVP_SMTP_URL?.trim() ? e.OVP_SMTP_URL.trim() : null,
     smtpFrom: e.OVP_SMTP_FROM?.trim() ? e.OVP_SMTP_FROM.trim() : null,
     watchEnabled: e.OVP_WATCH_ENABLED === 'true',
+    tableauMcp: e.OVP_OIDC_MCP_AUDIENCE?.trim()
+      ? { audience: e.OVP_OIDC_MCP_AUDIENCE.trim(), requiredScopes: mcpScopes(e.OVP_OIDC_MCP_SCOPES) }
+      : null,
   };
 }

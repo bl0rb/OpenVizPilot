@@ -22,6 +22,10 @@ import {
   EAS_PATH,
   WatchEngine,
   createWatchRoute,
+  createProtectedResourceRoute,
+  createTableauMcpRoute,
+  requireMcpAccessToken,
+  TABLEAU_MCP_PATH,
 } from '@openvizpilot/ee/server';
 import { Hono } from 'hono';
 import { createHash } from 'node:crypto';
@@ -38,6 +42,7 @@ import { createAuthRoutes, requireLocalUser } from './routes/auth';
 import { createChatRoute } from './routes/chat';
 import { createCommandsRoute } from './routes/commands';
 import { createDashboardsRoute } from './routes/dashboards';
+import { createDesktopRoute } from './routes/desktop';
 import { createHealthRoute } from './routes/health';
 import { createMetricsRoute } from './routes/metrics';
 import { createModelsRoute } from './routes/models';
@@ -217,7 +222,8 @@ export function createApp(config: AppConfig): {
   // In allen Modi ersetzt `authUser` die client-asserted Tableau-ID (Memory,
   // Präferenzen, Statistik). AUSGENOMMEN: /api/admin/* (eigenes Admin-Regime)
   // und /api/auth/* (Login-Handshake).
-  const isExempt = (path: string) => path.startsWith('/api/admin/') || path.startsWith('/api/auth/');
+  // /api/tableau-mcp prüft sein eigenes Access-Token (Audience der MCP-Ressource, siehe unten).
+  const isExempt = (path: string) => path.startsWith('/api/admin/') || path.startsWith('/api/auth/') || path === TABLEAU_MCP_PATH || path.startsWith(`${TABLEAU_MCP_PATH}/`);
   const tokenExpected = config.apiAuthToken ? `Bearer ${config.apiAuthToken}` : null;
   app.use('/api/*', async (c, next) => {
     if (isExempt(c.req.path)) {
@@ -247,6 +253,17 @@ export function createApp(config: AppConfig): {
     }
   });
 
+  // Tableau-MCP (Enterprise): OAuth-Resource-Server für externe Agenten (Weave, VS Code, Claude Code).
+  // Access-Token mit der Audience OVP_OIDC_MCP_AUDIENCE → `oidcUser`; Freigabe „Tableau-API“ prüft danach
+  // requireUserAccess wie bei /api/tableau-server. Die Discovery-Metadaten liegen öffentlich unter
+  // /.well-known/oauth-protected-resource (RFC 9728).
+  const mcpAccess = async () => {
+    const state = await authState.get();
+    return { issuer: state.oidcSettings?.issuer ?? null, publicUrl: state.publicUrl, oidc: state.oidc, ready: state.mode === 'oidc' && Boolean(state.oidc) && !state.blockedReason };
+  };
+  app.use(`${TABLEAU_MCP_PATH}/*`, requireMcpAccessToken(config.tableauMcp, mcpAccess, authLog));
+  app.use(TABLEAU_MCP_PATH, requireMcpAccessToken(config.tableauMcp, mcpAccess, authLog));
+  app.route('/.well-known/oauth-protected-resource', createProtectedResourceRoute(config.tableauMcp, mcpAccess));
   app.use('/api/*', requireUserAccess(memoryStore, logger));
   app.route('/api/auth', createAuthRoutes({ authState, store: memoryStore, logger, tableau }));
   app.route('/auth/callback', createAuthCallbackRoute());
@@ -282,7 +299,10 @@ export function createApp(config: AppConfig): {
   app.route('/api/models', createModelsRoute(config, logger, client, memoryStore));
   app.route('/api/chat', createChatRoute(config, logger, client, memoryStore, personalizationStore, licensedFeature, mcp, tableau));
   app.route('/api/mcp', createMcpRoute(mcp, logger, licensedFeature));
+  // Desktop-App (clients/desktop, Enterprise): serverseitiger Agenten-Loop über die Tableau-Server-Tools.
+  app.route('/api/desktop', createDesktopRoute(config, logger, client, memoryStore, licensedFeature, tableau));
   app.route('/api/tableau-server', createTableauRoute(tableau));
+  app.route(TABLEAU_MCP_PATH, createTableauMcpRoute({ tableau, hasFeature: licensedFeature, logger, metricCatalog: async () => (memoryStore ? memoryStore.getMetricCatalog() : null) }));
   app.route('/api/watch', createWatchRoute({ store: backend?.watch ?? null, engine: watchEngine, tableau, hasFeature: licensedFeature, logger }));
   // Personalisierung (User-Memory, eigene Abfragen) liegt in ee/ und ist
   // lizenzpflichtig — der Pfad bleibt /api/memory, damit ältere Extensions

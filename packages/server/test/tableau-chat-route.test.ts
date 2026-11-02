@@ -12,7 +12,7 @@ function config(): AppConfig {
     port: 3000, allowedOrigins: [], serveStaticDir: null, apiAuthToken: null, adminToken: null,
     memoryDatabaseUrl: null, memoryDbPath: null, memoryModel: 'memory', scopeGuardEnabled: false, scopeModel: 'scope',
     logLevel: 'error', authMode: 'none', publicUrl: null, oidc: null, telemetryEndpoint: '', appVersion: 'test', environment: 'test', licenseEnv: {},
-    smtpUrl: null, smtpFrom: null, watchEnabled: true,
+    smtpUrl: null, smtpFrom: null, watchEnabled: true, tableauMcp: null,
   };
 }
 

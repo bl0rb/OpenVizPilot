@@ -33,6 +33,8 @@ For administrators (`/admin` — the first visitor sets the admin password on fi
 - Model catalog: look up the models your endpoint offers and map them to friendly display names shown in the extension; the catalog is enforced on the chat endpoint.
 - Enterprise MCP: connect approved read-only sources and web-search services in the admin UI, assign them to managed sites, dashboards and authenticated members, and require consent before external queries. See [MCP setup and permission boundaries](docs/mcp.md).
 - Tableau Server integration (Enterprise): optional Connected-App/JWT sign-in, REST content search and Metadata API are implemented for Tableau Server 2024.2 or newer; status and scope are documented in [docs/tableau-server.md](docs/tableau-server.md).
+- Tableau-MCP (Enterprise): the same Tableau-Server tools as an MCP server at `/api/tableau-mcp` for external agents such as Weave, VS Code or Claude Code — OAuth resource server, personal identity only, no service account; see [docs/tableau-mcp.md](docs/tableau-mcp.md).
+- Desktop app (Enterprise server side, client open source at [bl0rb/OpenVizPilotDesktop](https://github.com/bl0rb/OpenVizPilotDesktop)): a macOS/Windows tray app that asks the Tableau estate without an open dashboard — same SSO, same Tableau-Server tools, agent loop server-side (`/api/desktop`); see [docs/desktop.md](docs/desktop.md).
 - Slash-command management: edit, add or reset the global playbooks centrally.
 - Standard analyses per dashboard: embedded extensions register automatically after sign-in. Select a dashboard in the admin portal to configure up to five starter questions and its own slash commands. Global commands remain available; open extensions refresh within a minute. See [setup and workbook copies](docs/admin-deployment.md#standardanalysen-pro-dashboard).
 - Anonymous usage: counters per model, tool, command and error, plus a per-dashboard view (questions, number of users, average and maximum questions per user) — users are counted only as non-reversible pseudonyms, never names, IDs or content.
@@ -47,6 +49,8 @@ Built-in guardrails
 ![Architecture: the chat extension runs inside the Tableau dashboard and executes tool calls in the viewer session, the stateless middleware injects system prompt and tool definitions and streams over SSE to an OpenAI-compatible LLM endpoint, an operational database holds settings, grants and user memory, and a separate Enterprise zone adds Tableau Server APIs, server-side view data, the Watch scheduler and the daily license heartbeat](docs/diagrams/architecture.png)
 
 The extension executes the LLM's tool calls in the user's browser (Extensions API, viewer session); the middleware stays stateless, injects the system prompt and tool definitions, and streams via SSE.
+
+Two further clients use the same middleware without an open dashboard (Enterprise): the [desktop app](https://github.com/bl0rb/OpenVizPilotDesktop) talks to `/api/desktop`, where the agent loop runs server-side over the Tableau-Server tools, and external agents (Weave, VS Code, Claude Code) connect to `/api/tableau-mcp`, an MCP server that exposes the same tools. Both act strictly under the personal identity of the signed-in user — see [docs/desktop.md](docs/desktop.md) and [docs/tableau-mcp.md](docs/tableau-mcp.md).
 
 📖 User guide: the [wiki](https://github.com/bl0rb/OpenVizPilot/wiki) explains the chat, slash commands, action chips and privacy for end users — in German and English.
 
@@ -114,15 +118,17 @@ Saved queries are the second half: the answer focus a user picks for a dashboard
 
 ## Data isolation
 
-Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application. Watch and cross-dashboard investigation need their own explicit opt-in (site switch, per-person grant, user consent — see [docs/admin-deployment.md](docs/admin-deployment.md#serverseitiger-datenzugriff-tableau-views-außerhalb-des-dashboards)) for a bounded serverside read of another view's summary data; without it, everything stays in the browser as described above.
+Every user can only query data they can see in Tableau. All data access runs client-side through the Extensions API in the Tableau session of the signed-in user — row-level security and user filters apply automatically. The middleware has no Tableau identity (no service account, no PAT), caches no dashboard data, keeps no chat history — conversations live in the user’s browser — and logs metadata only (never message content or dashboard data). What it does store is the application’s own state: sign-in accounts and sessions, admin settings, anonymous usage counters and, with an Enterprise license, personal facts and saved queries per user. Prerequisite: RLS is modeled in the Tableau data sources (user filters/entitlement table); hierarchies such as branch manager → sales partner are handled there, not in this application. Watch and cross-dashboard investigation need their own explicit opt-in (site switch, per-person grant, user consent — see [docs/admin-deployment.md](docs/admin-deployment.md#serverseitiger-datenzugriff-tableau-views-außerhalb-des-dashboards)) for a bounded serverside read of another view's summary data; without it, everything stays in the browser as described above. The desktop app and the Tableau-MCP server follow the same rule: every call carries the user's own IdP token, Tableau applies permissions and RLS for that person, and the data tools appear only with the `serverData` licence, the per-person grant and the user's consent — there is no service account and no way to name another user ([docs/tableau-mcp.md](docs/tableau-mcp.md#berechtigungsmodell--nichts-wird-gelockert)).
 
 ## Packages
 
 | Package | Contents |
 |---|---|
 | `packages/shared` | Contract between both sides: zod schemas, SSE protocol, tool definitions, Markdown helpers, `.trex` template |
-| `packages/server` | Middleware (Hono): `POST /api/chat` (SSE streaming), `GET /api/models`, admin API, `GET /healthz` |
+| `packages/server` | Middleware (Hono): `POST /api/chat` (SSE streaming), `GET /api/models`, `/api/desktop`, admin API, `GET /healthz` |
 | `packages/extension` | Dashboard extension (Vite + Preact): chat UI, context snapshot, tool executors, `.trex` manifest |
+| `ee/` | Enterprise Edition (stub in the public repo): SSO, licence, MCP sources, Tableau Server, Watch, the desktop agent (`/api/desktop`) and the Tableau-MCP server (`/api/tableau-mcp`) |
+| [bl0rb/OpenVizPilotDesktop](https://github.com/bl0rb/OpenVizPilotDesktop) | Separate open-source repository (MIT): the macOS/Windows tray app (Tauri 2) that talks to `/api/desktop` |
 
 ## Development
 
@@ -136,6 +142,7 @@ cp .env.example .env   # set OVP_LLM_BASE_URL, OVP_LLM_API_KEY, OVP_DEFAULT_MODE
 | `npm run dev` | Middleware (:3000) + extension (:5173) — for Tableau Desktop |
 | `npm run dev:mock` | Same, but with a mock dashboard in the browser (no Tableau) |
 | `npm run dev:demo` | Like `dev:mock`, plus a mock LLM server (:4010) — no LLM endpoint at all |
+| `npm run dev:static-demo -w @openvizpilot/extension` | Extension only, in the browser: static demo mode (scripted answers, no middleware, no LLM) with the mock dashboard — see [Static demo](#static-demo-no-middleware-no-llm) |
 | `npm run dev:claude` | For Tableau Desktop, answers via the locally signed-in Claude Code CLI (:4020) — a real LLM without an API key (`.env`: `OVP_LLM_BASE_URL=http://localhost:4020`) |
 | `npm test` | All unit/integration tests (vitest) |
 | `npm run typecheck` | TypeScript across all packages |
@@ -144,6 +151,17 @@ cp .env.example .env   # set OVP_LLM_BASE_URL, OVP_LLM_API_KEY, OVP_DEFAULT_MODE
 Testing with Tableau Desktop: run `npm run dev`, open a dashboard in Tableau, drag an “Extension” object onto the dashboard and pick [packages/extension/public/openvizpilot.dev.trex](packages/extension/public/openvizpilot.dev.trex) — this one points at the Vite dev server. (The manifest from the admin UI points at the middleware, which only serves the extension in production.) Debugging: start Tableau Desktop with `--remote-debugging-port=8696` and open Chrome at `http://localhost:8696`.
 
 Testing without Tableau: run `npm run dev:demo` and open http://localhost:5173 — questions containing “Filter” or “Revenue” trigger tool calls in the mock LLM.
+
+## Static demo (no middleware, no LLM)
+
+For trials and the Tableau Exchange listing the extension can run entirely in the browser: built with `vite --mode demo`, it answers every `/api/*` call itself ([packages/extension/src/demo](packages/extension/src/demo)), so plain static hosting is all that is needed. The answers are scripted, not generated — but they are computed from the open workbook with the same dashboard tools the full product uses (active filters, parameters, selected marks, top groups via `breakdown_by`, rows of a worksheet, worksheet list), so users see the real look and feel on their own data. A banner says so, the model picker shows “Demo (no AI)”, three starter chips lead into the supported questions, and anything else gets an honest “demo mode” reply. Nothing leaves the browser: no server, no LLM, no logs, no data processing agreement required.
+
+```bash
+npm run build:static-demo -w @openvizpilot/extension        # → packages/extension/dist-demo/ incl. openvizpilot-demo.trex
+OVP_DEMO_URL=https://demo.example.com/ npm run build:static-demo -w @openvizpilot/extension
+```
+
+Upload `dist-demo/` to any HTTPS static host (default manifest URL: `https://demo.werkworks.de/`). The demo manifest uses its own extension ID (`com.openvizpilot.extension.demo`) and the name “OpenVizPilot (Demo)”, so it can sit next to a production installation. Enterprise features that need a server (memory, saved queries, Watch, server-side data) are off; client-side dashboard actions stay on.
 
 ## Production (EKS + Helm)
 
@@ -199,6 +217,7 @@ The chart never needs a secret in `values.yaml`: every sensitive value is read f
 | `OVP_ENVIRONMENT` | `app.environment` | `production` (default) \| `development` \| `test` \| `staging` — counted during licence activation |
 | `OVP_AUTH_MODE` | `auth.mode` | `none` \| `token` \| `local` \| `oidc` |
 | `OVP_OIDC_PROVIDER`, `OVP_OIDC_ISSUER`, `OVP_OIDC_CLIENT_ID`, `OVP_OIDC_SCOPES` | `oidc.*` | Identity provider (Enterprise); the issuer must be `https://` (plain `http://` only for localhost) |
+| `OVP_OIDC_MCP_AUDIENCE`, `OVP_OIDC_MCP_SCOPES` | `oidc.mcpAudience`, `oidc.mcpScopes` | Tableau-MCP server (Enterprise): audience of the MCP resource at the IdP (not the extension's client id) and required scopes (default `tableau.read`, never empty); unset = `/api/tableau-mcp` off |
 | `OVP_SMTP_FROM` | `smtp.from` | Sender address for Watch alert emails (Enterprise) |
 | `OVP_WATCH_ENABLED` | `app.watchEnabled` | Global switch for the Watch engine (default on; Enterprise) |
 | `OVP_MEMORY_MODEL` | `memory.model` | Model for memory summaries |
@@ -250,7 +269,7 @@ spec:
 
 ## Editions
 
-OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the [PolyForm Noncommercial license](LICENSE) — free for any noncommercial purpose; commercial use, including running it inside a company, requires an agreement. The Enterprise Edition — Single Sign-On (OIDC), user memory, saved queries, MCP sources, dashboard actions, the Tableau Server integration and license activation — lives in a private repository and is available to customers for source review under contract/NDA; **`ee/` in this (public) repository is a stub** with the same package name and exports but no-op implementations, so the Core Edition builds and runs standalone. The Enterprise image is published as `ghcr.io/bl0rb/openvizpilot-enterprise`, a private GHCR package — customers receive a read-only token to pull it (`imagePullSecrets` in the chart, see [docs/enterprise.md](docs/enterprise.md)). One licence covers one production installation; development, test and staging installations (`OVP_ENVIRONMENT`) are included. Enterprise features switch on once the installation has activated itself against WerkWorks (immediately at startup, or via an offline lease); after that, an unreachable service does not switch anything off for 30 days after the lease expires. Setup and feature details: [docs/enterprise.md](docs/enterprise.md).
+OpenVizPilot is **source-available**, not open source. Everything outside `ee/` is the Core Edition under the [PolyForm Noncommercial license](LICENSE) — free for any noncommercial purpose; commercial use, including running it inside a company, requires an agreement. The Enterprise Edition — Single Sign-On (OIDC), user memory, saved queries, MCP sources, dashboard actions, the Tableau Server integration, Watch, the desktop endpoint, the Tableau-MCP server and license activation — lives in a private repository and is available to customers for source review under contract/NDA; **`ee/` in this (public) repository is a stub** with the same package name and exports but no-op implementations, so the Core Edition builds and runs standalone. The Enterprise image is published as `ghcr.io/bl0rb/openvizpilot-enterprise`, a private GHCR package — customers receive a read-only token to pull it (`imagePullSecrets` in the chart, see [docs/enterprise.md](docs/enterprise.md)). One licence covers one production installation; development, test and staging installations (`OVP_ENVIRONMENT`) are included. Enterprise features switch on once the installation has activated itself against WerkWorks (immediately at startup, or via an offline lease); after that, an unreachable service does not switch anything off for 30 days after the lease expires. Setup and feature details: [docs/enterprise.md](docs/enterprise.md).
 
 ## Manual test script
 

@@ -4,6 +4,7 @@
  *
  *   npm run build:trex -- --dev                          → public/openvizpilot.dev.trex (localhost:5173)
  *   npm run build:trex -- --url https://chat.example.com → dist/openvizpilot.trex
+ *   npm run build:trex -- --demo --url https://demo.werkworks.de/ --out dist-demo/openvizpilot-demo.trex
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,9 @@ const pkgRoot = path.resolve(here, '..');
 const { values } = parseArgs({
   options: {
     dev: { type: 'boolean', default: false },
+    demo: { type: 'boolean', default: false },
     url: { type: 'string' },
+    out: { type: 'string' },
   },
 });
 
@@ -38,10 +41,12 @@ if (!dev && !validation.url.startsWith('https://')) {
   process.exit(1);
 }
 
-const outPath = dev
-  ? path.join(pkgRoot, 'public', 'openvizpilot.dev.trex')
-  : path.join(pkgRoot, 'dist', 'openvizpilot.trex');
+const outPath = values.out
+  ? path.resolve(pkgRoot, values.out)
+  : dev
+    ? path.join(pkgRoot, 'public', 'openvizpilot.dev.trex')
+    : path.join(pkgRoot, 'dist', 'openvizpilot.trex');
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, buildTrexManifest({ url: validation.url, dev }));
+fs.writeFileSync(outPath, buildTrexManifest({ url: validation.url, dev, demo: values.demo === true }));
 console.log(`Manifest geschrieben: ${outPath} (source-location: ${validation.url})`);

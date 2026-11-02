@@ -35,6 +35,7 @@ import { describeContextChange, registerContextInvalidation } from '../tableau/e
 import { executeToolCall } from '../tools/registry';
 import { createServerDataConsentGate, executeMcpTool, executeTableauTool, ServerDataConsentDialog } from '@openvizpilot/ee/extension';
 import { setConfigureHandler } from '../main';
+import { IS_DEMO } from '../demo/flag';
 import { reducer } from './chat-reducer';
 import { Composer } from './Composer';
 import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';
@@ -753,6 +754,11 @@ export function App(props: { dashboard: Dashboard }) {
           <Icon name="settings" />
         </button>
       </header>
+      {IS_DEMO && locale !== null && (
+        <div class="demo-banner" role="note">
+          {t('demo.banner')}
+        </div>
+      )}
       {locale === null ? (
         <LanguageChooser onChoose={changeLocale} />
       ) : settingsOpen ? (

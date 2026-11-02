@@ -66,8 +66,8 @@ export function requireUserAccess(store: MemoryStore | null, logger: Logger): Mi
     }
     c.set('userAccess', access);
     c.header('Cache-Control', 'no-store');
-    const capability = pathWithin(c.req.path, '/api/tableau-server') ? 'tableauApi'
-      : ['/api/chat', '/api/models', '/api/mcp', '/api/memory'].some(root => pathWithin(c.req.path, root)) ? 'ai' : null;
+    const capability = pathWithin(c.req.path, '/api/tableau-server') || pathWithin(c.req.path, '/api/tableau-mcp') ? 'tableauApi'
+      : ['/api/chat', '/api/models', '/api/mcp', '/api/memory', '/api/desktop'].some(root => pathWithin(c.req.path, root)) ? 'ai' : null;
     if (capability && !access[capability]) {
       return c.json({
         error: capability === 'ai' ? 'KI-Nutzung ist noch nicht freigegeben.' : 'Tableau-API ist noch nicht freigegeben.',

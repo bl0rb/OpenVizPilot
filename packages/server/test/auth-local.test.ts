@@ -53,7 +53,7 @@ function localConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     environment: 'test',
     smtpUrl: null,
     smtpFrom: null,
-    watchEnabled: true,
+    watchEnabled: true, tableauMcp: null,
     ...testLicenseEnv(['savedQueries']),
     ...overrides,
   };

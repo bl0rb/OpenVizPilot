@@ -81,6 +81,8 @@ export interface TrexOptions {
   url: string;
   /** true = Dev-Manifest (eigene Extension-ID + "(Dev)"-Name). */
   dev?: boolean;
+  /** true = statische Demo ohne Middleware (eigene Extension-ID + "(Demo)"-Name). */
+  demo?: boolean;
 }
 
 /**
@@ -91,8 +93,9 @@ export const EXTENSION_VERSION = '1.7.10';
 
 export function buildTrexManifest(options: TrexOptions): string {
   const dev = options.dev === true;
-  const id = dev ? 'com.openvizpilot.extension.dev' : 'com.openvizpilot.extension';
-  const name = dev ? 'OpenVizPilot (Dev)' : 'OpenVizPilot';
+  const demo = options.demo === true;
+  const id = dev ? 'com.openvizpilot.extension.dev' : demo ? 'com.openvizpilot.extension.demo' : 'com.openvizpilot.extension';
+  const name = dev ? 'OpenVizPilot (Dev)' : demo ? 'OpenVizPilot (Demo)' : 'OpenVizPilot';
   const url = xmlEscape(options.url);
   // website MUSS laut Manifest-Schema https sein (auch im Dev-Manifest);
   // nur die source-location darf http://localhost verwenden.

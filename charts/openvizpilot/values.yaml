@@ -227,6 +227,11 @@ oidc:
   clientSecretSecret:
     existingSecret: ""
     key: OVP_OIDC_CLIENT_SECRET
+  # Tableau-MCP (Enterprise, docs/tableau-mcp.md): Audience der Access-Tokens der
+  # MCP-Ressource beim IdP (App-ID-URI/Client-ID, NICHT die client_id der Extension);
+  # leer = Endpunkt /api/tableau-mcp aus. Scopes leerzeichengetrennt, ohne Angabe tableau.read.
+  mcpAudience: ""
+  mcpScopes: "tableau.read"
 license:
   # Signierter Lizenzschlüssel (OVP_LICENSE) aus einem Secret. Der
   # Vertrauensanker (Public Key des Lizenzgenerators) ist fest eingebaut —

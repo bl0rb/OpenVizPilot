@@ -4,6 +4,7 @@ import { eventType, getTableau, type FormattingSheet } from './tableau/api';
 import { applyWorkbookFormatting } from './tableau/formatting';
 import { applyLocale, loadStoredLocale } from './locale';
 import { App } from './ui/App';
+import { IS_DEMO } from './demo/flag';
 import './ui/styles.css';
 
 // Ziel des Tableau-Menüpunkts „Konfigurieren" (initializeAsync-configure-
@@ -35,6 +36,11 @@ async function bootstrap(): Promise<void> {
   if (useMock) {
     const { installMockTableau } = await import('./mock/tableau-mock');
     installMockTableau();
+  }
+  if (IS_DEMO) {
+    // Statische Demo ohne Middleware: /api/* wird lokal im Browser beantwortet.
+    const { installDemoBackend } = await import('./demo/demo-backend');
+    installDemoBackend();
   }
 
   try {

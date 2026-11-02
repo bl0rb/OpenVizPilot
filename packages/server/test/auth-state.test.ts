@@ -41,7 +41,7 @@ function config(overrides: Partial<AppConfig> = {}): AppConfig {
     licenseEnv: {},
     smtpUrl: null,
     smtpFrom: null,
-    watchEnabled: true,
+    watchEnabled: true, tableauMcp: null,
     ...overrides,
   };
 }

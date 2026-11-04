@@ -11,6 +11,7 @@ import {
   requireOidcUser,
   type AuthVariables,
   type EeFeature,
+  type LicenseStatus,
   type HeartbeatAction,
   type HeartbeatResponseInfo,
   type TelemetryStore,
@@ -285,14 +286,7 @@ export function createApp(config: AppConfig): {
   // anzubieten und beim Speichern zu scheitern.
   app.get('/api/features', async (c) => {
     const { license } = await authState.get();
-    return c.json({
-      features: Object.fromEntries(EE_FEATURES.map((feature) => [feature, hasFeature(license, feature)
-        && (feature === 'tableauServer' ? Boolean(c.get('userAccess')?.tableauApi)
-          : feature === 'serverData' ? Boolean(c.get('userAccess')?.serverData)
-          // Watch braucht zusätzlich serverData (Lizenz UND Freigabe der Person) — dieselbe Gate wie beim Chat-Tool.
-          : feature === 'watch' ? Boolean(c.get('userAccess')?.serverData) && hasFeature(license, 'serverData')
-          : Boolean(c.get('userAccess')?.ai))])),
-    });
+    return c.json({ features: visibleFeatures(license, c.get('userAccess')) });
   });
 
   app.route('/healthz', createHealthRoute());
@@ -326,4 +320,26 @@ export function createApp(config: AppConfig): {
   }
 
   return { app, logger, memoryStore, authState, telemetryStore, stopHeartbeat: () => { stopHeartbeat(); tableau?.stop(); watchEngine?.stop(); } };
+}
+
+/**
+ * Was die Extension anbieten darf (GET /api/features). Muss dieselben Hürden abbilden wie die
+ * serverseitige Ausführung, sonst zeigt die Oberfläche Funktionen, die der Server dann ablehnt oder
+ * still zurückstuft: Serverdaten brauchen wie im Chat (routes/chat.ts) und in Watch (ee/watch/routes.ts)
+ * die Lizenzen serverData, tableauServer und sso sowie die Freigaben „Tableau-API“ UND „Serverdaten“;
+ * Watch zusätzlich die Lizenz watch. Die Laufzeitverfügbarkeit von Tableau Server (Integration an,
+ * Site, Claim) prüft erst der Chat — dafür gibt es dort den sichtbaren Rückstufungshinweis.
+ */
+export function visibleFeatures(
+  license: LicenseStatus,
+  access: { ai?: boolean; tableauApi?: boolean; serverData?: boolean } | undefined,
+): Record<EeFeature, boolean> {
+  const tableauLicensed = hasFeature(license, 'tableauServer') && hasFeature(license, 'sso');
+  const serverData = tableauLicensed && hasFeature(license, 'serverData')
+    && Boolean(access?.tableauApi) && Boolean(access?.serverData);
+  return Object.fromEntries(EE_FEATURES.map((feature) => [feature,
+    feature === 'tableauServer' ? hasFeature(license, feature) && Boolean(access?.tableauApi)
+      : feature === 'serverData' ? serverData
+        : feature === 'watch' ? serverData && hasFeature(license, 'watch')
+          : hasFeature(license, feature) && Boolean(access?.ai)])) as Record<EeFeature, boolean>;
 }

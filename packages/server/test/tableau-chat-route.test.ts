@@ -125,6 +125,11 @@ describe('mode "investigate-estate" (W7, Cross-Dashboard)', () => {
     expect(offline.tools.some((tool) => tool.function.name.startsWith('tableau_'))).toBe(false);
     expect(offline.sse).toContain('Tableau Server ist für diese Anfrage nicht erreichbar');
 
+    // Fehlende Tableau-API-Freigabe ist eine Freigabe-, keine Verfügbarkeitsfrage.
+    const noApiGrant = await requestWith({ available: available() }, false, { serverData: true, hasEeFeature: async () => true, mode: 'investigate-estate' });
+    expect(noApiGrant.sse).toContain('nicht freigegeben (Tableau-API)');
+    expect(noApiGrant.sse).not.toContain('nicht erreichbar');
+
     const granted = await requestWith({ available: available() }, true, { serverData: true, hasEeFeature: async (f) => f === 'serverData', mode: 'investigate-estate' });
     expect(granted.sse).not.toContain('Umgebungsweite Untersuchung ist');
   });

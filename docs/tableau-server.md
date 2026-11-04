@@ -73,7 +73,7 @@ Im Untersuchen-Modus kann die Extension den Umfang „Gesamte Umgebung“ wähle
 Modelle diesen Prompt-Hinweis ignorieren können, schreibt die Middleware bei einer frischen Nutzerfrage
 zusätzlich selbst einen kurzen Hinweis als erstes `delta` (Grund: Freigabe fehlt bzw. Tableau Server
 nicht erreichbar) und loggt `investigate-estate downgraded` mit `reason`
-(`tableau_unavailable`, `server_data_access`, `server_data_license`). Der Ablauf nutzt exakt denselben
+(`tableau_api_access`, `tableau_unavailable`, `server_data_access`, `server_data_license`). Der Ablauf nutzt exakt denselben
 `tableau_view_data`-Pfad wie oben, mit zwei zusätzlichen harten Regeln im Prompt: höchstens 5 Views
 je Turn lesen, dabei bevorzugt `aggregate` statt Rohzeilen anfordern. Seit W8 sucht der Modus auch
 über Datenquellen (`tableau_datasource_search`) und — mit Site-Schalter „Datenquellen abfragen“ —
@@ -144,8 +144,8 @@ Tableau Server **2024.2** einschließlich, REST API **3.23** (`TABLEAU_MIN_SERVE
 
 Die Middleware loggt zu Tableau Server nur Metadaten, nie Antworten, Abfragen oder Claims:
 
-- `tableau unavailable for chat` mit `error`: warum der Chat für eine Anfrage keine Tableau-Tools
-  bekommt, z. B. `oidc_user_missing`, `tableau_disabled`, `license_required`, `oidc_required`
+- `tableau unavailable` mit `error`: warum Chat, Desktop oder Tableau-MCP keine Tableau-Tools
+  bekommen (derselbe Grund höchstens einmal je Minute), z. B. `oidc_user_missing`, `tableau_disabled`, `license_required`, `oidc_required`
   (Anmeldung abgelaufen oder fremder Issuer), `TABLEAU_CLAIM_INVALID` (Username-Claim fehlt im
   Token), `TABLEAU_SITE_UNRESOLVED` (mehrere Sites, Dashboard keiner Site zugeordnet).
 - `tableau operation` mit `result: 'failed'`, `error` und ggf. `status`: der Fehler eines

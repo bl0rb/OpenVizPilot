@@ -13,6 +13,7 @@ import type { Logger } from '../logger';
 /** Sichtbarer Hinweis, wenn "Gesamte Umgebung" serverseitig auf das geöffnete Dashboard zurückgestuft wird. */
 export const ESTATE_DOWNGRADE_MESSAGES = {
   tableau_unavailable: '_Umgebungsweite Untersuchung ist gerade nicht verfügbar: Tableau Server ist für diese Anfrage nicht erreichbar (Integration aus, Site nicht zugeordnet, Anmeldung abgelaufen oder Username-Claim fehlt). Ich untersuche nur dieses Dashboard._',
+  tableau_api_access: '_Umgebungsweite Untersuchung ist für dich nicht freigegeben (Tableau-API). Ich untersuche nur dieses Dashboard._',
   server_data_access: '_Umgebungsweite Untersuchung ist für dich nicht freigegeben. Ich untersuche nur dieses Dashboard._',
   server_data_license: '_Umgebungsweite Untersuchung ist nicht freigegeben. Ich untersuche nur dieses Dashboard._',
 } as const;
@@ -185,8 +186,9 @@ export function createChatRoute(
       // ob Freigabe/Lizenz fehlen oder Tableau Server für die Anfrage nicht verfügbar ist (Integration
       // aus, Site nicht zugeordnet, Anmeldung abgelaufen, Username-Claim fehlt).
       const estateDowngradeReason = !estateDowngraded ? null
-        : !tableauServerEnabled ? 'tableau_unavailable'
-          : !c.get('userAccess')?.serverData ? 'server_data_access' : 'server_data_license';
+        : !c.get('userAccess')?.tableauApi ? 'tableau_api_access'
+          : !tableauServerEnabled ? 'tableau_unavailable'
+            : !c.get('userAccess')?.serverData ? 'server_data_access' : 'server_data_license';
       if (estateDowngradeReason) logger.info('investigate-estate downgraded', { reason: estateDowngradeReason });
 
       // Modellwahl über den Admin-Katalog (Admin-UI → „Modelle") — Regeln

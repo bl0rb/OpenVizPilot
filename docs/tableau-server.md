@@ -69,8 +69,11 @@ Im Untersuchen-Modus kann die Extension den Umfang „Gesamte Umgebung“ wähle
 (`mode: 'investigate-estate'`, `packages/shared/src/schemas.ts`). Der Kern hängt dafür zusätzlich
 `INVESTIGATE_ESTATE_PROMPT_SECTION` an — aber NUR wenn dieselben Hürden wie oben (Lizenz-Feature
 `serverData` UND Freigabe der Person) erfüllt sind; sonst wird der Modus serverseitig auf
-`investigate` zurückgestuft und stattdessen `INVESTIGATE_ESTATE_DOWNGRADE_NOTICE` angehängt (kein
-eigenes SSE-Event — der Hinweis steuert den Text der Modellantwort). Der Ablauf nutzt exakt denselben
+`investigate` zurückgestuft und stattdessen `INVESTIGATE_ESTATE_DOWNGRADE_NOTICE` angehängt. Weil
+Modelle diesen Prompt-Hinweis ignorieren können, schreibt die Middleware bei einer frischen Nutzerfrage
+zusätzlich selbst einen kurzen Hinweis als erstes `delta` (Grund: Freigabe fehlt bzw. Tableau Server
+nicht erreichbar) und loggt `investigate-estate downgraded` mit `reason`
+(`tableau_unavailable`, `server_data_access`, `server_data_license`). Der Ablauf nutzt exakt denselben
 `tableau_view_data`-Pfad wie oben, mit zwei zusätzlichen harten Regeln im Prompt: höchstens 5 Views
 je Turn lesen, dabei bevorzugt `aggregate` statt Rohzeilen anfordern. Seit W8 sucht der Modus auch
 über Datenquellen (`tableau_datasource_search`) und — mit Site-Schalter „Datenquellen abfragen“ —
@@ -136,3 +139,20 @@ Definiert in `ee/server/src/tableau-server/routes.ts` und `eas-routes.ts`; Mount
 ## Mindestversion
 
 Tableau Server **2024.2** einschließlich, REST API **3.23** (`TABLEAU_MIN_SERVER_VERSION`, `TABLEAU_REST_API_VERSION` in `ee/server/src/tableau-server/config.ts`). Der Connector verwendet 3.23 als feste Request-Version für alle REST-Aufrufe; neuere Server beantworten dies unverändert.
+
+## Fehlersuche (Logs)
+
+Die Middleware loggt zu Tableau Server nur Metadaten, nie Antworten, Abfragen oder Claims:
+
+- `tableau unavailable for chat` mit `error`: warum der Chat für eine Anfrage keine Tableau-Tools
+  bekommt, z. B. `oidc_user_missing`, `tableau_disabled`, `license_required`, `oidc_required`
+  (Anmeldung abgelaufen oder fremder Issuer), `TABLEAU_CLAIM_INVALID` (Username-Claim fehlt im
+  Token), `TABLEAU_SITE_UNRESOLVED` (mehrere Sites, Dashboard keiner Site zugeordnet).
+- `tableau operation` mit `result: 'failed'`, `error` und ggf. `status`: der Fehler eines
+  REST-/Metadata-/VizQL-Aufrufs als stabiler Code (`TABLEAU_AUTH_FAILED`, `TABLEAU_HTTP_ERROR`,
+  `TABLEAU_VERSION_UNSUPPORTED` …) plus HTTP-Status von Tableau, zusammen mit `requestId`,
+  `operation`, `site` und `durationMs`.
+- `investigate-estate downgraded` mit `reason`, siehe oben.
+
+Für eine Fehlermeldung genügen diese Zeilen (z. B. `kubectl logs … | grep tableau`) mit
+Tableau-Server-Version und Zeitpunkt.

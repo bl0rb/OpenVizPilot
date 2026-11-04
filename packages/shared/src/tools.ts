@@ -132,7 +132,7 @@ export const toolDefinitions: ToolDefinition[] = [
     function: {
       name: 'list_worksheets',
       description:
-        'List the names of all worksheets in the currently open dashboard. Use this if a worksheet name from the context seems outdated or a lookup by name failed.',
+        'List the names of all worksheets in the currently open dashboard (not other workbooks or views on Tableau Server). Use this if a worksheet name from the context seems outdated or a lookup by name failed.',
       parameters: { type: 'object', properties: {}, additionalProperties: false },
     },
   },

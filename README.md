@@ -20,7 +20,7 @@ OpenVizPilot is a Tableau dashboard extension with a chat UI that answers questi
 
 For dashboard users
 
-- Ask in plain language: the LLM reads worksheet data, filters, parameters and selections through 10 read-only tools (5 tool rounds per question in Ask mode, 12 when investigating, 16 across the estate), including aggregation drilldowns (`aggregate_summary_data`: group by/sum/avg/min/max/count over summary data — no full-data permission required).
+- Ask in plain language: the LLM reads worksheet data, filters, parameters and selections through 10 read-only tools (5 tool rounds per question in Ask mode, 12 when investigating, 24 across the estate), including aggregation drilldowns (`aggregate_summary_data`: group by/sum/avg/min/max/count over summary data — no full-data permission required).
 - Action chips (Enterprise, `actions`): the LLM proposes follow-up questions and dashboard actions — apply or clear filters, change parameters, highlight marks (for example “show me the top 3 regions”) and show or hide a dashboard zone. Actions run only on click, with the technical detail always shown in plain text — human-in-the-loop by design, which also reduces prompt injection risk. Without a license the model is not told the action syntax and never proposes one.
 - It knows what you are looking at: the context lists which views are currently hidden behind a show/hide zone, so the assistant can say “that view is closed — shall I open it?” instead of describing something you cannot see. It also names the real controls of the dashboard when you ask where to change something. Mark highlights are counted too, not just what you click. The chat panel inherits the workbook font and text color so it does not stick out on a dashboard with a corporate theme.
 - Transparency: analysis trace (every tool call is visible and expandable), source references in answers, transcript export as Markdown.
@@ -151,6 +151,8 @@ cp .env.example .env   # set OVP_LLM_BASE_URL, OVP_LLM_API_KEY, OVP_DEFAULT_MODE
 Testing with Tableau Desktop: run `npm run dev`, open a dashboard in Tableau, drag an “Extension” object onto the dashboard and pick [packages/extension/public/openvizpilot.dev.trex](packages/extension/public/openvizpilot.dev.trex) — this one points at the Vite dev server. (The manifest from the admin UI points at the middleware, which only serves the extension in production.) Debugging: start Tableau Desktop with `--remote-debugging-port=8696` and open Chrome at `http://localhost:8696`.
 
 Testing without Tableau: run `npm run dev:demo` and open http://localhost:5173 — questions containing “Filter” or “Revenue” trigger tool calls in the mock LLM.
+
+More for contributors (in German): [architecture](docs/architecture.md), [development guide](docs/development.md) (test loops, helper scripts, production build) and [contributing](docs/contributing.md) (checklists for adding a tool, a setting, an Enterprise feature or a UI text).
 
 ## Static demo (no middleware, no LLM)
 

@@ -9,6 +9,13 @@ import { checkScope, extractLatestUserMessage, SCOPE_REFUSAL_MESSAGE } from '../
 import { pipeChatStream } from '../llm/stream';
 import { pseudonymizeUser } from '../usage-pseudonym';
 import type { Logger } from '../logger';
+
+/** Sichtbarer Hinweis, wenn "Gesamte Umgebung" serverseitig auf das geöffnete Dashboard zurückgestuft wird. */
+export const ESTATE_DOWNGRADE_MESSAGES = {
+  tableau_unavailable: '_Umgebungsweite Untersuchung ist gerade nicht verfügbar: Tableau Server ist für diese Anfrage nicht erreichbar (Integration aus, Site nicht zugeordnet, Anmeldung abgelaufen oder Username-Claim fehlt). Ich untersuche nur dieses Dashboard._',
+  server_data_access: '_Umgebungsweite Untersuchung ist für dich nicht freigegeben. Ich untersuche nur dieses Dashboard._',
+  server_data_license: '_Umgebungsweite Untersuchung ist nicht freigegeben. Ich untersuche nur dieses Dashboard._',
+} as const;
 import {
   extractFactsInBackground,
   personalizationPromptSection,
@@ -174,6 +181,13 @@ export function createChatRoute(
       // erscheint als normaler Text am Anfang der Modellantwort.
       const estateDowngraded = requestedMode === 'investigate-estate' && !serverDataEnabled;
       const mode = estateDowngraded ? 'investigate' : requestedMode;
+      // Grund der Rückstufung nur als Metadaten-Klasse (kein Inhalt): ohne ihn sieht der Betrieb nicht,
+      // ob Freigabe/Lizenz fehlen oder Tableau Server für die Anfrage nicht verfügbar ist (Integration
+      // aus, Site nicht zugeordnet, Anmeldung abgelaufen, Username-Claim fehlt).
+      const estateDowngradeReason = !estateDowngraded ? null
+        : !tableauServerEnabled ? 'tableau_unavailable'
+          : !c.get('userAccess')?.serverData ? 'server_data_access' : 'server_data_license';
+      if (estateDowngradeReason) logger.info('investigate-estate downgraded', { reason: estateDowngradeReason });
 
       // Modellwahl über den Admin-Katalog (Admin-UI → „Modelle") — Regeln
       // und Fail-Closed-Verhalten in resolveModel() oben.
@@ -287,6 +301,16 @@ export function createChatRoute(
           }
 
           recordDashboardQuestion();
+
+          // Rückstufung sichtbar machen, ohne sich auf das Modell zu verlassen: der Hinweis im
+          // System-Prompt wurde in der Praxis ignoriert. Nur bei einer frischen Nutzerfrage, nicht in
+          // jeder Tool-Runde desselben Turns.
+          if (estateDowngradeReason && req.messages[req.messages.length - 1]?.role === 'user') {
+            await stream.writeSSE({
+              event: 'delta',
+              data: JSON.stringify({ content: `${ESTATE_DOWNGRADE_MESSAGES[estateDowngradeReason]}\n\n` }),
+            });
+          }
 
           let memoryFacts: string[] = [];
           // Ohne Lizenz mit "memory" wird nichts gelesen und später nichts

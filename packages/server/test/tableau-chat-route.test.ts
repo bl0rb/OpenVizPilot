@@ -35,11 +35,12 @@ async function requestWith(
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ context: '# Dashboard', messages: [{ role: 'user', content: 'Hallo' }], ...(mode ? { mode } : {}) }),
   });
-  await response.text();
+  const sse = await response.text();
   const calls = completion.mock.calls as unknown as Array<[unknown]>;
-  return calls[0]?.[0] as {
+  return { ...(calls[0]?.[0] as object), sse } as {
     tools: Array<{ function: { name: string } }>;
     messages: Array<{ content: string }>;
+    sse: string;
   };
 }
 
@@ -113,6 +114,19 @@ describe('mode "investigate-estate" (W7, Cross-Dashboard)', () => {
     const body = await requestWith({ available: available() }, true, { serverData: true, hasEeFeature: async () => false, mode: 'investigate-estate' });
     expect(body.messages[0]!.content).not.toContain('UMGEBUNGSWEITE UNTERSUCHUNG');
     expect(body.messages[0]!.content).toContain('HINWEIS AN DICH');
+  });
+
+  it('shows the downgrade deterministically as the first delta, with a reason, instead of relying on the model', async () => {
+    const denied = await requestWith({ available: available() }, true, { serverData: false, hasEeFeature: async () => true, mode: 'investigate-estate' });
+    expect(denied.sse).toContain('event: delta');
+    expect(denied.sse).toContain('für dich nicht freigegeben');
+
+    const offline = await requestWith({ available: vi.fn(async () => false) }, true, { serverData: true, hasEeFeature: async () => true, mode: 'investigate-estate' });
+    expect(offline.tools.some((tool) => tool.function.name.startsWith('tableau_'))).toBe(false);
+    expect(offline.sse).toContain('Tableau Server ist für diese Anfrage nicht erreichbar');
+
+    const granted = await requestWith({ available: available() }, true, { serverData: true, hasEeFeature: async (f) => f === 'serverData', mode: 'investigate-estate' });
+    expect(granted.sse).not.toContain('Umgebungsweite Untersuchung ist');
   });
 
   it('plain "investigate" mode never gets the estate section or the downgrade notice, even with full serverData access', async () => {

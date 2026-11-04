@@ -126,6 +126,7 @@ export const adminPageHtml = `<!doctype html>
   input[type="checkbox"]:checked::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 12px no-repeat; }
   input[type="checkbox"][role="switch"] { width: 36px; height: 20px; border-radius: 999px; background: var(--border); }
   input[type="checkbox"][role="switch"]::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgb(13 15 22 / 25%); transition: transform 0.15s; }
+  input[type="checkbox"][role="switch"]:checked { background: var(--accent); border-color: var(--accent); }
   input[type="checkbox"][role="switch"]:checked::before { transform: translateX(16px); }
   input[type="checkbox"][role="switch"]:checked::after { content: none; }
   input[type="checkbox"]:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -159,7 +160,8 @@ export const adminPageHtml = `<!doctype html>
   #users-table .icon-button + .icon-button { margin-left: 4px; }
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
-  dialog input { min-height: 44px; }
+  /* Kontrollkästchen und Schalter ausnehmen — sonst wird der Schalter im Dialog 44px hoch (hochkantes Oval). */
+  dialog input:not([type="checkbox"]) { min-height: 44px; }
   #metric-dialog { width: min(640px, calc(100% - 2rem)); }
   dialog.dialog-wide { width: min(760px, calc(100% - 2rem)); }
   #metric-dialog input[aria-invalid="true"], #metric-dialog textarea[aria-invalid="true"] { border-color: var(--danger); }
@@ -236,7 +238,7 @@ export const adminPageHtml = `<!doctype html>
   .danger-zone .hint { margin: 0 0 0.75rem; }
   .danger-zone .form-actions { margin: 0; padding: 0; border: 0; }
   /* Schalter mit Bezeichnung und Kurzbeschreibung rechts daneben. */
-  .switch-field { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 13px; }
+  .switch-field, .form-grid > label.switch-field { display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer; font-size: 13px; }
   .switch-field input { margin-top: 2px; }
   .switch-field strong { display: block; font-weight: 600; }
   .switch-field small { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; }

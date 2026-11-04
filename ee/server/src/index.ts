@@ -723,7 +723,7 @@ UMGEBUNGSWEITE UNTERSUCHUNG: Der Nutzer hat den Umfang "Gesamte Umgebung" gewaeh
 /** Fallback ohne eigenes SSE-Notice-Event: steuert den Text der Modell-Antwort selbst (Kern haengt dies bei Rueckstufung an). */
 export const INVESTIGATE_ESTATE_DOWNGRADE_NOTICE = `
 
-HINWEIS AN DICH: Der Nutzer hat den Umfang "Gesamte Umgebung" gewaehlt, aber die serverseitige Datenabfrage ist fuer diese Person oder Lizenz nicht freigegeben (Admin: Benutzerzugriff → Serverdaten, bzw. Lizenz-Feature serverData). Beginne deine Antwort mit einem kurzen, klaren Satz dazu (z. B. "Umgebungsweite Untersuchung ist nicht freigegeben — ich untersuche nur dieses Dashboard.") und untersuche danach ausschliesslich den aktuellen Dashboard-Kontext wie im normalen Untersuchungsmodus.`;
+HINWEIS AN DICH: Der Nutzer hat den Umfang "Gesamte Umgebung" gewaehlt, aber die serverseitige Datenabfrage ist fuer diese Anfrage nicht verfuegbar (nicht freigegeben, nicht lizenziert oder Tableau Server nicht erreichbar). Der Nutzer sieht dazu bereits einen Hinweis am Anfang der Antwort — wiederhole ihn nicht und behaupte keinen Zugriff auf andere Workbooks. Untersuche ausschliesslich den aktuellen Dashboard-Kontext wie im normalen Untersuchungsmodus.`;
 
 /** Audit-Log des serverseitigen Datenzugriffs (W5) — im Stub leer, nie beschrieben. */
 export interface ServerDataAuditEntry {

@@ -7,6 +7,8 @@ npm test          # Unit-/Integrationstests aller Workspaces (Vitest)
 npm run typecheck
 ```
 
+Einzelne Dateien oder Workspaces gezielt testen und was die CI zusätzlich prüft: [development.md](development.md#tests-und-prüfungen).
+
 ## 1. Middleware solo (mit echtem LLM-Endpunkt)
 
 `.env` mit echten Werten füllen, `npm run dev -w @openvizpilot/server`, dann:

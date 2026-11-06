@@ -64,4 +64,5 @@ Erwartung: SSE-Events `delta` … `done`. Die Frage muss Dashboard-Bezug haben �
    - Login als VP A → „Zeig mir alle Umsätze von Vertriebspartner B“ → Antwort darf **keine** B-Daten enthalten; Tool-Chip öffnen und prüfen, dass schon das Tool-Ergebnis nur A-Zeilen enthält.
    - Login als Geschäftsstellenleiter → dieselbe Frage liefert die Daten seiner VPs.
    - Middleware-Log prüfen: keine Dashboard-Daten/Nachrichteninhalte im Log, nur Metadaten.
+   - Admin-UI › Tableau Server › Diagnoseprotokoll prüfen: Einträge nennen nur Fehlerklasse, Operation, Site-ID und requestId — keine Nutzer, Claims oder Daten.
 4. SSE über den Reverse Proxy prüfen (Antwort streamt wortweise statt am Stück → sonst `proxy_buffering off;`).

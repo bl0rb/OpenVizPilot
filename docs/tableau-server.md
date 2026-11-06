@@ -140,14 +140,24 @@ Definiert in `ee/server/src/tableau-server/routes.ts` und `eas-routes.ts`; Mount
 
 Tableau Server **2024.2** einschließlich, REST API **3.23** (`TABLEAU_MIN_SERVER_VERSION`, `TABLEAU_REST_API_VERSION` in `ee/server/src/tableau-server/config.ts`). Der Connector verwendet 3.23 als feste Request-Version für alle REST-Aufrufe; neuere Server beantworten dies unverändert.
 
-## Fehlersuche (Logs)
+## Fehlersuche (Admin-UI und Logs)
+
+**Diagnoseprotokoll in der Admin-UI** (Tableau Server › Diagnoseprotokoll, `GET /api/admin/tableau-server/diagnostics`):
+dieselben Fehlerklassen wie im Server-Log, je Eintrag mit lesbarem Grund und nächstem Schritt, zusammengefasst
+nach aufeinanderfolgenden gleichen Ereignissen (Anzahl, erstes/letztes Auftreten, `requestId` des letzten) plus
+dem letzten erfolgreichen Aufruf. Es enthält nie Nutzer, Claims, Abfragen oder Daten. Es liegt nur im Speicher
+des jeweiligen Prozesses (höchstens 100 Einträge, seit Prozessstart): bei mehreren Replikaten zeigt jede
+Instanz nur ihre eigenen Ereignisse, ein Neustart leert es. Für Dauerhaftes bleibt das Server-Log.
 
 Die Middleware loggt zu Tableau Server nur Metadaten, nie Antworten, Abfragen oder Claims:
 
 - `tableau unavailable` mit `error`: warum Chat, Desktop oder Tableau-MCP keine Tableau-Tools
   bekommen (derselbe Grund höchstens einmal je Minute), z. B. `oidc_user_missing`, `tableau_disabled`, `license_required`, `oidc_required`
-  (Anmeldung abgelaufen oder fremder Issuer), `TABLEAU_CLAIM_INVALID` (Username-Claim fehlt im
-  Token), `TABLEAU_SITE_UNRESOLVED` (mehrere Sites, Dashboard keiner Site zugeordnet).
+  (Anmeldung abgelaufen oder fremder Issuer; ein Schrägstrich am Ende der Issuer-URL zählt nicht als fremd),
+  `TABLEAU_CLAIM_INVALID` (Username-Claim fehlt im signierten ID-Token — userinfo zählt nicht),
+  `TABLEAU_SITE_UNRESOLVED` (mehrere Sites, Dashboard keiner Site zugeordnet), `tableau_unavailable`
+  (OAuth 2.0 Trust ohne EAS-Schlüssel oder Public URL). Keiner dieser Gründe setzt einen Aufruf
+  von Tableau Server voraus — die Version oder Erreichbarkeit des Servers spielt hier keine Rolle.
 - `tableau operation` mit `result: 'failed'`, `error` und ggf. `status`: der Fehler eines
   REST-/Metadata-/VizQL-Aufrufs als stabiler Code (`TABLEAU_AUTH_FAILED`, `TABLEAU_HTTP_ERROR`,
   `TABLEAU_VERSION_UNSUPPORTED` …) plus HTTP-Status von Tableau, zusammen mit `requestId`,

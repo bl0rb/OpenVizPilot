@@ -84,7 +84,11 @@ nachgezogen werden. Vorausgesetzt: Tableau Server ab 2024.2 einschließlich bzw.
 
 Mit nur einer Site ist keine Zuordnung nötig — Suche und Metadaten lösen dann automatisch die einzige konfigurierte
 Site auf. Mit mehreren Sites ordnet der Abschnitt **Dashboard-Zuordnung** jedes eingebundene Dashboard genau einer
-Site zu (Auswahl aus den bereits registrierten Dashboards). Fragt ein Anwender aus einem nicht zugeordneten
+Site zu (Auswahl aus den bereits registrierten Dashboards). Jeder Eintrag zeigt Name, die letzten acht Zeichen des
+Registrierungsschlüssels und die letzte Nutzung; den vollständigen Schlüssel sieht der Autor in den Einstellungen der
+Extension („Zuordnung: dashboard:…“). Mehrere gleichnamige Einträge entstehen durch Workbook-Kopien oder, wenn das
+Workbook nach dem ersten Öffnen mit der Extension nie gespeichert wurde, durch eine neue Registrierung bei jedem
+Öffnen im Bearbeitungsmodus. Fragt ein Anwender aus einem nicht zugeordneten
 Dashboard nach Tableau-Server-Inhalten, erscheint die Meldung „Dashboard ist keiner Tableau-Site zugeordnet — im
 Admin unter Tableau Server zuordnen.“ statt eines Suchergebnisses.
 

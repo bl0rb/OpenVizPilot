@@ -24,6 +24,8 @@ export default defineConfig({
     proxy: {
       // Dev: Same-Origin über den Vite-Proxy — kein CORS nötig.
       '/api': `http://localhost:${serverPort()}`,
+      // Tableau-Desktop-Login: Die Extension holt den Code bei der Middleware ab (ee/server/src/auth-routes.ts).
+      '/auth/callback/relay': `http://localhost:${serverPort()}`,
     },
   },
   build: {

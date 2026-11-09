@@ -61,6 +61,14 @@ Nutzer-ID für Memory, Präferenzen und Statistik (statt der client-asserted Tab
 5. Die Extension sendet das ID-Token als `Authorization: Bearer …` bei allen API-Aufrufen; nach Ablauf
    (typisch 1 h) erscheint der Login erneut.
 
+**Tableau Desktop** fängt Popups ab, und Entra ID lässt sich nicht einbetten. Dort öffnet die Extension den
+IdP deshalb im System-Browser. Nach der Anmeldung legt `/auth/callback` den Code über `POST /auth/callback/relay`
+in der Betriebsdatenbank ab (Tabelle `ee_auth_relay`, nur Hashes von state und Bestätigungscode, 5 Minuten,
+einmalig) und zeigt einen 6-stelligen **Bestätigungscode**. Die Person tippt ihn in der Extension ein; erst
+damit gibt `POST /auth/callback/relay/take` den Code heraus (höchstens 5 Versuche), danach folgt Schritt 4.
+Der Bestätigungscode verhindert, dass jemand einen selbst gestarteten Login per Link unterschiebt und bei
+stillem SSO den Code der angemeldeten Person abholt — er erscheint nur in deren Browser.
+
 ## Einrichtung über die Admin-UI (empfohlen)
 
 Alles Folgende lässt sich ohne Redeploy in der Admin-UI (`/admin`) pflegen: unter **„Anmeldung“**
@@ -82,7 +90,15 @@ Extension an (Sitzungs-Token, 12 h, Lockout nach 5 Fehlversuchen). Das ist der W
   Diese **öffentliche URL** muss bekannt sein (Feld in der Admin-UI oder `OVP_PUBLIC_URL`): Aus ihr entsteht die
   Redirect-URI `<URL>/auth/callback`; sie wird bewusst nie aus dem Host-Header eines Requests abgeleitet.
   Ohne sie bleibt SSO blockiert.
-- Tableau: Popups aus der Extension müssen erlaubt sein (Standard in Tableau Server/Cloud und Desktop).
+- Tableau Server/Cloud: Popups aus der Extension müssen erlaubt sein (Standard).
+- Tableau Desktop: Login über den System-Browser mit Bestätigungscode (siehe Ablauf). Braucht die
+  Betriebsdatenbank wie die Benutzerfreigaben ohnehin; mit mehreren Replicas Postgres, Sticky Sessions sind
+  nicht nötig. Die Relay-Endpunkte antworten nur bei aktivem SSO und sind zwangsläufig unangemeldet —
+  zusätzlich zu den Grenzen in der Middleware (8 KiB, kein Überschreiben, höchstens 10 000 Einträge, wenige
+  gleichzeitige DB-Zugriffe) ein Ratenlimit je Client am Ingress für `/auth/callback/relay*` setzen; die
+  Middleware selbst kennt hinter dem Ingress keine verlässliche Client-IP.
+- Keycloak: Der Code verfällt nach dem *Client login timeout* des Realms (Standard 1 Minute). Für Tableau
+  Desktop muss der Bestätigungscode innerhalb dieser Zeit eingegeben sein — bei Bedarf den Wert erhöhen.
 
 ## Microsoft Entra ID
 

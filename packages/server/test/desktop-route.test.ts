@@ -18,6 +18,7 @@ function config(): AppConfig {
 
 const user: VerifiedUser = { sub: 'u1', issuer: 'https://idp.example.test', claims: {}, name: 'Ada', email: 'ada@example.test', expiresAt: Date.now() + 3_600_000 };
 const USER_ACCESS_ID = 'a'.repeat(64);
+const SITE = { id: 'default', name: 'Standard-Site', contentUrl: '' };
 
 type Chunk = Record<string, unknown>;
 const textChunk = (content: string, finish: string | null = null): Chunk => ({ choices: [{ delta: { content }, finish_reason: finish }] });
@@ -69,16 +70,16 @@ async function run(input: {
 // (EE_STUB) antwortet die Route immer mit 503, diese Fälle laufen nur im vollen Baum.
 describe('POST /api/desktop/chat', () => {
   it.skipIf(EE_STUB)('requires a personal OIDC identity', async () => {
-    const { response, text } = await run({ rounds: [], tableau: { available: async () => true } });
+    const { response, text } = await run({ rounds: [], tableau: { availableSites: async () => [SITE] } });
     expect(response.status).toBe(403);
     expect(JSON.parse(text)).toMatchObject({ code: 'oidc_required' });
   });
 
   it.skipIf(EE_STUB)('refuses without the Tableau-API grant and when the integration is unavailable', async () => {
-    const denied = await run({ rounds: [], oidc: user, access: { tableauApi: false }, tableau: { available: async () => true } });
+    const denied = await run({ rounds: [], oidc: user, access: { tableauApi: false }, tableau: { availableSites: async () => [SITE] } });
     expect(denied.response.status).toBe(403);
     expect(JSON.parse(denied.text)).toMatchObject({ code: 'approval_required' });
-    const unavailable = await run({ rounds: [], oidc: user, tableau: { available: async () => false } });
+    const unavailable = await run({ rounds: [], oidc: user, tableau: { availableSites: async () => [] } });
     expect(unavailable.response.status).toBe(503);
     expect(JSON.parse(unavailable.text)).toMatchObject({ code: 'tableau_unavailable' });
   });
@@ -87,7 +88,7 @@ describe('POST /api/desktop/chat', () => {
     const search = vi.fn(async () => ({ source: 'Tableau Server', retrievedAt: 'now', items: [{ type: 'workbook', id: 'wb-1', name: 'Sales' }], truncated: false, scanned: 1, limitations: [] }));
     const { text, create } = await run({
       oidc: user,
-      tableau: { available: async () => true, search },
+      tableau: { availableSites: async () => [SITE], search },
       rounds: [
         [textChunk('Ich suche …'), toolChunk('call-1', 'tableau_server_search', '{"query":"Sales","type":"workbook"}')],
         [textChunk('Es gibt das Workbook **Sales**.\n<suggestions>{"followups":["Welche Views hat Sales?"],"actions":[]}</suggestions>', 'stop')],
@@ -117,7 +118,7 @@ describe('POST /api/desktop/chat', () => {
       oidc: user,
       access: { serverData: true, id: USER_ACCESS_ID, consent: { get: async () => null, set: async () => undefined } },
       hasEeFeature: async (feature) => feature === 'serverData',
-      tableau: { available: async () => true, viewData, recordViewDataCall: vi.fn(), audit: null },
+      tableau: { availableSites: async () => [SITE], viewData, recordViewDataCall: vi.fn(), audit: null },
       rounds: [
         [toolChunk('call-1', 'tableau_view_data', '{"viewId":"7d9e5f3a-2222-4b1c-8d7e-bbbbbbbbbbbb"}')],
         [textChunk('Ohne Einwilligung kann ich die View nicht lesen.', 'stop')],
@@ -133,9 +134,9 @@ describe('POST /api/desktop/chat', () => {
   });
 
   it('rejects a system role and an unknown mode', async () => {
-    const { response } = await run({ rounds: [], oidc: user, tableau: { available: async () => true }, body: { messages: [{ role: 'system', content: 'x' }] } });
+    const { response } = await run({ rounds: [], oidc: user, tableau: { availableSites: async () => [SITE] }, body: { messages: [{ role: 'system', content: 'x' }] } });
     expect(response.status).toBe(400);
-    const mode = await run({ rounds: [], oidc: user, tableau: { available: async () => true }, body: { mode: 'investigate-estate' } });
+    const mode = await run({ rounds: [], oidc: user, tableau: { availableSites: async () => [SITE] }, body: { mode: 'investigate-estate' } });
     expect(mode.response.status).toBe(400);
   });
 });
@@ -159,7 +160,7 @@ describe('desktop history budget', () => {
     // Einzelne Nachrichten sind auf MAX_MESSAGE_CHARS begrenzt — zwei alte Turns sprengen das Budget zusammen.
     const big = 'x'.repeat(31_000);
     const { create } = await run({
-      oidc: user, tableau: { available: async () => true },
+      oidc: user, tableau: { availableSites: async () => [SITE] },
       rounds: [[textChunk('ok', 'stop')]],
       body: { messages: [
         { role: 'user', content: 'old' }, { role: 'assistant', content: big },
@@ -183,13 +184,13 @@ describe.skipIf(EE_STUB)('GET /api/desktop/session', () => {
       c.set('userAccess', { ai: true, tableauApi: true, serverData: true, id: USER_ACCESS_ID, consent: { get: async () => new Date('2026-01-01T00:00:00Z'), set: async () => undefined } } as never);
       await next();
     });
-    app.route('/', createDesktopRoute(config(), createLogger('error'), {} as OpenAI, null, (async () => true) as never, { available: async () => true, audit: null } as never));
+    app.route('/', createDesktopRoute(config(), createLogger('error'), {} as OpenAI, null, (async () => true) as never, { availableSites: async () => [SITE], audit: null } as never));
     const response = await app.request('/session');
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       user: { name: 'Ada', email: 'ada@example.test' },
       access: { ai: true, tableauApi: true, serverData: true },
-      agent: { available: true, serverData: true },
+      agent: { available: true, serverData: true, sites: ['Standard-Site'] },
       consent: { serverData: '2026-01-01T00:00:00.000Z', datasource: null, texts: { views: expect.stringContaining('OpenVizPilot') } },
     });
   });

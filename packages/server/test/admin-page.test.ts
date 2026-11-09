@@ -243,6 +243,9 @@ describe('admin presentation', () => {
       expect(adminPageHtml).toContain('data:font/woff2;base64,');
       const callback = await instance.app.request('/auth/callback');
       expect(callback.headers.get('content-security-policy')).not.toContain('font-src');
+      // /auth/callback zeigt im Tableau-Desktop-Login den Bestätigungscode — nie rahmbar (Clickjacking).
+      expect(callback.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+      expect(callback.headers.get('x-frame-options')).toBe('DENY');
     } finally {
       instance.stopHeartbeat();
       await instance.memoryStore?.close();

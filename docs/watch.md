@@ -44,6 +44,12 @@ Schwellwert oder `Änderung in %` gegenüber dem vorherigen Lauf). Gelesen werde
 Zeilen; hat die View mehr, bricht der Lauf mit `too_many_rows` ab, statt über einen Ausschnitt zu
 rechnen. Wer View, Kennzahl, Filter oder Bedingung ändert, startet ohne Vorwert und Alarmzustand.
 
+Die Site einer Regel ergibt sich bei jedem Lauf aus ihrem gespeicherten Dashboard-Schlüssel (siehe
+Dashboard→Site-Zuordnung in [tableau-server.md](tableau-server.md)). Regeln, die angelegt wurden,
+als die Extension noch den Dashboard-Namen schickte, lassen sich bei mehreren Sites nicht zuordnen
+und scheitern dann mit `TABLEAU_SITE_UNRESOLVED`; sie müssen nach dem Wechsel auf mehrere Sites
+über den Chat neu angelegt werden.
+
 ## Zeitpläne
 
 `15m` · `1h` · `6h` · `24h` · `weekly` (mit Wochentag + Stunde), Zeitzone als IANA-Name (Default

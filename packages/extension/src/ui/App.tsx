@@ -23,7 +23,7 @@ import {
 } from '@openvizpilot/ee/extension';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import { ChatSession } from '../chat/agent-loop';
-import { ensureDashboardKey, registerDashboard } from '../tableau/dashboard-registration';
+import { ensureDashboardKey, registerDashboard, tableauToolDashboardKey } from '../tableau/dashboard-registration';
 import { loadSlashCommands, sendUsageEvents } from '../chat/commands-client';
 import { expandSlashCommand } from '../chat/slash-commands';
 import { isAllowedBackendUrl, loadSettings, parseMaxToolRounds, saveSettings, type ExtensionSettings } from '../settings';
@@ -446,13 +446,14 @@ export function App(props: { dashboard: Dashboard }) {
             authorContext,
             answerFocus,
             dashboardKey: dashboardKey || undefined,
+            registrationKey: playbookKey || undefined,
             mode,
             maxToolRounds: parseMaxToolRounds(settings.maxToolRounds),
             getContext,
             executeTool: (call, approval, signal) => ['tableau_server_search', 'tableau_metadata_search', 'tableau_metadata_field', 'tableau_view_data', 'tableau_datasource_search', 'tableau_datasource_fields', 'tableau_datasource_query', 'propose_watch_rule'].includes(call.function.name)
-              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: dashboardKey || undefined, consent: consentGateRef.current })
+              ? executeTableauTool({ call, signal, baseUrl, apiToken: apiToken || undefined, dashboardKey: tableauToolDashboardKey(playbookKey, dashboardKey), consent: consentGateRef.current })
               : call.function.name.startsWith('mcp__')
-                ? executeMcpTool({ call, approval, signal, dashboardKey: dashboardKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => askConfirm(t('app.confirm.mcpTitle'), message, t('app.confirm.mcpAccept')) })
+                ? executeMcpTool({ call, approval, signal, dashboardKey: playbookKey || '', baseUrl, apiToken: apiToken || undefined, confirm: (message) => askConfirm(t('app.confirm.mcpTitle'), message, t('app.confirm.mcpAccept')) })
                 : executeToolCall(call, dashboard, { baseUrl, apiToken: apiToken || undefined }),
           },
           {
@@ -492,7 +493,7 @@ export function App(props: { dashboard: Dashboard }) {
         )
         .finally(() => setBusy(false));
     },
-    [session, baseUrl, apiToken, settings.model, settings.maxToolRounds, userId, authorContext, answerFocus, mode, getContext, dashboard, logout, features.actions, authReady, askConfirm],
+    [session, baseUrl, apiToken, settings.model, settings.maxToolRounds, userId, authorContext, answerFocus, mode, getContext, dashboard, playbookKey, logout, features.actions, authReady, askConfirm],
   );
 
   const send = useCallback(

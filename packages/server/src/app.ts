@@ -267,7 +267,19 @@ export function createApp(config: AppConfig): {
   app.route('/.well-known/oauth-protected-resource', createProtectedResourceRoute(config.tableauMcp, mcpAccess));
   app.use('/api/*', requireUserAccess(memoryStore, logger));
   app.route('/api/auth', createAuthRoutes({ authState, store: memoryStore, logger, tableau }));
-  app.route('/auth/callback', createAuthCallbackRoute());
+  // Relay für den System-Browser-Login aus Tableau Desktop: nur mit Betriebsdatenbank (gemeinsam
+  // über alle Replicas) und nur, solange SSO wirklich aktiv ist — dieselbe Bedingung wie für /api/*.
+  app.route(
+    '/auth/callback',
+    createAuthCallbackRoute({
+      relay: backend?.authRelay ?? null,
+      relayEnabled: async () => {
+        const state = await authState.get();
+        return state.mode === 'oidc' && Boolean(state.oidc) && !state.blockedReason;
+      },
+      log: authLog,
+    }),
+  );
 
   // Sitzungs-Check der Extension beim Start: läuft durch den Guard oben, liefert
   // also 401, wenn das gespeicherte Token (nach Moduswechsel, Ablauf, Sperre)
@@ -295,7 +307,9 @@ export function createApp(config: AppConfig): {
   app.route('/api/mcp', createMcpRoute(mcp, logger, licensedFeature));
   // Desktop-App (clients/desktop, Enterprise): serverseitiger Agenten-Loop über die Tableau-Server-Tools.
   app.route('/api/desktop', createDesktopRoute(config, logger, client, memoryStore, licensedFeature, tableau));
-  app.route('/api/tableau-server', createTableauRoute(tableau));
+  app.route('/api/tableau-server', createTableauRoute(tableau, {
+    isRegisteredDashboard: memoryStore ? async (key) => (await memoryStore.listDashboards()).some((dashboard) => dashboard.dashboardKey === key) : undefined,
+  }));
   app.route(TABLEAU_MCP_PATH, createTableauMcpRoute({ tableau, hasFeature: licensedFeature, logger, metricCatalog: async () => (memoryStore ? memoryStore.getMetricCatalog() : null) }));
   app.route('/api/watch', createWatchRoute({ store: backend?.watch ?? null, engine: watchEngine, tableau, hasFeature: licensedFeature, logger }));
   // Personalisierung (User-Memory, eigene Abfragen) liegt in ee/ und ist

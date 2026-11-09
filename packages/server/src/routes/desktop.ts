@@ -65,7 +65,7 @@ export function trimDesktopHistory(messages: DesktopChatRequest['messages'], max
 const DENIED: Record<'oidc_required' | 'approval_required' | 'tableau_unavailable', { status: 402 | 403 | 503; error: string }> = {
   oidc_required: { status: 403, error: 'Persönliche Anmeldung per Single Sign-On erforderlich.' },
   approval_required: { status: 403, error: 'Tableau-API ist für dein Konto noch nicht freigegeben — bitte den Admin (Benutzer & Zugriff).' },
-  tableau_unavailable: { status: 503, error: 'Tableau-Integration nicht verfügbar — Enterprise-Lizenz (tableauServer, sso) und eine aktive Tableau-Konfiguration mit genau einer Site erforderlich.' },
+  tableau_unavailable: { status: 503, error: 'Tableau-Integration nicht verfügbar — Enterprise-Lizenz (tableauServer, sso) und eine aktive Tableau-Konfiguration mit mindestens einer Site erforderlich.' },
 };
 
 export function createDesktopRoute(
@@ -100,7 +100,7 @@ export function createDesktopRoute(
     return c.json({
       user: { name: user?.name ?? null, email: user?.email ?? null },
       access: { ai: Boolean(access?.ai), tableauApi: Boolean(access?.tableauApi), serverData: Boolean(access?.serverData) },
-      agent: 'reason' in agent ? { available: false, reason: agent.reason, error: DENIED[agent.reason].error } : { available: true, serverData: agent.serverData },
+      agent: 'reason' in agent ? { available: false, reason: agent.reason, error: DENIED[agent.reason].error } : { available: true, serverData: agent.serverData, sites: agent.sites.map((site) => site.name) },
       consent: { ...consent, texts: { views: SERVER_DATA_CONSENT_TEXT, datasource: DATASOURCE_CONSENT_TEXT } },
     });
   });

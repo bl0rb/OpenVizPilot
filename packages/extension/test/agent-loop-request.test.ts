@@ -94,6 +94,7 @@ describe('ChatSession request contract', () => {
         authorContext: 'Glossar',
         answerFocus: 'Kurzfassung',
         dashboardKey: 'Rentabilität',
+        registrationKey: 'dashboard:11111111-1111-4111-8111-111111111111',
         getContext: async () => '# Dashboard: Rentabilität',
         executeTool: async () => 'unused',
       },
@@ -121,6 +122,7 @@ describe('ChatSession request contract', () => {
       authorContext: 'Glossar',
       answerFocus: 'Kurzfassung',
       dashboardKey: 'Rentabilität',
+      registrationKey: 'dashboard:11111111-1111-4111-8111-111111111111',
     });
     expect(request.messages).toEqual([{ role: 'user', content: 'Wie läuft es?' }]);
     expect(request.retry).toBeUndefined();

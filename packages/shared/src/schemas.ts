@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_FOCUS_CHARS, MAX_DASHBOARD_KEY_CHARS } from './prefs';
+import { registeredDashboardKeySchema } from './dashboards';
 
 export const MAX_MESSAGES = 200;
 export const MAX_MESSAGE_CHARS = 32_000;
@@ -64,6 +65,13 @@ export const chatRequestSchema = z.object({
    * Nutzungsstatistik pro Dashboard; fließt nicht in den Prompt.
    */
   dashboardKey: z.string().min(1).max(MAX_DASHBOARD_KEY_CHARS).optional(),
+  /**
+   * Registrierungsschlüssel des Workbooks (`dashboard:<uuid>`, Workbook-Einstellung) — derselbe
+   * Schlüssel, unter dem Admin und Autor Dashboard→Site-Zuordnung und MCP-Sites pflegen. Nur
+   * Konfigurationsidentität für die Auflösung; keine Berechtigung. Der Dashboard-Name
+   * (`dashboardKey`) ist dafür ungeeignet: nicht eindeutig und nie registriert.
+   */
+  registrationKey: registeredDashboardKeySchema.optional(),
   /**
    * true = Wiederholung desselben Turns nach einem Fehler (Extension:
    * runTurn(null)) — die Frage wird dann NICHT erneut in der

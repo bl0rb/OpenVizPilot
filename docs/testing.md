@@ -53,6 +53,7 @@ Erwartung: SSE-Events `delta` … `done`. Die Frage muss Dashboard-Bezug haben �
    - „Wo stelle ich die Region um?“ → der Assistent nennt das Bedienelement aus dem Abschnitt „Bedienelemente im Dashboard“.
    - Workbook-Schrift in Tableau umstellen (Format → Arbeitsmappe) → das Chat-Panel übernimmt Schrift und Textfarbe ohne Reload.
    - Nicht existentes Worksheet erfragen („Zeig mir Daten aus Blatt XYZ“) → das LLM korrigiert sich über die Fehlermeldung/`list_worksheets`.
+   - Nur mit SSO-Lizenz und Betriebsdatenbank (Modus „Single Sign-On“): „Mit … anmelden“ öffnet den System-Browser; nach der Anmeldung zeigt er einen Bestätigungscode. Einen falschen Code eingeben → „verbleibende Versuche: 4“; den richtigen eingeben → angemeldet. Den Login ein zweites Mal starten und 5 Minuten warten → „abgelaufen“. **Hier zeigt sich, ob Tableau Desktop `window.open` an den System-Browser weitergibt** — das belegen die automatischen Tests nicht.
 4. Debugging: Desktop mit `--remote-debugging-port=8696` starten, Chrome → `http://localhost:8696`.
 
 ## 4. Tableau Server (Abnahme)

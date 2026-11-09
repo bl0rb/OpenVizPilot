@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ensureDashboardKey, registerDashboard } from '../src/tableau/dashboard-registration';
+import { ensureDashboardKey, registerDashboard, tableauToolDashboardKey } from '../src/tableau/dashboard-registration';
 import type { Dashboard } from '../src/tableau/api';
 
 const KEY = 'openvizpilot.dashboardRegistration';
@@ -62,5 +62,14 @@ describe('dashboard registration request', () => {
       method: 'POST', headers: { authorization: 'Bearer session-token', 'content-type': 'application/json' },
       body: JSON.stringify({ dashboardKey: ID, name: 'Sales' }),
     }));
+  });
+});
+
+// Admin und Autor ordnen Sites unter dem Registrierungsschlüssel zu; der Name allein traf nie.
+describe('Tableau tool dashboard key', () => {
+  it('prefers the registration key and keeps the dashboard name only for unregistered instances', () => {
+    expect(tableauToolDashboardKey(ID, 'Sales Overview')).toBe(ID);
+    expect(tableauToolDashboardKey(null, 'Sales Overview')).toBe('Sales Overview');
+    expect(tableauToolDashboardKey(null, '')).toBeUndefined();
   });
 });

@@ -21,14 +21,16 @@ Identität akzeptiert.
 Darüber hinaus gelten je Aufruf, serverseitig geprüft:
 
 1. Freigabe **„Tableau-API“** der Person (Admin → Benutzer & Zugriff) — sonst `403 approval_required`.
-2. Aktive Tableau-Integration mit Lizenz `tableauServer` + `sso` und genau einer Site.
+2. Aktive Tableau-Integration mit Lizenz `tableauServer` + `sso` und mindestens einer Site. Mit
+   mehreren Sites suchen die Such-Tools siteübergreifend und die Einzelabrufe verlangen `site` —
+   genau wie in der Desktop-App ([desktop.md › Mehrere Sites](desktop.md#mehrere-sites)).
 3. Daten-Tools (`tableau_view_data`, `tableau_datasource_fields`, `tableau_datasource_query`)
    erscheinen nur mit Lizenz `serverData` **und** Freigabe „Serverdaten“; sie brauchen zusätzlich
    die Einwilligung der Person und den Site-Schalter. Fehlt die Einwilligung, liefert das Tool
    nur den Einwilligungstext und den Hinweis, sie in Extension oder Desktop-App zu erteilen —
    ein MCP-Client kann sie nicht stellvertretend geben.
-4. Budgets (8 View- bzw. 12 Datenquellen-Aufrufe je 2 Minuten) und Audit (`purpose: mcp`)
-   wie in der Extension; alle Tools sind `readOnlyHint: true`, nichts schreibt.
+4. Budgets (8 View- bzw. 12 Datenquellen-Aufrufe je 2 Minuten, je Person über alle Sites und
+   gemeinsam mit der Desktop-App) und Audit (`purpose: mcp`) wie in der Extension; alle Tools sind `readOnlyHint: true`, nichts schreibt.
 
 Was die Person im Dashboard nicht sieht, bekommt sie auch über diesen Weg nicht: Die Antwort
 kommt aus Tableau unter ihrer eigenen Anmeldung.

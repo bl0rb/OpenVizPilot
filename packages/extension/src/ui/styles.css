@@ -920,6 +920,13 @@ body {
   opacity: 0.6;
   cursor: wait;
 }
+/* Abbrechen neben „Bestätigen" (Bestätigungscode in Tableau Desktop): genau eine Primäraktion. */
+.login-panel button.btn-secondary {
+  margin-left: 8px;
+  border-color: var(--border-input);
+  background: #fff;
+  color: #333;
+}
 .login-panel label {
   display: block;
   text-align: left;
@@ -1082,6 +1089,11 @@ body {
   background: #fff;
   color: var(--danger);
   border: 1px solid var(--danger-border);
+}
+
+/* Bereich „Tableau-Site“ (Autoren): Aktionsbutton kompakt statt über die volle Spaltenbreite. */
+.prefs-section .btn-primary {
+  align-self: flex-start;
 }
 
 .settings-confirm p {

@@ -4,7 +4,7 @@ Regeln für jede Änderung und Checklisten für die häufigsten Aufgaben. Agente
 
 - **Sprache und Stack:** TypeScript (strict, `tsconfig.base.json` mit `noUncheckedIndexedAccess`), ESM, npm-Workspaces, Node 24. Server auf Hono, Extension auf Preact, Schemas mit zod. Neue Abhängigkeiten nur, wenn vorhandene nicht reichen.
 - **Lizenz:** Alles außerhalb von `ee/` steht unter [PolyForm Noncommercial 1.0.0](../LICENSE), `ee/` unter der proprietären Enterprise-Lizenz. Lizenzpflichtige Logik gehört nach `ee/`, nie nach `packages/`.
-- **Datenisolation:** Keine Tableau-Identität in der Middleware, keine Inhalte in Logs, Dashboard-Änderungen nur auf Klick, Lizenz- und Freigabeprüfung serverseitig. Siehe *Datenisolation zuerst* in `AGENTS.md` und die Sicherheitsgrenzen in [architecture.md](architecture.md#7-sicherheitsgrenzen).
+- **Datenisolation:** Keine Tableau-Identität in der Middleware, keine Inhalte in Logs, Dashboard-Änderungen nur auf Klick, Lizenz- und Freigabeprüfung serverseitig. Siehe *Datenisolation und Sicherheit* in `AGENTS.md` und die Sicherheitsgrenzen in [architecture.md](architecture.md#7-sicherheitsgrenzen).
 - **Tests:** Jede Verhaltensänderung kommt mit Vitest-Tests im `test/`-Ordner des Workspace. Änderungen an Auth, Freigaben, Lizenz oder Datenzugriff testen auch den abgelehnten Fall.
 - **Prüfen:** `npm run typecheck`, `npm test` und `npm run build` müssen grün sein, siehe [development.md](development.md#tests-und-prüfungen).
 - **Texte:** Sichtbare Texte der Extension in `packages/shared/src/i18n.ts`, immer für `de` und `en`. Doku unter `docs/` und Code-Kommentare auf Deutsch, `README.md` auf Englisch. Kommentare erklären das *Warum*.

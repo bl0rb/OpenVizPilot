@@ -19,9 +19,9 @@ function config(): AppConfig {
 async function requestWith(
   tableau: unknown,
   tableauApi = true,
-  options: { serverData?: boolean; hasEeFeature?: (feature: string) => Promise<boolean>; mode?: string } = {},
+  options: { serverData?: boolean; hasEeFeature?: (feature: string) => Promise<boolean>; mode?: string; body?: Record<string, unknown>; mcp?: unknown } = {},
 ) {
-  const { serverData = false, hasEeFeature = async () => false, mode } = options;
+  const { serverData = false, hasEeFeature = async () => false, mode, body: extra = {}, mcp = null } = options;
   const completion = vi.fn(async () => (async function* () {
     yield { choices: [{ delta: {}, finish_reason: 'stop' }] };
   })());
@@ -29,15 +29,17 @@ async function requestWith(
   app.use('*', async (c, next) => { c.set('userAccess', { ai: true, tableauApi, serverData }); await next(); });
   app.route('/', createChatRoute(
     config(), createLogger('error'), { chat: { completions: { create: completion } } } as unknown as OpenAI,
-    null, null, hasEeFeature as never, null, tableau as never,
+    null, null, hasEeFeature as never, mcp as never, tableau as never,
   ));
   const response = await app.request('/', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ context: '# Dashboard', messages: [{ role: 'user', content: 'Hallo' }], ...(mode ? { mode } : {}) }),
+    body: JSON.stringify({ context: '# Dashboard', messages: [{ role: 'user', content: 'Hallo' }], ...(mode ? { mode } : {}), ...extra }),
   });
+  if (!response.ok) return { status: response.status, tools: [], messages: [], sse: await response.text() };
   const sse = await response.text();
   const calls = completion.mock.calls as unknown as Array<[unknown]>;
-  return { ...(calls[0]?.[0] as object), sse } as {
+  return { status: response.status, ...(calls[0]?.[0] as object), sse } as {
+    status: number;
     tools: Array<{ function: { name: string } }>;
     messages: Array<{ content: string }>;
     sse: string;
@@ -139,5 +141,37 @@ describe('mode "investigate-estate" (W7, Cross-Dashboard)', () => {
     expect(body.messages[0]!.content).toContain('UNTERSUCHUNGSMODUS');
     expect(body.messages[0]!.content).not.toContain('UMGEBUNGSWEITE UNTERSUCHUNG');
     expect(body.messages[0]!.content).not.toContain('HINWEIS AN DICH');
+  });
+});
+
+// Admin und Autor speichern Dashboard→Site-Zuordnung und MCP-Bereiche unter dem Registrierungsschlüssel
+// (`dashboard:<uuid>`); der Dashboard-Name bleibt Statistik-Schlüssel und darf die Auflösung nicht steuern.
+describe('dashboard keys for site resolution and MCP', () => {
+  const registrationKey = 'dashboard:11111111-1111-4111-8111-111111111111';
+
+  it('resolves the Tableau site and the MCP area by the registration key, not by the dashboard name', async () => {
+    const available = vi.fn(async () => true);
+    const mcp = { catalogue: vi.fn(async () => []), approvals: vi.fn(async () => ({})) };
+    const body = await requestWith({ available }, true, { body: { dashboardKey: 'Sales Overview', registrationKey }, mcp });
+    expect(body.status).toBe(200);
+    expect(available).toHaveBeenCalledWith(undefined, registrationKey);
+    expect(mcp.catalogue).toHaveBeenCalledWith(undefined, registrationKey, expect.any(AbortSignal));
+  });
+
+  it('uses the dashboard name only without a registration key (like the tool calls), never for MCP', async () => {
+    const available = vi.fn(async () => true);
+    const mcp = { catalogue: vi.fn(async () => []), approvals: vi.fn(async () => ({})) };
+    await requestWith({ available }, true, { body: { dashboardKey: 'Sales Overview' }, mcp });
+    expect(available).toHaveBeenCalledWith(undefined, 'Sales Overview');
+    expect(mcp.catalogue).toHaveBeenCalledWith(undefined, undefined, expect.any(AbortSignal));
+  });
+
+  it('rejects a registration key that is not a registered-dashboard identity', async () => {
+    const available = vi.fn(async () => true);
+    for (const bad of ['Sales Overview', 'dashboard:not-a-uuid', 'dashboard:11111111-1111-4111-8111-111111111111x']) {
+      const body = await requestWith({ available }, true, { body: { registrationKey: bad } });
+      expect(body.status).toBe(400);
+    }
+    expect(available).not.toHaveBeenCalled();
   });
 });

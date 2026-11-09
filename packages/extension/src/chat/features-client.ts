@@ -16,9 +16,11 @@ export interface EeFeatures {
   watch: boolean;
   /** Serverseitiger Datenzugriff (W5) je Person freigegeben + lizenziert — schaltet u. a. den Untersuchen-Umfang „Gesamte Umgebung" frei (W7). */
   serverData: boolean;
+  /** Tableau-Server-Connector lizenziert + Freigabe „Tableau-API“ je Person — zeigt Autoren die Site-Zuordnung in den Einstellungen. */
+  tableauServer: boolean;
 }
 
-export const NO_EE_FEATURES: EeFeatures = { sso: false, memory: false, savedQueries: false, actions: false, watch: false, serverData: false };
+export const NO_EE_FEATURES: EeFeatures = { sso: false, memory: false, savedQueries: false, actions: false, watch: false, serverData: false, tableauServer: false };
 
 export async function fetchFeatures(baseUrl: string, apiToken?: string): Promise<EeFeatures> {
   try {
@@ -34,6 +36,7 @@ export async function fetchFeatures(baseUrl: string, apiToken?: string): Promise
       actions: data.features?.actions === true,
       watch: data.features?.watch === true,
       serverData: data.features?.serverData === true,
+      tableauServer: data.features?.tableauServer === true,
     };
   } catch {
     // Nicht erreichbar: wie "keine Lizenz" behandeln — der Chat selbst läuft weiter.

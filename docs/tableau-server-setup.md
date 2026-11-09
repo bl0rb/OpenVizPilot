@@ -48,7 +48,13 @@ Auth-Modus, eigener Connected App und eigenem Secret.
    Secret-Verfügbarkeit. Diese Aktion kontaktiert Tableau nicht.
 7. Nach dem Speichern den Button **Verbindung testen** der jeweiligen Site-Karte verwenden. Der Button
    ist nur bei geladener, aktivierter und unveränderter Konfiguration sowie vorhandener Lizenz und
-   OIDC-Bereitschaft aktiv; ist er gesperrt, steht der Grund daneben. Das Ergebnis erscheint in der Site-Karte.
+   OIDC-Bereitschaft aktiv; ist er gesperrt, steht der Grund daneben. Das Ergebnis erscheint in der Site-Karte;
+   schlägt der Test fehl, nennt sie die Fehlerklasse mit festem Klartext und, falls bekannt, dem nächsten
+   Schritt — nie Tableaus eigene Fehlertexte. Scheitern einzelne Prüfungen (Serverinfo, Workbooks, Views,
+   Projekte, Datenquellen), steht die Klasse je Prüfung daneben (z. B. `TABLEAU_AUTH_FAILED`, mit HTTP-Status,
+   falls vorhanden) und jeder nächste Schritt einmal darunter; `TABLEAU_AUTH_FAILED` mit 408, 429 oder 5xx
+   gilt als vorübergehender Ausfall, nicht als Ablehnung. Scheitert der ganze Test, steht dort der Text der
+   Middleware mit Code (z. B. `license_required`, `TABLEAU_TIMEOUT`).
 
 ### OAuth 2.0 Trust (je Site, ein gemeinsamer Schlüssel)
 
@@ -81,6 +87,26 @@ Site auf. Mit mehreren Sites ordnet der Abschnitt **Dashboard-Zuordnung** jedes 
 Site zu (Auswahl aus den bereits registrierten Dashboards). Fragt ein Anwender aus einem nicht zugeordneten
 Dashboard nach Tableau-Server-Inhalten, erscheint die Meldung „Dashboard ist keiner Tableau-Site zugeordnet — im
 Admin unter Tableau Server zuordnen.“ statt eines Suchergebnisses.
+
+**Der Autor ordnet selbst zu.** Öffnet der Workbook-Autor die Extension im Bearbeitungsmodus, zeigen die
+Einstellungen bei mehreren konfigurierten Sites den Bereich **Tableau-Site** mit einer Auswahl (Name und
+Content-URL je Site, keine Connected-App-Angaben). Voraussetzung: Enterprise-Lizenz mit `tableauServer` und `sso`,
+persönliche OIDC-Anmeldung, Freigabe **Tableau-API** für die Person und ein registriertes Dashboard (die
+Zuordnung „Standardanalysen pro Dashboard“ im selben Bereich). Die Extensions API nennt die Site des Workbooks
+nicht, deshalb gibt es keinen Vorschlagswert; der Autor wählt und klickt **Site zuordnen**. Die Middleware prüft
+die Site-ID gegen die konfigurierten Sites und setzt die Zuordnung nur, solange noch keine besteht: Eine vom Admin
+(oder früher vom Autor) gesetzte Zuordnung wird nie überschrieben, die Extension zeigt sie dann nur an. Ändern
+oder entfernen kann sie ausschließlich der Admin im Abschnitt **Dashboard-Zuordnung**. Mit genau einer Site
+erscheint der Bereich nicht, weil keine Auswahl nötig ist.
+
+Den Bearbeitungsmodus kann die Middleware nicht prüfen: Die Beschränkung auf den Autor ist eine Bedienhilfe der
+Extension. Serverseitig darf jede Person mit den genannten Voraussetzungen ein **registriertes**, noch nicht
+zugeordnetes Dashboard als Erste zuordnen. Nicht registrierte Schlüssel lehnt die Middleware ab (`404
+dashboard_unregistered`) — das bremst nur Tipp- und Zufallsschlüssel, denn registrieren kann sich jede angemeldete
+Person selbst. Gegen gezielten Missbrauch begrenzt sie die Zuordnungsversuche auf 10 je Person und Stunde (`429
+site_assignment_rate_limited`, je Prozess) und nimmt ab 2000 Zuordnungen keine Autoren-Zuordnungen mehr an (`409
+site_assignment_limit`, die Extension verweist dann an den Admin). Eine falsche Zuordnung korrigiert der Admin;
+Daten liest Tableau auch dann nur mit der persönlichen Identität der fragenden Person auf der zugeordneten Site.
 
 ## Was der persönliche Test macht
 
@@ -139,7 +165,7 @@ Suchtreffer und Metadaten werden als Tool-Ergebnisse an den konfigurierten LLM-A
 - Der Hintergrundabgleich prüft aktive Verbindungen alle 30 Sekunden. Auf anderen Replicas kann ein Config-/Lizenzwechsel wegen des bestehenden Auth-State-Caches bis zu etwa 15 Sekunden später wirksam werden.
 - Logout ist best effort: lokale Credentials werden verworfen und Tableau-Sign-out versucht. Lokales Löschen widerruft weder ein OIDC-ID-Token beim IdP noch garantiert es bei Netzwerkausfall eine sofortige Tableau-Revokation.
 - Bei Secret-Rotation neue Secret-ID und Env-Secret bereitstellen, alle Replicas neu starten, Konfiguration speichern und das alte Secret erst danach in Tableau zurückziehen. Alte lokale Sessions werden unbrauchbar; ein fehlgeschlagener Sign-out ist möglich.
-- Connection- und Suchoperationen werden nach 10 Sekunden abgebrochen. Responses sind zusätzlich größenbegrenzt; Redirects und unsichere Ziele werden abgewiesen.
+- Connection- und Suchoperationen werden nach 10 Sekunden abgebrochen und als `TABLEAU_TIMEOUT` gemeldet (`TABLEAU_ABORTED` nur bei Abbruch durch den Aufrufer). Responses sind zusätzlich größenbegrenzt; Redirects und unsichere Ziele werden abgewiesen.
 - Bei OIDC-, TLS-, Berechtigungs-, Versionierungs- oder REST-Fehlern zeigt die Anwendung eine bereinigte Fehlermeldung. Rohantworten von Tableau werden nicht weitergereicht.
 - Reload, Save, Reset und ungespeicherte Feldänderungen brechen einen laufenden Browser-Test ab und verwerfen sein Ergebnis.
 

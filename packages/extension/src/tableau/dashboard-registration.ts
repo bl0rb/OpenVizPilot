@@ -42,3 +42,13 @@ export async function registerDashboard(baseUrl: string, apiToken: string | unde
     return response.ok;
   } catch { return false; }
 }
+
+/**
+ * Schlüssel, mit dem Tableau-Tools die Site auflösen und unter dem ihr Aufruf-Budget zählt: der
+ * Registrierungsschlüssel, unter dem Admin und Autor die Dashboard→Site-Zuordnung speichern. Ohne
+ * Registrierung bleibt es beim Dashboard-Namen wie bisher — sonst teilten sich alle nicht
+ * registrierten Dashboards einer Person einen Budget-Topf mit Desktop-App und Tableau-MCP.
+ */
+export function tableauToolDashboardKey(registrationKey: string | null, dashboardName: string): string | undefined {
+  return registrationKey || dashboardName || undefined;
+}

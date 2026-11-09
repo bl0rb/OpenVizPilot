@@ -66,6 +66,8 @@ export interface AgentDeps {
   answerFocus?: string;
   /** Dashboard-Name — nur für die anonyme Nutzungsstatistik pro Dashboard. */
   dashboardKey?: string;
+  /** Registrierungsschlüssel (`dashboard:<uuid>`) — Tableau-Site-Zuordnung und MCP-Sites. */
+  registrationKey?: string;
   /** Untersuchungsmodus vs. normaler Chat (Default 'ask') — steuert Rundenbudget und Server-Prompt-Abschnitt. */
   mode?: ChatMode;
   /** Überschreibt das Rundenbudget je Modus (Workbook-Einstellung). */
@@ -133,6 +135,7 @@ export class ChatSession {
             authorContext: deps.authorContext,
             answerFocus: deps.answerFocus,
             dashboardKey: deps.dashboardKey,
+            registrationKey: deps.registrationKey,
             mode: deps.mode,
             // Nur beim Retry nach Fehler (userText === null) — sonst zählte
             // die Statistik dieselbe Frage doppelt.

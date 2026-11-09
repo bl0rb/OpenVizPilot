@@ -35,6 +35,15 @@ export function LoginPanel(props: { baseUrl: string; config: AuthConfigResponse;
   ]);
 }
 
+/**
+ * Site-Auswahl für Dashboard-Autoren (Tableau-Server-Connector, Enterprise): ohne Lizenz gibt es
+ * keine Sites — der Bereich erscheint nicht. Der Kern rendert die Komponente ohnehin nur, wenn
+ * `/api/features` `tableauServer` freigibt.
+ */
+export function DashboardSitePicker(_props: { baseUrl: string; apiToken?: string; dashboardKey: string }) {
+  return null;
+}
+
 // ---------------------------------------------------------- Personalisierung
 
 export interface DashboardPrefs {

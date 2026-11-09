@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
 import {
+  createPgAuthRelayStore,
+  createSqliteAuthRelayStore,
+  type AuthRelayStore,
   createPgPersonalizationStore,
   createPgTelemetryStore,
   createPgMcpStore,
@@ -240,6 +243,8 @@ export interface MemoryBackend {
   serverDataAudit: ServerDataAuditStore;
   /** Beobachtungsregeln von Watch (W6, ee/), ebenfalls auf derselben Verbindung. */
   watch: WatchStore;
+  /** Ablage für den System-Browser-Login aus Tableau Desktop (ee/, siehe auth-routes.ts), ebenfalls auf derselben Verbindung. */
+  authRelay: AuthRelayStore;
   /**
    * Schließt die gemeinsame Verbindung — danach sind BEIDE Stores tot. Der
    * einzige richtige Weg, das Backend zu beenden; `store.close()` direkt
@@ -268,6 +273,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
       // Installations-ID (Pseudonym-Grundlage) kommt vom Telemetry-Store — dieselbe Verbindung.
       serverDataAudit: createPgServerDataAuditStore(pool, telemetry, logger),
       watch: createPgWatchStore(pool, logger),
+      authRelay: createPgAuthRelayStore(pool, logger),
       close: () => store.close(),
     };
   }
@@ -283,6 +289,7 @@ export function createMemoryStore(config: AppConfig, logger: Logger): MemoryBack
       telemetry,
       serverDataAudit: createSqliteServerDataAuditStore(db, telemetry),
       watch: createSqliteWatchStore(db),
+      authRelay: createSqliteAuthRelayStore(db),
       close: () => store.close(),
     };
   }

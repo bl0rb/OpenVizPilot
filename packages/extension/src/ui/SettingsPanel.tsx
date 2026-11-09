@@ -1,5 +1,5 @@
 import { EXTENSION_VERSION, MAX_AUTHOR_CONTEXT_CHARS, t, type ModelOption, type SupportedLocale } from '@openvizpilot/shared';
-import { MemoryFactsPanel, SavedQueriesPanel, WatchSettingsPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
+import { DashboardSitePicker, MemoryFactsPanel, SavedQueriesPanel, WatchSettingsPanel, type DashboardPrefs } from '@openvizpilot/ee/extension';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { TOOL_ROUNDS_BY_MODE } from '../chat/agent-loop';
 import {
@@ -290,6 +290,12 @@ export function SettingsPanel(props: {
           <button type="button" class="btn-danger" onClick={() => void props.onResetRegistration()}>{t('settings.resetRegistrationButton')}</button>
           <p class="field-hint">{t('settings.resetRegistrationHint')}</p>
         </section>
+      )}
+
+      {/* Tableau-Site des Dashboards (Enterprise, mehrere Sites): der Autor ordnet sie selbst zu,
+          statt auf den Admin zu warten — nur mit Lizenz + Freigabe „Tableau-API“ und registriertem Dashboard. */}
+      {props.isAuthor && props.features.tableauServer && props.registrationKey && (
+        <DashboardSitePicker baseUrl={props.backendUrl} apiToken={props.apiToken || undefined} dashboardKey={props.registrationKey} />
       )}
 
       {/* Speichern-Leiste bleibt am unteren Rand sichtbar (UI-Review P1). */}

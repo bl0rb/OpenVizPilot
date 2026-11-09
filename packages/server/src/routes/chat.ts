@@ -160,7 +160,7 @@ export function createChatRoute(
       let tableauServerEnabled = false;
       if (tableau && c.get('userAccess')?.tableauApi) {
         try {
-          tableauServerEnabled = await tableau.available(oidcUser, req.dashboardKey);
+          tableauServerEnabled = await tableau.available(oidcUser, req.registrationKey ?? req.dashboardKey);
         } catch {
           tableauServerEnabled = false;
         }
@@ -333,7 +333,7 @@ export function createChatRoute(
             }
           }
 
-          const externalTools = mcp ? await mcp.catalogue(authUser, req.dashboardKey, abortSignal) : [];
+          const externalTools = mcp ? await mcp.catalogue(authUser, req.registrationKey, abortSignal) : [];
           const tableauTools = tableauServerEnabled
             ? [TABLEAU_SEARCH_TOOL, ...TABLEAU_METADATA_TOOLS, TABLEAU_DATASOURCE_SEARCH_TOOL, ...(serverDataEnabled ? [TABLEAU_VIEW_DATA_TOOL, TABLEAU_DATASOURCE_FIELDS_TOOL, TABLEAU_DATASOURCE_QUERY_TOOL] : []), ...(watchEnabled ? [WATCH_PROPOSE_TOOL] : [])]
             : [];
@@ -413,7 +413,7 @@ export function createChatRoute(
                     .recordUsage(toolCalls.map((call) => ({ metric: 'tool_call', key: call.function.name })))
                     .catch(() => undefined);
                 }
-                const external = mcp ? await mcp.approvals(authUser, req.dashboardKey, toolCalls, externalTools) : {};
+                const external = mcp ? await mcp.approvals(authUser, req.registrationKey, toolCalls, externalTools) : {};
                 return stream.writeSSE({ event: 'tool_calls', data: JSON.stringify({ toolCalls, ...(Object.keys(external).length > 0 ? { external } : {}) }) });
               },
               onDone: async (data) => {

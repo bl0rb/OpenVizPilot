@@ -345,8 +345,44 @@ export class OidcClient {
 
 const ENTERPRISE_REQUIRED = { error: 'enterprise_required' } as const;
 
-/** `/auth/callback` — im Stub nie ein gültiges Ziel (kein OIDC-Login möglich). */
-export function createAuthCallbackRoute(): Hono {
+/** Ablage für den System-Browser-Login aus Tableau Desktop — im Stub nie benutzt (kein OIDC-Login). */
+export type AuthRelayTake =
+  | { status: 'ok'; code: string }
+  | { status: 'mismatch'; attemptsLeft: number }
+  | { status: 'missing' };
+
+export interface AuthRelayStore {
+  put(entry: { stateHash: string; confirmHash: string; code: string }, nowMs: number, ttlMs: number, maxRows: number): Promise<boolean>;
+  take(stateHash: string, confirmHash: string, nowMs: number, maxAttempts: number): Promise<AuthRelayTake>;
+}
+
+function emptyAuthRelayStore(): AuthRelayStore {
+  return {
+    async put() {
+      return false;
+    },
+    async take() {
+      return { status: 'missing' };
+    },
+  };
+}
+
+export function createSqliteAuthRelayStore(_db: unknown): AuthRelayStore {
+  return emptyAuthRelayStore();
+}
+
+export function createPgAuthRelayStore(_pool: unknown, _logger?: unknown): AuthRelayStore {
+  return emptyAuthRelayStore();
+}
+
+export interface AuthCallbackOptions {
+  relay?: AuthRelayStore | null;
+  relayEnabled?: () => Promise<boolean>;
+  log?: AuthLog;
+}
+
+/** `/auth/callback` — im Stub nie ein gültiges Ziel (kein OIDC-Login möglich), auch nicht das Relay. */
+export function createAuthCallbackRoute(_options?: AuthCallbackOptions): Hono {
   const app = new Hono();
   app.all('*', (c) => c.json(ENTERPRISE_REQUIRED, 402));
   return app;
@@ -855,7 +891,12 @@ export class TableauService {
 }
 
 /** `/api/tableau-server/*` — verlangt wie im echten ee/ eine persönliche OIDC-Anmeldung, die es in der Core-Edition nie gibt. */
-export function createTableauRoute(service: TableauService | null): Hono<AuthVariables> {
+/** Wie im echten ee/ — in der Core-Edition ohne Wirkung. */
+export interface TableauRouteOptions {
+  isRegisteredDashboard?: (dashboardKey: string) => Promise<boolean>;
+}
+
+export function createTableauRoute(service: TableauService | null, _options: TableauRouteOptions = {}): Hono<AuthVariables> {
   const app = new Hono<AuthVariables>();
   app.use('*', async (c, next) => {
     c.header('cache-control', 'no-store');
@@ -1080,6 +1121,8 @@ export interface DesktopAgent {
   systemPrompt: string;
   maxRounds: number;
   serverData: boolean;
+  /** Nutzbare konfigurierte Sites (Name je Site, ohne Secrets) — im Stub nie befüllt. */
+  sites: Array<{ id: string; name: string; contentUrl: string }>;
   execute(call: ToolCall, options?: { signal?: AbortSignal; onConsentRequired?(scope: DesktopConsentScope, text: string): void }): Promise<string>;
 }
 export interface DesktopAgentInput {

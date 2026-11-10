@@ -163,8 +163,27 @@ Die Middleware loggt zu Tableau Server nur Metadaten, nie Antworten, Abfragen od
 - `tableau operation` mit `result: 'failed'`, `error` und ggf. `status`: der Fehler eines
   REST-/Metadata-/VizQL-Aufrufs als stabiler Code (`TABLEAU_AUTH_FAILED`, `TABLEAU_HTTP_ERROR`,
   `TABLEAU_VERSION_UNSUPPORTED` …) plus HTTP-Status von Tableau, zusammen mit `requestId`,
-  `operation`, `site` und `durationMs`.
+  `operation`, `site` und `durationMs`. `result: 'partial'` (info) heißt: Die Suche lief, aber
+  einzelne Ressourcen fehlten — `partial` nennt sie als `ressource:CODE[:status]`.
+  Zeit- und Zählmetadaten je Operation (`ee/server/src/tableau-server/trace.ts`, nie Pfade, Hosts,
+  Adressen oder Meldungstexte): `requests`, `signins`, `requestMsSum`/`requestMsMax`, die längste
+  Dauer je Phase (`dnsMsMax`, `connectMsMax`, `tlsMsMax`, `waitMsMax`), `family` (IPv4/6),
+  `netCode` (Node-Fehlercode wie `ECONNREFUSED`, `EAI_AGAIN`, `CERT_HAS_EXPIRED`) und bei
+  Drosselung `retryStatus`/`retryAfterMs`. Bei Fehlern zusätzlich `timeoutMs`, `deadline`
+  (`operation` = eigene Frist, `caller`/`caller_deadline` = Abbruch bzw. Frist des Aufrufers,
+  `transport`, `retry_budget` = Retry-After passt nicht mehr in die Frist), `stage`
+  (`prepare` = vor dem ersten Tableau-Aufruf, `work`, `finalize`), `prepMs` und der letzte Request:
+  `lastKind` (`signin`, `workbooks`, `views`, `metadata` …), `lastPage`, `lastPhase`, `lastStatus`,
+  `lastError`, `lastMs`, `lastPhaseMs`, `lastOpen`.
 - `investigate-estate downgraded` mit `reason`, siehe oben.
+
+**Zeitüberschreitung lesen** (`error: 'TABLEAU_TIMEOUT'`): `lastPhase` zeigt, wo der hängende Request
+stand — `dns` (Namensauflösung im Cluster), `connect` (TCP-Aufbau: Firewall, Security Group, Route,
+Proxy-Zwang), `tls` (Handshake: MTU, TLS-Inspektion), `response` (Tableau antwortet nicht), `body`
+(Antwort bricht ab). Viele `requests` mit kleinem `requestMsMax` heißen: Die Seiten summieren sich
+über die Frist. `stage: 'prepare'` verweist auf die Middleware selbst (Datenbank), `requests: 0` mit
+`stage: 'work'` auf das Warten auf eine parallele Anmeldung derselben Person. Die Verbindungsprüfung
+in der Admin-UI liest je Ressource nur einen Datensatz und kann grün sein, während eine Suche scheitert.
 
 Für eine Fehlermeldung genügen diese Zeilen (z. B. `kubectl logs … | grep tableau`) mit
 Tableau-Server-Version und Zeitpunkt.

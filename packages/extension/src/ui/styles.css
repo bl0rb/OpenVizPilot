@@ -132,10 +132,13 @@ body {
   font-size: 15px;
   cursor: pointer;
   padding: 4px 6px;
+  /* Mindest-Zielgröße 24 × 24 px (WCAG 2.5.8) — auch für die flacheren Varianten wie .btn-download. */
+  min-width: 24px;
+  min-height: 24px;
   color: #555;
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   color: #000;
 }
 
@@ -167,12 +170,14 @@ body {
   border: 0;
 }
 
-/* Erscheint nur, wenn der Nutzer nicht mehr nahe am unteren Rand ist (P1 Nr. 1). */
+/* Erscheint nur, wenn der Nutzer nicht mehr nahe am unteren Rand ist (P1 Nr. 1).
+   sticky statt absolute: .messages ist selbst der Scroll-Container, absolut positioniert
+   scrollte der Button mit dem Inhalt weg. bottom = 10px − Innenabstand von .messages (12px),
+   weil Chrome die Sticky-Kante ab dem Padding rechnet. */
 .jump-to-latest {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  transform: translateX(-50%);
+  position: sticky;
+  bottom: -2px;
+  align-self: center;
   border: 1px solid var(--accent-border);
   background: #fff;
   color: var(--accent);
@@ -221,6 +226,7 @@ body {
   font-size: var(--fs-meta);
   cursor: pointer;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .chip:hover:not(:disabled) {
@@ -318,8 +324,10 @@ body {
   max-width: 92%;
 }
 
+/* 100 % statt none: Sonst setzt sich bei schmalem iframe die Mindestbreite einer Markdown-Tabelle
+   gegen die Gruppe durch und die Bubble ragt hinaus, statt dass .markdown horizontal scrollt. */
 .assistant-group .msg-assistant {
-  max-width: none;
+  max-width: 100%;
 }
 
 .assistant-footer {
@@ -343,6 +351,7 @@ body {
   border: 1px solid #cfe8d2;
   border-radius: 8px;
   padding: 2px 8px;
+  overflow-wrap: anywhere;
 }
 
 .thinking {
@@ -368,10 +377,24 @@ body {
   margin-bottom: 0;
 }
 
+/* Überschriften, Listen und Codeblöcke am Rand behalten sonst ihre UA-Ränder zusätzlich zum Bubble-Padding. */
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
 /* Breite Tabellen scrollen im Antwortblock; die Tabelle selbst bleibt
    display:table, damit Screenreader die Tabellensemantik behalten. */
 .markdown {
   overflow-x: auto;
+}
+
+/* .markdown ist Scroll-Container und schneidet nach außen ragende Fokusringe ab. */
+.markdown a:focus-visible {
+  outline-offset: -2px;
 }
 
 .markdown table {
@@ -406,6 +429,12 @@ body {
   border-radius: 6px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Das Inline-Padding von .markdown code rückte sonst nur die erste Codezeile ein. */
+.markdown pre code {
+  padding: 0;
+  background: none;
 }
 
 .tool-chip {
@@ -471,6 +500,7 @@ body {
   color: #8f2a20;
   border-radius: 8px;
   padding: 7px 10px;
+  overflow-wrap: anywhere;
 }
 
 .error-banner button {
@@ -481,6 +511,11 @@ body {
   padding: 3px 10px;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.error-banner button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .composer {
@@ -514,6 +549,7 @@ body {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  min-height: 24px;
   padding: 2px 0;
   border-radius: 0;
   background: transparent;
@@ -581,7 +617,7 @@ body {
   border: 1px solid var(--border-input);
   border-radius: 8px;
   box-sizing: border-box;
-  max-height: 260px;
+  max-height: min(260px, 50vh);
   overflow-y: auto;
   z-index: 10;
 }
@@ -593,11 +629,16 @@ body {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 6px 10px;
   font: inherit;
   font-size: var(--fs-meta);
   cursor: pointer;
   text-align: left;
+}
+
+/* Höhere Spezifität als ".composer button" (padding), nur für das Padding:
+   background bleibt bei 0,1,0, damit .slash-item-active weiter greift. */
+.composer .slash-item {
+  padding: 6px 10px;
 }
 
 .slash-item-active {
@@ -673,12 +714,14 @@ body {
   color: #fff;
 }
 
+/* break-word statt anywhere: lange Namen/URLs umbrechen, ohne die Mindestbreite der Flex-Zeilen zu senken. */
 .settings-panel {
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  overflow-wrap: break-word;
 }
 
 .settings-panel h2 {
@@ -743,32 +786,15 @@ body {
   gap: 8px;
 }
 
-.settings-actions button,
-.settings-header button {
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 6px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-
-.settings-actions .btn-secondary,
-.settings-header .btn-secondary {
-  border: 1px solid var(--border-input);
-  background: #fff;
-  color: #333;
-}
-
 .memory-section {
   border-top: 1px solid #e0e0e0;
   padding-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.memory-section h3 {
+.memory-section h4 {
   margin: 0;
   font-size: 13px;
 }
@@ -803,7 +829,7 @@ body {
   gap: 10px;
 }
 
-.prefs-section h3 {
+.prefs-section :is(h3, h4) {
   margin: 0;
   font-size: 13px;
 }
@@ -842,6 +868,7 @@ body {
   border-radius: 8px;
   padding: 10px;
   background: #fafbfc;
+  overflow-wrap: anywhere;
   font-size: var(--fs-meta);
   max-width: 92%;
 }
@@ -965,7 +992,8 @@ body {
 
 /* Enterprise: Einwilligung „Serverseitiger Datenzugriff" (W5, tableau_view_data) */
 .server-data-consent {
-  max-width: 320px;
+  /* min(): behält den Viewport-Abstand der UA-Regel dialog:modal in schmalen iframes. */
+  max-width: min(320px, calc(100% - 6px - 2em));
   border: none;
   border-radius: 8px;
   padding: 16px;
@@ -1044,13 +1072,8 @@ body {
   color: var(--text-muted);
 }
 
-/* Einstellungen: Abschnitte, eingeklappte Verbindung, Speichern-Leiste. */
-.settings-details {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
+/* Einstellungen: Abschnitte, eingeklappte Verbindung, Speichern-Leiste.
+   Abstände in .settings-details nur über Margins: display:flex auf <details> greift nicht in jeder Engine. */
 .settings-details summary {
   cursor: pointer;
   font-weight: 600;
@@ -1065,9 +1088,11 @@ body {
   margin-top: 10px;
 }
 
+/* bottom = -Innenabstand von .settings-panel: Chrome rechnet die Sticky-Kante ab dem Padding,
+   sonst scrollt Inhalt im 14-px-Streifen unter der Leiste sichtbar durch. */
 .settings-savebar {
   position: sticky;
-  bottom: 0;
+  bottom: -14px;
   margin: 0 -14px -14px;
   padding: 10px 14px 14px;
   display: flex;
@@ -1092,7 +1117,7 @@ body {
 }
 
 /* Bereich „Tableau-Site“ (Autoren): Aktionsbutton kompakt statt über die volle Spaltenbreite. */
-.prefs-section .btn-primary {
+.prefs-section > .btn-primary {
   align-self: flex-start;
 }
 
@@ -1100,7 +1125,8 @@ body {
   margin: 0 0 8px;
 }
 
-.settings-panel input[aria-invalid='true'] {
+.settings-panel input[aria-invalid='true'],
+.login-panel input[aria-invalid='true'] {
   border-color: var(--danger);
 }
 

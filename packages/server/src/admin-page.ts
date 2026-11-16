@@ -74,7 +74,7 @@ export const adminPageHtml = `<!doctype html>
     margin-bottom: 1rem;
   }
   .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-  input[type="text"], input[type="password"], input[type="url"], input[type="search"], textarea, select {
+  input[type="text"], input[type="password"], input[type="url"], input[type="search"], input[type="number"], textarea, select {
     font: inherit;
     color: inherit;
     background: var(--surface);
@@ -90,7 +90,7 @@ export const adminPageHtml = `<!doctype html>
   .form-field, .form-grid > label { display: grid; gap: 0.4rem; min-width: 0; font-size: 13px; font-weight: 500; }
   .form-field > input, .form-grid > label > input, .form-grid > label > select { width: 100%; min-width: 0; }
   .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 1.25rem; margin-top: 1.25rem; border-top: 1px solid var(--border); }
-  .inline-field { display: flex; gap: 0.4rem; }
+  .inline-field { display: flex; gap: 0.4rem; min-width: 0; }
   .inline-field input { flex: 1; min-width: 0; }
   .setup-steps { border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.75rem; margin: 0 0 1rem; font-size: 13px; }
   .setup-steps summary { cursor: pointer; font-weight: 600; }
@@ -113,9 +113,9 @@ export const adminPageHtml = `<!doctype html>
     background: var(--surface);
     padding: 0.45rem 0.85rem;
   }
-  button:hover { border-color: var(--accent); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.primary:hover { background: var(--accent-hover); opacity: 1; }
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); opacity: 1; }
   :is(button, input, select, textarea, a, summary):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   /* Der Seitentitel wird beim Bereichswechsel nur für Screenreader fokussiert — kein Rahmen. */
   #view-title:focus { outline: none; }
@@ -140,13 +140,13 @@ export const adminPageHtml = `<!doctype html>
   .col-name { width: 12%; }
   .col-desc { width: 20%; }
   .col-hint { width: 12%; }
-  .col-del { width: 2.5rem; text-align: center; }
+  .col-del { width: 2.5rem; text-align: center; white-space: nowrap; }
   #commands-table, #playbook-commands-table { min-width: 820px; table-layout: fixed; }
   #commands-table .col-name, #playbook-commands-table .col-name { width: 17%; }
   #commands-table .col-hint, #playbook-commands-table .col-hint { width: 16%; }
   #models-table { min-width: 520px; }
   #users-table { min-width: 520px; }
-  #users-table .col-del { width: 144px; white-space: nowrap; }
+  #users-table .col-del { width: 144px; }
   #user-access-table { min-width: 860px; }
   #user-access-table .col-access { width: 110px; text-align: center; }
   #user-access-table .col-save { width: 90px; white-space: nowrap; }
@@ -157,25 +157,30 @@ export const adminPageHtml = `<!doctype html>
   .user-access-checkbox { display: flex; justify-content: center; min-width: 44px; }
   .user-access-checkbox input { width: 18px; height: 18px; }
   .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; flex-shrink: 0; }
-  #users-table .icon-button + .icon-button { margin-left: 4px; }
+  .col-del button { vertical-align: middle; }
+  .col-del button + button { margin-left: 4px; }
   dialog { width: min(440px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); }
   dialog::backdrop { background: rgb(13 15 22 / 45%); }
   /* Kontrollkästchen und Schalter ausnehmen — sonst wird der Schalter im Dialog 44px hoch (hochkantes Oval). */
-  dialog input:not([type="checkbox"]) { min-height: 44px; }
+  dialog input:not([type="checkbox"]), dialog select { min-height: 44px; }
   #metric-dialog { width: min(640px, calc(100% - 2rem)); }
   dialog.dialog-wide { width: min(760px, calc(100% - 2rem)); }
   #metric-dialog input[aria-invalid="true"], #metric-dialog textarea[aria-invalid="true"] { border-color: var(--danger); }
+  /* Die Fehlerhinweise zwischen den Feldern sind meist ausgeblendet — der Abstand hängt am Folgefeld; ein sichtbarer Hinweis kollabiert mit ihm. */
+  #metric-form > .hint.error + * { margin-top: 1rem; }
   .metric-question-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0.5rem 0.75rem; align-items: end; border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem; margin: 0 0 0.6rem; }
   .metric-question-row label { display: grid; gap: 0.3rem; font-size: 13px; font-weight: 500; min-width: 0; }
   .has-help { position: relative; }
   /* Nur der Begriff ist der Auslöser — nicht das Eingabefeld darunter, sonst
      ploppt beim Überfahren eines Formulars an jedem Feld ein Tooltip auf. */
   .help-term { cursor: help; text-decoration: underline dotted; text-decoration-color: var(--text-muted); text-underline-offset: 2px; }
-  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 2px; width: max-content; max-width: 320px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
+  .help-tip { display: none; position: absolute; z-index: 30; top: 100%; left: 0; margin-top: 2px; width: max-content; max-width: min(320px, calc(100vw - 2rem)); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 14px rgb(13 15 22 / 15%); padding: 0.55rem 0.7rem; font-size: 12px; font-weight: 400; line-height: 1.5; white-space: normal; text-decoration: none; }
   .has-help:has(> .help-term:hover) > .help-tip, .has-help:focus-within > .help-tip, .has-help:has(+ :focus) > .help-tip, .has-help[aria-expanded="true"] > .help-tip { display: block; }
   .help-left .help-tip { left: auto; right: 0; }
   /* Dialoge fokussieren beim Öffnen das erste Feld — dort Tooltip nur beim Überfahren, sonst verdeckt er den Titel. */
   dialog .has-help:focus-within > .help-tip { display: none; }
+  /* Dialog-Labels füllen ihre Spalte; breiter darf der Tooltip nicht werden, sonst schneidet der Dialog (overflow) ihn ab. */
+  dialog label.has-help > .help-tip { max-width: min(320px, 100%); }
   /* Über Formularfeldern erscheint der Tooltip oberhalb des Begriffs; in Tabellen
      bleibt er darunter, weil die Tabellenhülle (overflow) nach oben abschneidet. */
   label.has-help > .help-tip, legend.has-help > .help-tip { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 2px; }
@@ -185,6 +190,7 @@ export const adminPageHtml = `<!doctype html>
   .banner { border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 1rem; font-size: 0.9rem; display: none; }
   .banner.error { display: block; background: var(--danger-bg); color: var(--danger); }
   .banner.ok { display: block; background: var(--ok-bg); color: #1e5631; }
+  .banner.info { display: block; }
   .hint.error { color: var(--danger); font-weight: 600; }
   /* Titel, die der Seitentitel (h1) schon sichtbar trägt — nur für aria-labelledby und Screenreader. */
   .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -202,7 +208,7 @@ export const adminPageHtml = `<!doctype html>
   .status-chip[data-level="warn"]::before { content: '!'; }
   .status-chip[data-level="error"] { background: var(--danger-bg); color: var(--danger); border-color: #f5c9c4; }
   .status-chip[data-level="error"]::before { content: '✕'; }
-  .status-name { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .status-name { font-size: 12px; font-weight: 500; color: var(--text-muted); overflow-wrap: anywhere; }
   .status-detail { color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
   .status-link { margin-top: auto; color: var(--accent); font-weight: 500; text-decoration: none; white-space: nowrap; }
   .status-link:hover { text-decoration: underline; }
@@ -243,8 +249,12 @@ export const adminPageHtml = `<!doctype html>
   .switch-field strong { display: block; font-weight: 600; }
   .switch-field small { display: block; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
   /* Umschalter mit wenigen festen Werten (z. B. Zeitraum). */
-  .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; }
   .workspace .segmented button { border: 0; border-radius: 0; background: var(--surface); }
+  /* Ecken an den Enden statt overflow: hidden am Container — das schnitt den Fokusring ab; 5px = Containerradius minus Rahmen. */
+  .workspace .segmented button:first-child { border-radius: 5px 0 0 5px; }
+  .workspace .segmented button:last-child { border-radius: 0 5px 5px 0; }
+  .workspace .segmented button:focus-visible { position: relative; z-index: 1; }
   .workspace .segmented button + button { border-left: 1px solid var(--border); }
   .workspace .segmented button[aria-pressed="true"] { background: var(--accent); color: #fff; }
   .section-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.25rem; margin: 0.5rem 0 1rem; }
@@ -257,21 +267,24 @@ export const adminPageHtml = `<!doctype html>
   th.num, td.num { text-align: right; }
   #gate { max-width: 420px; margin: 5rem auto; padding: 2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
   #gate .row { justify-content: center; margin-top: 0.75rem; }
+  #gate .row > label { width: 100%; }
   #app { display: none; }
   ${mcpAdminStyles}
   ${tableauAdminStyles}
   ${watchAdminStyles}
   [hidden] { display: none !important; }
   .ui-icon { flex: 0 0 18px; vertical-align: middle; }
-  .masthead { height: 72px; padding: 0 2rem; background: var(--graphite); color: #e7e9f2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .masthead { min-height: 72px; padding: 0 2rem; background: var(--graphite); color: #e7e9f2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   .brand { display: flex; align-items: center; gap: 0.75rem; font-size: 18px; font-weight: 700; }
   .brand img { width: 34px; height: 34px; }
   .brand-origin { font-size: 12px; font-weight: 400; color: #a1a8c0; border-left: 1px solid #343847; padding-left: 1rem; }
-  .masthead-label { font-size: 12px; color: #a1a8c0; }
+  .masthead-label { font-size: 12px; color: #a1a8c0; overflow-wrap: anywhere; }
   #admin-identity::before { content: '·'; margin: 0 0.4rem; }
   .admin-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 72px); }
   .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 2rem 1rem 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; }
-  .sidebar nav { position: sticky; top: 1.5rem; }
+  /* Abstand = Höhe von #logout plus Sidebar-gap: Sonst schiebt die sticky Navigation am Seitenende ihre letzten Einträge über „Abmelden“. */
+  /* Höher als das Fenster scrollt die Navigation selbst. Das Padding hält den Fokusring im Scrollbereich (6px = 3px Ring + 3px Abstand), das negative Margin die Links an ihrer Stelle. */
+  .sidebar nav { position: sticky; top: 1.5rem; margin: 0 -6px calc(42px + 1.5rem); padding: 0 6px 6px; max-height: calc(100vh - 3rem); overflow-y: auto; scroll-padding-block: 6px; }
   .nav-group { margin: 1.5rem 0 0.5rem; padding: 0 0.75rem; font-size: 11px; font-weight: 600; color: var(--text-muted); }
   .nav-group:first-child { margin-top: 0; }
   .sidebar a { min-height: 42px; display: flex; align-items: center; gap: 0.7rem; margin: 0.2rem 0; padding: 0.6rem 0.75rem; color: var(--text-muted); border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500; }
@@ -291,10 +304,14 @@ export const adminPageHtml = `<!doctype html>
   .workspace button, dialog button { min-height: 38px; font-size: 13px; font-weight: 500; }
   .workspace input:not([type="checkbox"]), .workspace select { min-height: 38px; }
   .workspace th, .workspace td { padding: 0.7rem 0.6rem; }
+  /* Die 38-px-Icon-Buttons passen sonst nicht in die 2,5rem breite Spalte (fixes Tabellenlayout) und ragen über den Rand. */
+  .workspace .col-del { padding-left: 0; padding-right: 0; }
   .workspace table { font-size: 13px; }
   .workspace tbody tr:hover { background: #f0f2f7; }
   .row > input, .row > select { max-width: 100%; min-width: 0; }
-  .banner, td, .hint { overflow-wrap: anywhere; }
+  .banner, td, .hint, code { overflow-wrap: anywhere; }
+  /* Buttons erben sonst „anywhere“ aus td und schrumpfen in schmalen Spalten zu einem Buchstabenturm. */
+  td button { overflow-wrap: normal; }
   #mcp-admin { border: 0; padding-top: 1.5rem; }
   #mcp-admin .mcp-entry { padding: 1.1rem 1.25rem; margin: 0.75rem 0 1rem; border-radius: 8px; }
   #mcp-admin summary { font-size: 14px; }
@@ -317,9 +334,12 @@ export const adminPageHtml = `<!doctype html>
     .brand-origin { display: none; }
   }
   @media (max-width: 680px) {
-    .masthead { height: 64px; padding: 0 1.1rem; }
+    .masthead { min-height: 64px; padding: 0.5rem 1.1rem; }
     .brand { font-size: 16px; }
-    .masthead-label { font-size: 11px; }
+    .masthead-label { font-size: 11px; min-width: 0; text-align: right; }
+    /* Kennung unter „Administration“ statt daneben: der Punkt-Trenner ist keine Umbruchstelle, die Zeile lief bei 320 px aus dem Kopf. */
+    #admin-identity { display: block; }
+    #admin-identity::before { content: none; }
     .admin-shell { display: block; min-height: calc(100vh - 64px); }
     .sidebar { padding: 0.75rem 1rem; border-right: 0; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; gap: 0.5rem; }
     .sidebar nav { display: none; }
@@ -327,7 +347,7 @@ export const adminPageHtml = `<!doctype html>
     #logout { margin: 0; padding: 0.5rem; }
     #logout span { display: none; }
     .workspace { padding: 1.5rem 1rem 3rem; }
-    .workspace input:not([type="checkbox"]), .workspace textarea, .workspace select, #gate input, dialog input { font-size: 16px; }
+    .workspace input:not([type="checkbox"]), .workspace textarea, .workspace select, #gate input, dialog input, dialog select, dialog textarea { font-size: 16px; }
     .workspace-heading h1 { font-size: 24px; }
     .workspace-heading { padding-bottom: 1.25rem; }
     #mcp-admin .mcp-entry { padding: 1rem; }
@@ -1002,8 +1022,13 @@ export const adminPageHtml = `<!doctype html>
     var wasHidden = getComputedStyle(tip).display === 'none';
     if (wasHidden) tip.style.display = 'block';
     var rect = tip.getBoundingClientRect();
-    if (rect.right > document.documentElement.clientWidth) el.classList.add('help-left');
-    if (rect.top < 0) el.classList.add('help-below');
+    // Dialoge schneiden per overflow ab — dort gilt deren Rand, begrenzt auf den Viewport.
+    var box = el.closest('dialog');
+    var bounds = box ? box.getBoundingClientRect() : null;
+    var maxRight = bounds ? Math.min(bounds.right, document.documentElement.clientWidth) : document.documentElement.clientWidth;
+    var minTop = bounds ? Math.max(bounds.top, 0) : 0;
+    if (rect.right > maxRight) el.classList.add('help-left');
+    if (rect.top < minTop) el.classList.add('help-below');
     if (wasHidden) tip.style.display = '';
     el.dataset.helpPositioned = '1';
   }
@@ -1078,6 +1103,8 @@ export const adminPageHtml = `<!doctype html>
     if (passwordDialog && passwordDialog.open) passwordDialog.close();
     app.style.display = 'none';
     gate.style.display = 'block';
+    // Kopfzeile darf nach Abmeldung/Ablauf nicht weiter „Angemeldet als …“ zeigen.
+    document.getElementById('admin-identity').hidden = true;
     showBanner(gateError, message || '', 'error');
     initGate();
   }
@@ -2412,8 +2439,7 @@ export const adminPageHtml = `<!doctype html>
 
   function metricsChanged() {
     metricsDirty = true;
-    showBanner(metricsBanner, 'Ungespeicherte Änderungen.', '');
-    metricsBanner.style.display = 'block';
+    showBanner(metricsBanner, 'Ungespeicherte Änderungen.', 'info');
   }
 
   function openMetricDialog(index) {

@@ -147,7 +147,8 @@ Tableau Server **2024.2** einschließlich, REST API **3.23** (`TABLEAU_MIN_SERVE
 **Diagnoseprotokoll in der Admin-UI** (Tableau Server › Diagnoseprotokoll, `GET /api/admin/tableau-server/diagnostics`):
 dieselben Fehlerklassen wie im Server-Log, je Eintrag mit lesbarem Grund und nächstem Schritt, zusammengefasst
 nach aufeinanderfolgenden gleichen Ereignissen (Anzahl, erstes/letztes Auftreten, `requestId` des letzten) plus
-dem letzten erfolgreichen Aufruf. Es enthält nie Nutzer, Claims, Abfragen oder Daten. Es liegt nur im Speicher
+dem letzten erfolgreichen Aufruf. Teilausfälle (Suche oder Verbindungsprüfung lief, einzelne Ressourcen fehlten)
+erscheinen als „Teilweise fehlgeschlagen“ und zählen nicht als erfolgreicher Aufruf. Es enthält nie Nutzer, Claims, Abfragen oder Daten. Es liegt nur im Speicher
 des jeweiligen Prozesses (höchstens 100 Einträge, seit Prozessstart): bei mehreren Replikaten zeigt jede
 Instanz nur ihre eigenen Ereignisse, ein Neustart leert es. Für Dauerhaftes bleibt das Server-Log.
 
@@ -163,7 +164,7 @@ Die Middleware loggt zu Tableau Server nur Metadaten, nie Antworten, Abfragen od
 - `tableau operation` mit `result: 'failed'`, `error` und ggf. `status`: der Fehler eines
   REST-/Metadata-/VizQL-Aufrufs als stabiler Code (`TABLEAU_AUTH_FAILED`, `TABLEAU_HTTP_ERROR`,
   `TABLEAU_VERSION_UNSUPPORTED` …) plus HTTP-Status von Tableau, zusammen mit `requestId`,
-  `operation`, `site` und `durationMs`. `result: 'partial'` (info) heißt: Die Suche lief, aber
+  `operation`, `site` und `durationMs`. `result: 'partial'` (info) heißt: Suche oder Verbindungsprüfung lief, aber
   einzelne Ressourcen fehlten — `partial` nennt sie als `ressource:CODE[:status]`.
   Zeit- und Zählmetadaten je Operation (`ee/server/src/tableau-server/trace.ts`, nie Pfade, Hosts,
   Adressen oder Meldungstexte): `requests`, `signins`, `requestMsSum`/`requestMsMax`, die längste
@@ -184,6 +185,15 @@ Proxy-Zwang), `tls` (Handshake: MTU, TLS-Inspektion), `response` (Tableau antwor
 über die Frist. `stage: 'prepare'` verweist auf die Middleware selbst (Datenbank), `requests: 0` mit
 `stage: 'work'` auf das Warten auf eine parallele Anmeldung derselben Person. Die Verbindungsprüfung
 in der Admin-UI liest je Ressource nur einen Datensatz und kann grün sein, während eine Suche scheitert.
+
+**„Tableau nicht erreichbar“ lesen** (`TABLEAU_REQUEST_FAILED`): Die Middleware bekam keine HTTP-Antwort.
+Verbindungstest und Diagnoseprotokoll zeigen dazu den Node-Fehlercode und die Phase (im Log `netCode`):
+`ENOTFOUND`/`EAI_AGAIN` — DNS im Container bzw. Pod; `ECONNREFUSED` — Port oder Firewall (die Middleware
+verbindet direkt, ohne `HTTPS_PROXY`); `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, `SELF_SIGNED_CERT_IN_CHAIN` u. ä. —
+Node kennt die ausstellende CA nicht, weil es nur eigene Stammzertifikate nutzt: interne CA als PEM einbinden und
+`NODE_EXTRA_CA_CERTS=<Pfad>` setzen (Windows-Dienst: `NODE_USE_SYSTEM_CA=1`), dann neu starten;
+`ERR_TLS_CERT_ALTNAME_INVALID` — Hostname der Server-URL fehlt im Zertifikat; `ECONNRESET` in Phase TLS —
+meist TLS-Inspektion oder ein Proxy auf dem Weg.
 
 Für eine Fehlermeldung genügen diese Zeilen (z. B. `kubectl logs … | grep tableau`) mit
 Tableau-Server-Version und Zeitpunkt.

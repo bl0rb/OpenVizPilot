@@ -203,6 +203,7 @@ export function MessageList(props: {
     setStick(true);
   };
 
+  const empty = props.items.every((i) => i.kind === 'notice');
   return (
     <div class="messages" ref={ref} onScroll={onScroll}>
       {/* Höfliche Live-Region: meldet Beginn/Ende der Antwort, ohne bei jedem
@@ -212,7 +213,7 @@ export function MessageList(props: {
       </div>
       {/* Empty-State auch zeigen, solange nur Notices da sind (z. B. direkt
           nach dem Fokus-Onboarding) — sonst verschwinden die Starter-Chips. */}
-      {props.items.every((i) => i.kind === 'notice') && (
+      {empty && (
         <div class="empty-hint">
           {props.onboarding ? (
             <>
@@ -393,7 +394,8 @@ export function MessageList(props: {
             );
         }
       })}
-      {!stickToBottom && (
+      {/* Nicht im Empty-State: Ist der Hinweis höher als ein niedriges iframe, gibt es keine Antwort, zu der man springen könnte. */}
+      {!stickToBottom && !empty && (
         <button type="button" class="jump-to-latest" onClick={jumpToLatest}>
           {t('message.jumpToLatest')}
         </button>

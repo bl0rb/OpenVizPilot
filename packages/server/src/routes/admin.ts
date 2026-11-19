@@ -56,8 +56,12 @@ import {
 import type { AuthStateProvider } from '../auth-state';
 import type { AppConfig } from '../env';
 import type { Logger } from '../logger';
+import { LLM_TIMEOUT_MS } from '../llm/client';
+import { apiKeyHint, normalizeBaseUrl, safeOrigin, testLlmEndpoint, type LlmEndpointProvider } from '../llm/endpoint';
 import type { MemoryStore } from '../memory/store';
+import { decryptSecret, encryptSecret, isSecretKeyConfigured } from '../secret-box';
 import { resolveUserAccess } from '../user-access';
+import { effectiveDefaultModel } from './chat';
 
 /**
  * Admin-API: zentrale Verwaltung der Slash-Befehle, Manifest-Download und
@@ -209,6 +213,8 @@ export function createAdminRoute(
   refreshLease:
     | ((options?: { action?: HeartbeatAction; onResponse?: (info: HeartbeatResponseInfo) => void; reactivate?: boolean }) => Promise<'sent' | 'skipped' | 'failed'>)
     | null = null,
+  /** Wirksamer LLM-Endpunkt (Env oder Admin-UI) — null nur in Tests ohne App. */
+  llmEndpoint: LlmEndpointProvider | null = null,
 ): Hono<AdminEnv> {
   const app = new Hono<AdminEnv>();
   const tokenMode = Boolean(config.adminToken);
@@ -634,6 +640,130 @@ export function createAdminRoute(
       });
       return c.json({ error: 'LLM-Endpunkt nicht erreichbar' }, 502);
     }
+  });
+
+  // ---- LLM-Endpunkt: Env-Default, in der Admin-UI überschreibbar (llm/endpoint.ts) ----
+
+  const httpUrl = z.string().trim().max(2000).url().refine((url) => /^https?:\/\//i.test(url), 'Nur http:// oder https://');
+  const llmEndpointInput = z.object({ baseUrl: httpUrl, apiKey: z.string().trim().max(4000).optional() });
+  const llmEndpointTestInput = z.object({ baseUrl: httpUrl.optional(), apiKey: z.string().trim().max(4000).optional() });
+  const API_KEY_REQUIRED = 'Für eine andere Adresse ist der API-Key Pflicht — ein vorhandener Key wird nie an eine andere Adresse geschickt.';
+
+  const currentDefaultModel = async (): Promise<string> => {
+    try {
+      return effectiveDefaultModel(config.defaultModel, memoryStore ? await memoryStore.getModelCatalog() : null);
+    } catch {
+      return config.defaultModel;
+    }
+  };
+
+  /** Was gerade gilt und woher es kommt — ohne Key-Klartext (nur die letzten vier Zeichen). */
+  app.get('/llm-endpoint', async (c) => {
+    if (!llmEndpoint) return c.json({ error: 'LLM-Endpunkt nicht verfügbar' }, 503);
+    await llmEndpoint.refresh();
+    const state = llmEndpoint.current();
+    let stored: { baseUrl: string; updatedAt: string } | null = null;
+    if (memoryStore) {
+      try {
+        const settings = await memoryStore.getLlmEndpointSettings();
+        stored = settings ? { baseUrl: settings.baseUrl, updatedAt: settings.updatedAt } : null;
+      } catch (err) {
+        logger.warn('admin llm endpoint read failed', { name: err instanceof Error ? err.name : 'unknown' });
+      }
+    }
+    return c.json({
+      effective: {
+        source: state.source,
+        baseUrl: state.baseUrl,
+        apiKeyHint: state.apiKey ? apiKeyHint(state.apiKey) : null,
+        updatedAt: state.updatedAt,
+        blockedReason: state.blockedReason,
+      },
+      env: { baseUrl: config.litellmBaseUrl, apiKeyHint: apiKeyHint(config.litellmApiKey) },
+      stored,
+      timeoutMs: LLM_TIMEOUT_MS,
+      maxRetries: 0,
+      defaultModel: await currentDefaultModel(),
+      modelAllowlist: config.modelAllowlist,
+      canOverride: Boolean(memoryStore),
+      secretKeyConfigured: isSecretKeyConfigured(),
+    });
+  });
+
+  /**
+   * Überschreibung speichern. Ohne neuen Key nur bei unveränderter Adresse (der gespeicherte
+   * Key bleibt dann) — sonst ginge ein Key an eine Adresse, für die er nicht ausgestellt wurde.
+   */
+  app.put('/llm-endpoint', zValidator('json', llmEndpointInput, (result, c) => {
+      if (!result.success) return c.json({ error: 'Ungültige Angaben zum LLM-Endpunkt', details: result.error.issues }, 400);
+    }), async (c) => {
+    if (!memoryStore || !llmEndpoint) return c.json({ error: 'Einstellungen benötigen einen Memory-Store' }, 503);
+    if (!isSecretKeyConfigured()) {
+      return c.json({ error: 'OVP_SECRET_KEY ist nicht gesetzt — der API-Key kann nicht verschlüsselt gespeichert werden.', code: 'secret_key_missing' }, 400);
+    }
+    const input = c.req.valid('json');
+    const baseUrl = normalizeBaseUrl(input.baseUrl);
+    try {
+      const stored = await memoryStore.getLlmEndpointSettings();
+      let apiKey = input.apiKey ? encryptSecret(input.apiKey) : null;
+      if (!apiKey) {
+        if (!stored || stored.baseUrl !== baseUrl) return c.json({ error: API_KEY_REQUIRED, code: 'api_key_required' }, 400);
+        try {
+          decryptSecret(stored.apiKey);
+        } catch {
+          return c.json({ error: 'Gespeicherter API-Key nicht lesbar — bitte neu eingeben.', code: 'api_key_required' }, 400);
+        }
+        apiKey = stored.apiKey;
+      }
+      await memoryStore.setLlmEndpointSettings({ baseUrl, apiKey, updatedAt: new Date().toISOString() });
+      await llmEndpoint.invalidate();
+      logger.info('admin llm endpoint updated', { origin: safeOrigin(baseUrl), keyChanged: Boolean(input.apiKey) });
+      return c.json({ ok: true });
+    } catch (err) {
+      logger.error('admin llm endpoint write failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
+    }
+  });
+
+  app.delete('/llm-endpoint', async (c) => {
+    if (!memoryStore || !llmEndpoint) return c.json({ error: 'Einstellungen benötigen einen Memory-Store' }, 503);
+    try {
+      await memoryStore.setLlmEndpointSettings(null);
+      await llmEndpoint.invalidate();
+      logger.info('admin llm endpoint reset');
+      return c.json({ ok: true });
+    } catch (err) {
+      logger.error('admin llm endpoint reset failed', { name: err instanceof Error ? err.name : 'unknown' });
+      return c.json({ error: 'Datenbank nicht erreichbar' }, 503);
+    }
+  });
+
+  /**
+   * Verbindungstest: ohne Body der wirksame Endpunkt, sonst die Formularwerte (ohne zu
+   * speichern). Der wirksame Key geht nur an die wirksame Adresse.
+   */
+  app.post('/llm-endpoint/test', zValidator('json', llmEndpointTestInput, (result, c) => {
+      if (!result.success) return c.json({ error: 'Ungültige Angaben zum LLM-Endpunkt', details: result.error.issues }, 400);
+    }), async (c) => {
+    if (!llmEndpoint) return c.json({ error: 'LLM-Endpunkt nicht verfügbar' }, 503);
+    await llmEndpoint.refresh();
+    const state = llmEndpoint.current();
+    const input = c.req.valid('json');
+    const baseUrl = input.baseUrl ? normalizeBaseUrl(input.baseUrl) : state.baseUrl;
+    let apiKey = input.apiKey;
+    if (!apiKey) {
+      if (baseUrl !== state.baseUrl || !state.apiKey) return c.json({ error: API_KEY_REQUIRED, code: 'api_key_required' }, 400);
+      apiKey = state.apiKey;
+    }
+    const result = await testLlmEndpoint({ baseUrl, apiKey }, await currentDefaultModel());
+    logger.info('admin llm endpoint test', {
+      origin: safeOrigin(baseUrl),
+      ok: result.ok,
+      ...(result.status ? { status: result.status } : {}),
+      ...(result.error ? { kind: result.error.kind, code: result.error.code } : {}),
+    });
+    const fromForm = Boolean(input.baseUrl || input.apiKey);
+    return c.json({ ...result, source: fromForm ? 'form' : state.source, blockedReason: fromForm ? null : state.blockedReason });
   });
 
   // ---- Anmeldung, OIDC & Lizenz (Admin-UI überschreibt die Env-Defaults) ----

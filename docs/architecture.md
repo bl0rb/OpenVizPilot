@@ -4,7 +4,7 @@
 
 ![Architektur](diagrams/architecture.png)
 
-Weitere Diagramme: [Datenzugriff](diagrams/datenzugriff.png) und [Lizenzzustände](diagrams/lizenz-zustaende.png). Quelle ist jeweils die `.html`-Datei daneben.
+Weiteres Diagramm: [Datenzugriff](diagrams/datenzugriff.png). Quelle ist jeweils die `.html`-Datei daneben.
 
 ## 1. Ziele und Grundsätze
 
@@ -63,7 +63,7 @@ Lizenzpflichtige Funktionen und ihre Feature-Schlüssel:
 | `serverData` | Serverseitiges Lesen fremder Views (umgebungsweite Untersuchung, Watch) |
 | `watch` | Dashboards beobachten und melden |
 
-Die Lizenz wird beim Start und vor jeder lizenzpflichtigen Ausführung serverseitig geprüft; ohne `actions` kennt das Modell die Aktionssyntax gar nicht. Lizenzformat, Aktivierung und Lease: [enterprise.md](enterprise.md).
+Die Lizenz wird beim Start und vor jeder lizenzpflichtigen Ausführung serverseitig geprüft; ohne `actions` kennt das Modell die Aktionssyntax gar nicht. Lizenz und Aktivierung: [enterprise.md](enterprise.md#lizenzschlüssel).
 
 ## 6. Weitere Clients (Enterprise)
 

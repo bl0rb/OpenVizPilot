@@ -110,8 +110,9 @@ app:
   # ... oder als Klartext (nur Dev/CI; siehe authToken oben).
   adminToken: ""
   # Schlüssel (>= 32 Zeichen, z. B. `openssl rand -hex 32`), mit dem im Admin-UI
-  # eingetragene Tableau-Connected-App-Secrets verschlüsselt in der DB liegen
-  # (AES-256-GCM). Ohne ihn bleibt nur die Env-Referenz (tableau.secretRefs).
+  # eingetragene Tableau-Connected-App-Secrets und ein überschriebener API-Key
+  # des LLM-Endpunkts verschlüsselt in der DB liegen (AES-256-GCM). Ohne ihn
+  # bleibt nur die Env-Referenz (tableau.secretRefs bzw. llm.apiKeySecret).
   secretKeySecret:
     existingSecret: ""
     key: OVP_SECRET_KEY

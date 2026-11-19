@@ -1,6 +1,7 @@
 import type { AuthSettings, DashboardRegistration, RegisteredDashboard, DashboardPlaybook, Metric, ModelOption, SlashCommand } from '@openvizpilot/shared';
 import { createHash } from 'node:crypto';
 import type { AppConfig } from '../env';
+import type { LlmEndpointSettings } from '../llm/endpoint';
 import type { Logger } from '../logger';
 import {
   createPgAuthRelayStore,
@@ -222,6 +223,9 @@ export interface MemoryStore {
   // --- Admin-Einstellungen: Anmeldung/OIDC/Lizenz (überschreiben Env) ---
   getAuthSettings(): Promise<AuthSettings | null>;
   setAuthSettings(settings: AuthSettings | null): Promise<void>;
+  // --- Admin-Einstellung: LLM-Endpunkt (überschreibt OVP_LLM_*, llm/endpoint.ts) ---
+  getLlmEndpointSettings(): Promise<LlmEndpointSettings | null>;
+  setLlmEndpointSettings(settings: LlmEndpointSettings | null): Promise<void>;
   /**
    * Schließt die Datenbankverbindung. ACHTUNG: Sie wird mit dem
    * Personalisierungs-Store der Enterprise-Edition geteilt — im laufenden

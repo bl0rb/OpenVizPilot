@@ -11,6 +11,7 @@ import {
   type SlashCommand,
 } from '@openvizpilot/shared';
 import { Pool } from 'pg';
+import { llmEndpointSettingsSchema, type LlmEndpointSettings } from '../llm/endpoint';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
 import { usageIncrement, userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
@@ -722,6 +723,32 @@ export function createPgMemoryStore(pool: PgPoolLike, logger: Logger): MemorySto
       }
       await pool.query(
         `INSERT INTO admin_settings (id, settings, updated_at) VALUES (1, $1, now())
+         ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = now()`,
+        [JSON.stringify(settings)],
+      );
+    },
+
+    async getLlmEndpointSettings(): Promise<LlmEndpointSettings | null> {
+      await ensureSchema();
+      const result = await pool.query('SELECT settings FROM admin_settings WHERE id = 2');
+      const row = result.rows[0] as { settings: string } | undefined;
+      if (!row) return null;
+      try {
+        const parsed = llmEndpointSettingsSchema.safeParse(JSON.parse(row.settings));
+        return parsed.success ? parsed.data : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setLlmEndpointSettings(settings: LlmEndpointSettings | null): Promise<void> {
+      await ensureSchema();
+      if (settings === null) {
+        await pool.query('DELETE FROM admin_settings WHERE id = 2');
+        return;
+      }
+      await pool.query(
+        `INSERT INTO admin_settings (id, settings, updated_at) VALUES (2, $1, now())
          ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = now()`,
         [JSON.stringify(settings)],
       );

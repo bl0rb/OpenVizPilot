@@ -720,6 +720,34 @@ export const adminPageHtml = `<!doctype html>
 
     <section class="card" id="models-admin" aria-labelledby="models-heading" hidden>
       <h2 id="models-heading" class="visually-hidden">Modelle</h2>
+      <h3 class="overview-heading">LLM-Endpunkt</h3>
+      <p class="hint">Der OpenAI-kompatible Endpunkt, an den alle Chats gehen. Hier gespeicherte Werte überschreiben <code>OVP_LLM_BASE_URL</code> und <code>OVP_LLM_API_KEY</code> für alle Anwender; „Auf Env zurücksetzen“ löscht sie wieder.</p>
+      <p id="llm-banner" class="banner"></p>
+      <dl class="kv-list" id="llm-config" aria-live="polite">
+        <div><dt>Wirksame Adresse</dt><dd id="llm-base-url">–</dd></div>
+        <div><dt>Quelle</dt><dd id="llm-source">–</dd></div>
+        <div><dt>API-Key</dt><dd id="llm-key">–</dd></div>
+        <div><dt>Standardmodell</dt><dd id="llm-default-model">–</dd></div>
+        <div><dt>Zeitlimit je Aufruf</dt><dd id="llm-timeout">–</dd></div>
+        <div><dt>Env-Default (<code>OVP_LLM_BASE_URL</code>)</dt><dd id="llm-env">–</dd></div>
+      </dl>
+      <dl class="kv-list" id="llm-test-result" aria-live="polite" hidden></dl>
+      <div class="form-grid">
+        <label class="has-help"><span class="help-term">Adresse (Base URL)</span><span role="tooltip" id="help-llm-url" class="help-tip">Basis-URL inklusive Versionspfad, z. B. <code>https://litellm.example.com/v1</code> — die Middleware hängt <code>/models</code> und <code>/chat/completions</code> an.</span>
+          <input type="url" id="llm-form-url" autocomplete="off" spellcheck="false" aria-describedby="help-llm-url" />
+        </label>
+        <label class="has-help"><span class="help-term">API-Key</span><span role="tooltip" id="help-llm-key" class="help-tip">Bleibt serverseitig und wird mit <code>OVP_SECRET_KEY</code> verschlüsselt gespeichert. Leer lassen behält den gespeicherten Key — nur bei unveränderter Adresse; ein vorhandener Key wird nie an eine andere Adresse geschickt.</span>
+          <input type="password" id="llm-form-key" autocomplete="new-password" placeholder="unverändert lassen" aria-describedby="help-llm-key" />
+        </label>
+      </div>
+      <p id="llm-form-hint" class="hint"></p>
+      <div class="form-actions">
+        <button type="button" id="llm-test">Verbindung testen</button>
+        <button type="button" class="primary" id="llm-save">Überschreibung speichern</button>
+        <button type="button" class="danger" id="llm-reset" hidden>Auf Env zurücksetzen</button>
+      </div>
+
+      <h3 class="overview-heading">Modellauswahl</h3>
       <p class="hint">Welche Modelle die Extension im Auswahlmenü anbietet — mit sprechendem Anzeigenamen statt der technischen Modell-ID.</p>
       <p id="models-source" class="hint"></p>
       <p id="models-banner" class="banner"></p>
@@ -1189,6 +1217,7 @@ export const adminPageHtml = `<!doctype html>
     loadCommands();
     loadPlaybooks();
     loadMetrics();
+    loadLlmConfig();
     loadModels();
     loadStats();
     loadWatch();
@@ -1232,7 +1261,7 @@ export const adminPageHtml = `<!doctype html>
       'license-admin': function () { loadAuth(); loadSystem(); },
       'auth-admin': loadAuth,
       'tableau-server-admin': tableau,
-      'models-admin': loadModels,
+      'models-admin': function () { loadLlmConfig(); loadModels(); },
       'users-admin': function () { loadUsers(); loadUserAccess(); },
       'mcp-admin': function () { if (typeof loadMcp === 'function' && !mcpDirty) loadMcp(); },
       'commands-admin': loadCommands,
@@ -1324,20 +1353,161 @@ export const adminPageHtml = `<!doctype html>
       .catch(function () { /* ohne Datenbank bleiben die Kennzahlen leer */ });
   }
 
-  /** Erreichbarkeit des LLM-Endpunkts: dieselbe Abfrage wie „Vom Endpunkt laden“ unter Modelle. */
+  /** Erreichbarkeit des LLM-Endpunkts: dieselbe Abfrage wie „Vom Endpunkt laden“ — mit Adresse, Quelle und Ursache. */
   function loadLlmEndpoint() {
-    return adminFetch('/upstream-models')
+    return adminFetch('/llm-endpoint/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
       .then(function (result) {
-        if (!result.ok) { overviewSet('llm', 'error', 'Nicht erreichbar — Adresse und API-Key des LLM-Endpunkts prüfen.'); return; }
-        var count = (result.data.models || []).length;
-        overviewSet('llm', 'ok', 'Erreichbar · ' + (count === 1 ? '1 Modell' : count + ' Modelle') + ' gemeldet');
+        var d = result.data || {};
+        if (!result.ok) { overviewSet('llm', 'error', d.error || 'Prüfung fehlgeschlagen.'); return; }
+        var where = llmHost(d.baseUrl) + ' (' + llmSourceLabel(d.source) + ')';
+        if (d.blockedReason) { overviewSet('llm', 'error', d.blockedReason); return; }
+        if (!d.ok) { overviewSet('llm', 'error', where + ': ' + llmErrorText(d)); return; }
+        var models = d.modelCount === 1 ? '1 Modell' : d.modelCount + ' Modelle';
+        var text = 'Erreichbar · ' + where + ' · ' + models + ' · ' + d.latencyMs + ' ms';
+        if (d.defaultModelListed === false) overviewSet('llm', 'warn', text + ' — Standardmodell „' + d.defaultModel + '“ wird nicht gemeldet.');
+        else overviewSet('llm', 'ok', text);
       })
       .catch(function (error) {
         if (error && error.message === 'unauthorized') return;
-        overviewSet('llm', 'error', 'Nicht erreichbar — Adresse und API-Key des LLM-Endpunkts prüfen.');
+        overviewSet('llm', 'error', 'Prüfung fehlgeschlagen.');
       });
   }
+
+  function llmHost(url) { try { return new URL(url).host; } catch (e) { return url || '–'; } }
+  function llmSourceLabel(source) { return source === 'admin' ? 'Admin-UI' : source === 'form' ? 'Formular' : 'Env'; }
+  function llmErrorText(d) {
+    var e = d.error || {};
+    return (e.message || 'Fehler') + (e.code ? ' [' + e.code + ']' : '') + (d.status ? ' (HTTP ' + d.status + ')' : '');
+  }
+
+  // ---------- LLM-Endpunkt (Bereich Modelle) ----------
+
+  var llmBanner = document.getElementById('llm-banner');
+  var llmFormUrl = document.getElementById('llm-form-url');
+  var llmFormKey = document.getElementById('llm-form-key');
+  var llmState = null;
+
+  function llmText(id, text) { document.getElementById(id).textContent = text; }
+
+  function loadLlmConfig() {
+    return adminFetch('/llm-endpoint')
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(llmBanner, result.data.error || 'LLM-Einstellungen konnten nicht geladen werden.', 'error'); return; }
+        var d = result.data;
+        llmState = d;
+        var eff = d.effective;
+        llmText('llm-base-url', eff.baseUrl);
+        llmText('llm-source', eff.source === 'admin'
+          ? 'Admin-UI' + (eff.updatedAt ? ' (gespeichert ' + new Date(eff.updatedAt).toLocaleString('de-DE') + ')' : '')
+          : 'Env (OVP_LLM_BASE_URL, OVP_LLM_API_KEY)');
+        llmText('llm-key', eff.apiKeyHint ? 'gesetzt, endet auf ' + eff.apiKeyHint : (eff.blockedReason ? 'nicht lesbar' : 'gesetzt'));
+        llmText('llm-default-model', d.defaultModel + (d.modelAllowlist ? ' · Allowlist: ' + d.modelAllowlist.join(', ') : ''));
+        llmText('llm-timeout', Math.round(d.timeoutMs / 1000) + ' s, ' + (d.maxRetries === 0 ? 'keine automatische Wiederholung' : d.maxRetries + ' Wiederholungen'));
+        llmText('llm-env', d.env.baseUrl + (d.env.apiKeyHint ? ' · Key endet auf ' + d.env.apiKeyHint : ''));
+        if (eff.blockedReason) showBanner(llmBanner, eff.blockedReason, 'error');
+        else showBanner(llmBanner, '', 'info');
+        if (document.activeElement !== llmFormUrl) llmFormUrl.value = eff.baseUrl;
+        llmFormKey.value = '';
+        document.getElementById('llm-reset').hidden = !d.stored;
+        // Ein früheres Testergebnis kann zu einem anderen Endpunkt gehören.
+        document.getElementById('llm-test-result').hidden = true;
+        var canSave = d.canOverride && d.secretKeyConfigured;
+        document.getElementById('llm-save').disabled = !canSave;
+        llmText('llm-form-hint', !d.canOverride
+          ? 'Überschreiben braucht eine Datenbank (OVP_DATABASE_URL) — testen ist trotzdem möglich.'
+          : !d.secretKeyConfigured
+            ? 'OVP_SECRET_KEY setzen, um einen API-Key verschlüsselt zu speichern — testen ist trotzdem möglich.'
+            : 'Vor dem Speichern testen: die Überschreibung gilt sofort für alle Chats.');
+      })
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        showBanner(llmBanner, 'LLM-Einstellungen konnten nicht geladen werden.', 'error');
+      });
+  }
+
+  function renderLlmTest(d) {
+    var list = document.getElementById('llm-test-result');
+    list.textContent = '';
+    function row(label, value) {
+      var div = document.createElement('div');
+      var dt = document.createElement('dt'); dt.textContent = label;
+      var dd = document.createElement('dd'); dd.textContent = value;
+      div.appendChild(dt); div.appendChild(dd); list.appendChild(div);
+    }
+    row('Ergebnis', d.ok ? 'Erreichbar' : llmErrorText(d));
+    row('Abgefragt', 'GET ' + d.requestUrl + ' (' + llmSourceLabel(d.source) + ')');
+    row('HTTP-Status', d.status ? String(d.status) : '–');
+    row('Antwortzeit', d.latencyMs + ' ms');
+    if (d.ok) {
+      row('Gemeldete Modelle', String(d.modelCount));
+      row('Standardmodell „' + d.defaultModel + '“', d.defaultModelListed ? 'gemeldet' : 'nicht gemeldet');
+    }
+    list.hidden = false;
+  }
+
+  /** Formularwerte nur mitsenden, wenn sie vom wirksamen Endpunkt abweichen. */
+  function llmFormBody() {
+    var body = {};
+    var url = llmFormUrl.value.trim();
+    var key = llmFormKey.value.trim();
+    if (url && (!llmState || url.replace(/\\/+$/, '') !== llmState.effective.baseUrl)) body.baseUrl = url;
+    if (key) { body.apiKey = key; body.baseUrl = url || (llmState && llmState.effective.baseUrl); }
+    return body;
+  }
+
+  document.getElementById('llm-test').addEventListener('click', function () {
+    var button = this;
+    button.disabled = true;
+    showBanner(llmBanner, 'Teste …', 'info');
+    adminFetch('/llm-endpoint/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(llmFormBody()) })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(llmBanner, result.data.error || 'Test fehlgeschlagen.', 'error'); return; }
+        renderLlmTest(result.data);
+        showBanner(llmBanner, result.data.ok ? 'Endpunkt erreichbar.' : 'Endpunkt nicht erreichbar.', result.data.ok ? 'ok' : 'error');
+      })
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        showBanner(llmBanner, 'Test fehlgeschlagen.', 'error');
+      })
+      .then(function () { button.disabled = false; });
+  });
+
+  document.getElementById('llm-save').addEventListener('click', function () {
+    var url = llmFormUrl.value.trim();
+    if (!url) { showBanner(llmBanner, 'Adresse eintragen.', 'error'); llmFormUrl.focus(); return; }
+    var body = { baseUrl: url };
+    if (llmFormKey.value.trim()) body.apiKey = llmFormKey.value.trim();
+    if (!confirm('LLM-Endpunkt für alle Chats auf ' + url + ' umstellen?')) return;
+    adminFetch('/llm-endpoint', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (result) {
+        if (!result.ok) { showBanner(llmBanner, result.data.error || 'Speichern fehlgeschlagen.', 'error'); return; }
+        return loadLlmConfig().then(function () {
+          showBanner(llmBanner, 'Gespeichert — alle Chats verwenden jetzt diesen Endpunkt.', 'ok');
+          loadLlmEndpoint();
+        });
+      })
+      .catch(function (error) {
+        if (error && error.message === 'unauthorized') return;
+        showBanner(llmBanner, 'Speichern fehlgeschlagen.', 'error');
+      });
+  });
+
+  document.getElementById('llm-reset').addEventListener('click', function () {
+    if (!confirm('Überschreibung löschen? Danach gelten wieder OVP_LLM_BASE_URL und OVP_LLM_API_KEY.')) return;
+    adminFetch('/llm-endpoint', { method: 'DELETE' })
+      .then(function (res) {
+        if (!res.ok) { showBanner(llmBanner, 'Zurücksetzen fehlgeschlagen.', 'error'); return; }
+        return loadLlmConfig().then(function () {
+          showBanner(llmBanner, 'Zurückgesetzt — es gilt wieder der Env-Endpunkt.', 'ok');
+          loadLlmEndpoint();
+        });
+      })
+      .catch(function () { /* adminFetch hat bei 401 schon reagiert */ });
+  });
 
   document.getElementById('update-check').addEventListener('click', function () {
     var button = this;

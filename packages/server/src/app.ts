@@ -35,7 +35,7 @@ import { cors } from 'hono/cors';
 import { adminPageHtml } from './admin-page';
 import { createAuthStateProvider, type AuthStateProvider } from './auth-state';
 import type { AppConfig } from './env';
-import { createLLMClient } from './llm/client';
+import { createLlmEndpointProvider } from './llm/endpoint';
 import { createLogger, type Logger } from './logger';
 import { createMemoryStore, type MemoryStore } from './memory/store';
 import { createAdminRoute } from './routes/admin';
@@ -63,9 +63,13 @@ export function createApp(config: AppConfig): {
   stopHeartbeat: () => void;
 } {
   const logger = createLogger(config.logLevel);
-  const client = createLLMClient(config);
   const backend = createMemoryStore(config, logger);
   const memoryStore = backend?.store ?? null;
+  // LLM-Endpunkt: Env-Default, in der Admin-UI überschreibbar (llm/endpoint.ts). `client`
+  // folgt dem jeweils wirksamen Endpunkt; ein Request lädt nach Ablauf des Caches neu.
+  const llmEndpoint = createLlmEndpointProvider(config, memoryStore, logger);
+  const client = llmEndpoint.client;
+  void llmEndpoint.refresh();
   // Speicher der Enterprise-Personalisierung (ee/) auf derselben Verbindung.
   const personalizationStore = backend?.personalization ?? null;
   const telemetryStore = backend?.telemetry ?? null;
@@ -266,6 +270,11 @@ export function createApp(config: AppConfig): {
   app.use(TABLEAU_MCP_PATH, requireMcpAccessToken(config.tableauMcp, mcpAccess, authLog));
   app.route('/.well-known/oauth-protected-resource', createProtectedResourceRoute(config.tableauMcp, mcpAccess));
   app.use('/api/*', requireUserAccess(memoryStore, logger));
+  // Admin-UI-Änderungen am LLM-Endpunkt auch auf anderen Replicas übernehmen (Cache 15 s).
+  app.use('/api/*', async (_c, next) => {
+    await llmEndpoint.refresh();
+    await next();
+  });
   app.route('/api/auth', createAuthRoutes({ authState, store: memoryStore, logger, tableau }));
   // Relay für den System-Browser-Login aus Tableau Desktop: nur mit Betriebsdatenbank (gemeinsam
   // über alle Replicas) und nur, solange SSO wirklich aktiv ist — dieselbe Bedingung wie für /api/*.
@@ -320,7 +329,7 @@ export function createApp(config: AppConfig): {
   app.route('/api/metrics', createMetricsRoute(memoryStore, logger));
   app.route('/api/dashboards', createDashboardsRoute(memoryStore, logger));
   app.route('/api/stats', createStatsRoute(memoryStore, logger));
-  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau, backend?.watch ?? null, refreshLease));
+  app.route('/api/admin', createAdminRoute(config, memoryStore, logger, client, authState, telemetryStore, backend?.mcp ?? null, tableau, backend?.watch ?? null, refreshLease, llmEndpoint));
 
   // Admin-UI: erreichbar mit statischem OVP_ADMIN_TOKEN ODER — für den
   // Passwort-Modus mit Ersteinrichtung — sobald ein Memory-Store existiert

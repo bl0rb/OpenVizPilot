@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import type { AppConfig } from '../env';
 
+/** Zeitlimit je LLM-Aufruf im Betrieb — in der Admin-UI angezeigt. */
+export const LLM_TIMEOUT_MS = 120_000;
+
 /**
  * OpenAI-Client gegen den LiteLLM-Proxy.
  *
@@ -8,11 +11,11 @@ import type { AppConfig } from '../env';
  * Teilübertragung Duplikate erzeugen. Die Retry-Entscheidung trifft die
  * Extension anhand des `retryable`-Flags im error-Event.
  */
-export function createLLMClient(config: AppConfig): OpenAI {
+export function createLLMClient(config: Pick<AppConfig, 'litellmBaseUrl' | 'litellmApiKey'>, timeout = LLM_TIMEOUT_MS): OpenAI {
   return new OpenAI({
     baseURL: config.litellmBaseUrl,
     apiKey: config.litellmApiKey,
-    timeout: 120_000,
+    timeout,
     maxRetries: 0,
   });
 }

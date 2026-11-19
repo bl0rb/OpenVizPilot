@@ -13,6 +13,7 @@ import {
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { llmEndpointSettingsSchema, type LlmEndpointSettings } from '../llm/endpoint';
 import type { Logger } from '../logger';
 import { generateUsageSalt } from '../usage-pseudonym';
 import { usageIncrement, userAccessId, type LocalUser, type LocalUserAuth, type MemoryStore, type UserAccess, type UserAccessGrants, type UserAccessIdentity } from './store';
@@ -603,6 +604,28 @@ export function createSqliteMemoryStore(db: SqliteDatabase, logger: Logger): Mem
       }
       db.prepare(
         `INSERT INTO admin_settings (id, settings, updated_at) VALUES (1, ?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET settings = excluded.settings, updated_at = excluded.updated_at`,
+      ).run(JSON.stringify(settings));
+    },
+
+    async getLlmEndpointSettings(): Promise<LlmEndpointSettings | null> {
+      const rows = db.prepare('SELECT settings FROM admin_settings WHERE id = 2').all() as Array<{ settings: string }>;
+      if (!rows[0]) return null;
+      try {
+        const parsed = llmEndpointSettingsSchema.safeParse(JSON.parse(rows[0].settings));
+        return parsed.success ? parsed.data : null;
+      } catch {
+        return null;
+      }
+    },
+
+    async setLlmEndpointSettings(settings: LlmEndpointSettings | null): Promise<void> {
+      if (settings === null) {
+        db.prepare('DELETE FROM admin_settings WHERE id = 2').run();
+        return;
+      }
+      db.prepare(
+        `INSERT INTO admin_settings (id, settings, updated_at) VALUES (2, ?, datetime('now'))
          ON CONFLICT(id) DO UPDATE SET settings = excluded.settings, updated_at = excluded.updated_at`,
       ).run(JSON.stringify(settings));
     },

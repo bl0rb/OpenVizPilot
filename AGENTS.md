@@ -28,7 +28,7 @@ Dokumentation nach Aufgabe auswählen, nicht vollständig laden:
 
 - [README.md](README.md): Produkt und Einstieg; [docs/architecture.md](docs/architecture.md): Datenfluss und Architekturgrenzen.
 - [docs/contributing.md](docs/contributing.md): Checklisten für Tools, Konfiguration, Enterprise-Funktionen und Texte; [docs/development.md](docs/development.md): Befehle und Export; [docs/testing.md](docs/testing.md): manuelle Integrationsprüfungen.
-- [docs/UI-SPEC.md](docs/UI-SPEC.md): Gestaltung; [docs/admin-deployment.md](docs/admin-deployment.md) und [docs/enterprise.md](docs/enterprise.md): Betrieb und Lizenzierung.
+- [docs/UI-SPEC.md](docs/UI-SPEC.md): Gestaltung; [docs/admin-deployment.md](docs/admin-deployment.md) und [docs/enterprise.md](docs/enterprise.md): Betrieb und Lizenzierung; Aktivierung, Lease und Image-Bezug in `docs/enterprise-lizenz.md` (Enterprise-only).
 - [docs/desktop.md](docs/desktop.md), [docs/tableau-server.md](docs/tableau-server.md), [docs/tableau-mcp.md](docs/tableau-mcp.md), [docs/mcp.md](docs/mcp.md), [docs/watch.md](docs/watch.md), [docs/user-approvals.md](docs/user-approvals.md): jeweilige Funktions- und Sicherheitsgrenzen.
 - Die README des betroffenen Workspace; interne Pläne, ADRs und Release-Abläufe unter `private/` nur bei Bedarf (Enterprise-only).
 
